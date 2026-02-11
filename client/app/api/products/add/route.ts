@@ -24,14 +24,13 @@ export async function POST(req: Request) {
     }
 
     const db = await getDB();
-    const result = await db.query(`INSERT INTO products (name, slug, description, price, image_url, category_id, active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    const result = await db.query(`INSERT INTO products (name, slug, description, price, category_id, active)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [
         name,
         slug,
         description ?? null,
         price,
-        image_url ?? null,
         category_id ?? null,
         active,
       ]

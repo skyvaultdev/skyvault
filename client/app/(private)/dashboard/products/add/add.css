@@ -7,10 +7,9 @@
 
 .addProductHeader {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 16px;
+  margin: 0;
 }
 
 .addProductHeader h1 {
@@ -19,28 +18,38 @@
 }
 
 .backLink {
-  color: #9ca3af;
-  text-decoration: none;
-  border: 1px solid #1f1f1f;
+   display: flex;
+   justify-content: end;
+   width: 150px;
+  border: 1px solid #2c036d85;
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 9px 12px;
+  margin-bottom: 15px;
   transition: color 0.3s ease, border-color 0.3s ease;
 }
 
+.backLink :link{
+    color: #9ca3af;
+  text-decoration: none;
+}
+
+.backLink p{
+    color: #9ca3af;
+}
+
 .backLink:hover {
-  color: #fff;
-  border-color: #60a5fa;
+  color: #ffffff;
+  border-color: #8400ff;
 }
 
 .addProductForm {
-  max-width: 900px;
-  background: #000;
+  background: #000000;
   border: 1px solid #1f1f1f;
   border-radius: 16px;
   padding: 18px;
-  display: grid;
+  display: grid ;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  height: 600px;
 }
 
 .fieldGroup,
@@ -59,7 +68,9 @@
 
 .fieldGroup input,
 .fieldGroup textarea {
-  width: 100%;
+    display: flex;
+    justify-content: center;
+  width: 90%;
   border: 1px solid #1f1f1f;
   border-radius: 12px;
   background: #000;
@@ -70,7 +81,7 @@
 .fieldGroup input:focus,
 .fieldGroup textarea:focus {
   outline: none;
-  border-color: #60a5fa;
+  border-color: #5c00d4;
 }
 
 .fieldGroup textarea {
@@ -110,7 +121,7 @@
 }
 
 .btn {
-  padding: 10px 14px;
+  padding: 0px 12px;
   border-radius: 12px;
   border: 1px solid rgb(61, 61, 61);
   background: transparent;
@@ -126,8 +137,8 @@
 }
 
 .btnGhost:hover {
-  border-color: #a78bfa;
-  color: #a78bfa;
+  border-color: #eb1e1e;
+  color: #f15353;
   transform: scale(1.03);
 }
 
@@ -150,5 +161,9 @@
   .actionsRow,
   .feedback {
     grid-column: auto;
+  }
+
+  .backLink{
+    position: relative; top: 750px;
   }
 }

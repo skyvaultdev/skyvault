@@ -1,4 +1,5 @@
 import "./dashboard.css";
+import Link from "next/link";
 
 type Product = {
   id: number;
@@ -55,7 +56,7 @@ export default function Dashboard() {
         <section className="mainArea">
           <div className="actions">
             <button className="btn btnAdd" type="button">
-              ADD PRODUTO
+              <Link href="/dashboard/products/add">ADICIONAR PRODUTO</Link>
             </button>
 
             <button className="btn btnEdit" type="button">

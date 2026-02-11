@@ -4,3 +4,151 @@
   color: #fff;
   padding: 22px;
 }
+
+.addProductHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.addProductHeader h1 {
+  font-size: clamp(24px, 4vw, 32px);
+  margin: 0;
+}
+
+.backLink {
+  color: #9ca3af;
+  text-decoration: none;
+  border: 1px solid #1f1f1f;
+  border-radius: 12px;
+  padding: 8px 12px;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.backLink:hover {
+  color: #fff;
+  border-color: #60a5fa;
+}
+
+.addProductForm {
+  max-width: 900px;
+  background: #000;
+  border: 1px solid #1f1f1f;
+  border-radius: 16px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fieldGroup,
+.checkboxGroup {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldGroup span,
+.checkboxGroup span {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.fieldGroup input,
+.fieldGroup textarea {
+  width: 100%;
+  border: 1px solid #1f1f1f;
+  border-radius: 12px;
+  background: #000;
+  color: #fff;
+  padding: 10px 12px;
+}
+
+.fieldGroup input:focus,
+.fieldGroup textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+}
+
+.fieldGroup textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.fieldGroupFull {
+  grid-column: 1 / -1;
+}
+
+.checkboxGroup {
+  flex-direction: row;
+  align-items: center;
+  align-self: end;
+}
+
+.feedback {
+  margin: 0;
+  font-size: 14px;
+  grid-column: 1 / -1;
+}
+
+.feedbackSuccess {
+  color: #4ade80;
+}
+
+.feedbackError {
+  color: #f87171;
+}
+
+.actionsRow {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgb(61, 61, 61);
+  background: transparent;
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btnGhost:hover {
+  border-color: #a78bfa;
+  color: #a78bfa;
+  transform: scale(1.03);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  border-color: #35b63b;
+  color: #35b63b;
+  transform: scale(1.03);
+}
+
+@media (max-width: 840px) {
+  .addProductPage {
+    padding: 16px;
+  }
+
+  .addProductForm {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldGroupFull,
+  .actionsRow,
+  .feedback {
+    grid-column: auto;
+  }
+}

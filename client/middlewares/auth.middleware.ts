@@ -1,8 +1,7 @@
 "use server";
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT } from "../lib/jwt/init";
-import { config } from "../config/configuration";
+import { verifyJWT } from "@/lib/jwt/init";
 import { isPrivateRoute } from "./routeMap"
 
 export async function authMiddleware(req: NextRequest) {
@@ -10,8 +9,9 @@ export async function authMiddleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const isPrivate = isPrivateRoute(pathname)
-
-  if (isPrivate) {
+  const hasAdmin = token?.role === "admin";
+  
+  if (isPrivate && !hasAdmin) {
     if (!token || !(await verifyJWT(token))) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";

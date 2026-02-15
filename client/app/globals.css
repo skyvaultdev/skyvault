@@ -12,6 +12,9 @@ body {
   position: relative;
 }
 
+h1{
+  color: white;
+}
 
 body::before {
   content: "";

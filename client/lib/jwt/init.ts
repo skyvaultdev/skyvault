@@ -1,7 +1,7 @@
 "use server";
 
 import { SignJWT, jwtVerify } from "jose";
-import { config } from "../../config/configuration";
+import { config } from "@/config/configuration";
 
 const secret = new TextEncoder().encode(config.jwt.secret);
 

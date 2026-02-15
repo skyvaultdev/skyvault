@@ -1,4 +1,4 @@
-import { config } from "../../config/configuration";
+import { config } from "@/config/configuration";
 
 export function genAuthURL(scopes: string):string {
     if (!scopes) {

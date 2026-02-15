@@ -1,6 +1,6 @@
 "use server";
 
-import { authMiddleware } from "./middlewares/auth.middleware";
+import { authMiddleware } from "@/middlewares/auth.middleware";
 import { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
@@ -8,5 +8,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|favicon.ico|api).*)"]
+  matcher: ["/dashboard:path*"]
 };

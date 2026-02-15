@@ -7,8 +7,7 @@ import "./(components)/footer/footer.css";
 import Footer from "./(components)/footer/page";
 
 import "./globals.css";
-
-import { initApp } from "./lib/database/init";
+import { initApp } from "@/lib/database/init";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +29,6 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children,}: Readonly<{children: React.ReactNode;}>) {
   await initApp();
-
   return (
     <html lang="en">
       <body

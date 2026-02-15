@@ -5,8 +5,9 @@ import Link from "next/link";
 import "./add.css";
 
 type Category = {
-  id: string;   // UUID (ou string)
+  id: string; 
   name: string;
+  slug: string;
 };
 
 type FormState = {
@@ -14,8 +15,8 @@ type FormState = {
   slug: string;
   description: string;
   price: string;
-  imageFile: File | null;   // ✅ arquivo real
-  categoryId: string;       // ✅ vai ser o id (uuid/string)
+  imageFile: File | null;
+  categoryId: string;
   active: boolean;
 };
 
@@ -45,7 +46,6 @@ export default function AddProductPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
 
-  // ✅ categorias
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categoriesError, setCategoriesError] = useState("");
@@ -63,7 +63,7 @@ export default function AddProductPage() {
           return;
         }
 
-        const data = (await res.json()) as Category[];
+        const data = (await res.json()).product as Category[];
         setCategories(Array.isArray(data) ? data : []);
       } catch {
         setCategoriesError("Erro de rede ao carregar categorias.");
@@ -110,25 +110,27 @@ export default function AddProductPage() {
       return;
     }
 
-
-    const payload = {
-      name: form.name.trim(),
-      slug: slugify(form.name.trim()),
-      description: form.description.trim() || null,
-      price: Number(form.price),
-      category_id: form.categoryId || null, 
-      active: form.active,
-    };
-
     try {
       setIsSubmitting(true);
       setHasError(false);
       setFeedback(null);
 
+      const formData = new FormData();
+
+      formData.append("name", form.name.trim());
+      formData.append("slug", slugify(form.name.trim()));
+      formData.append("description", form.description.trim());
+      formData.append("price", form.price);
+      formData.append("category_id", form.categoryId);
+      formData.append("active", String(form.active));
+
+      if (form.imageFile) {
+        formData.append("image", form.imageFile);
+      }
+
       const response = await fetch("/api/products/add", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const data = await response.json().catch(() => ({}));
@@ -139,8 +141,10 @@ export default function AddProductPage() {
 
       setFeedback("Produto cadastrado com sucesso.");
       resetForm();
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro inesperado";
+      const message =
+        error instanceof Error ? error.message : "Erro inesperado";
       setHasError(true);
       setFeedback(message);
     } finally {
@@ -154,7 +158,6 @@ export default function AddProductPage() {
         <h1>Novo produto</h1>
       </header>
 
-      {/* ✅ Coloca a classe no Link, não numa div */}
       <Link className="backLink" href="/dashboard">
         Voltar ao dashboard
       </Link>

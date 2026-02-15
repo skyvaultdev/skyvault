@@ -108,7 +108,27 @@
   flex-wrap: wrap;
 }
 
+.searchSelect {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #1f1f1f;
+  background: #000;
+  color: white;
+  min-width: 0;
+}
+
 .searchInput {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #1f1f1f;
+  background: #000;
+  color: white;
+  min-width: 0;
+}
+
+.searchSelect:focus{
   flex: 1;
   padding: 10px;
   border-radius: 12px;
@@ -178,6 +198,8 @@
   color: #fca5a5;
   transform: scale(1.07);
 }
+
+
 
 @media (max-width: 1200px) {
   .content {

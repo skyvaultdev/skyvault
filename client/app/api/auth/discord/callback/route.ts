@@ -1,10 +1,25 @@
 "use server"
 
 import { NextResponse } from "next/server";
-import { config } from "../../../../config/configuration";
-import { getDB } from "../../../../lib/database/db";
-import { signJWT, verifyJWT } from "../../../../lib/jwt/init";
+import { config } from "@/config/configuration";
+import { getDB } from "@/lib/database/db";
+import { signJWT } from "@/lib/jwt/init";
 const discord = config.discord;
+
+async function sendWebhookLog(content: any) {
+  try {
+    await fetch(discord.webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(content),
+    });
+  } catch (err) {
+    console.error("Erro ao enviar webhook:", err);
+  }
+}
+
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -28,7 +43,6 @@ export async function GET(req: Request) {
         },
         body: bodyParams,
     });
-
 
     const tokenData = await tokenRes.json();
     const userRes = await fetch("https://discord.com/api/v10/users/@me", {
@@ -69,17 +83,63 @@ export async function GET(req: Request) {
         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING`, userFormatted
     );
 
-    const email = user.email
-    const token = await signJWT({email});
-    const res = NextResponse.json({ ok: true });
-    res.cookies.set("auth_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7
-    })
+    await db.query(
+        "INSERT INTO page_views (path) VALUES ($1)",
+        ["/login"]
+    );
 
+    const email = user?.email
+    await sendWebhookLog({
+        embeds: [
+            {
+                title: "🔐 - OAUTH2",
+                color: 0x00ff99,
+                fields: [
+                    { name: "Email", value: email || null, inline: false },
+                    { name: "Usuário", value: user?.username || null, inline: false },
+                    { name: "ID", value: user?.id || null, inline: false },
+                    { name: "Horário", value: new Date().toLocaleString(), inline: false }
+                ],
+                timestamp: new Date().toISOString()
+            }
+        ]
+    });
 
-    return NextResponse.redirect(config.WEBSITE_URL);
+    const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
+    if (adminRow.rows.length > 0) {
+        const token = await signJWT({
+            email: email,
+            role: "admin",
+            permissions: ["admin"]
+        });
+
+        const res = NextResponse.redirect(config.WEBSITE_URL);
+        res.cookies.set("auth_token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/",
+            maxAge: 60 * 60 * 24 * 7
+        })
+
+        return res
+    } else {
+        const token = await signJWT({
+            email: email,
+            role: "regular_citzen",
+            permissions: []
+        });
+
+        const res = NextResponse.redirect(config.WEBSITE_URL);
+        res.cookies.set("auth_token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/",
+            maxAge: 60 * 60 * 24 * 7
+        })
+
+        return res
+    }
+
 }

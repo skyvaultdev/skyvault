@@ -3,7 +3,7 @@
 import { createTransport } from "nodemailer";
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { getDB } from "../../../lib/database/db";
+import { getDB } from "@/lib/database/db";
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();

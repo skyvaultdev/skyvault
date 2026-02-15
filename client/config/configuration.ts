@@ -18,6 +18,7 @@ export const config = {
         clientId: process.env.DISCORD_CLIENT_ID!,
         clientToken: process.env.DISCORD_CLIENT_TOKEN!,
         clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+        webhookUrl: process.env.WEBHOOK_URL!,
         scopes: process.env.DISCORD_SCOPES!,
     },
 };

@@ -13,9 +13,9 @@ export default function Header() {
 
     async function checarLogin() {
       try {
-        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        const res = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
         const data = await res.json();
-        if (!cancelado) setIsLogged(!!data.logged);
+        if (!cancelado) setIsLogged(Boolean(data.logged));
       } catch {
         if (!cancelado) setIsLogged(false);
       }

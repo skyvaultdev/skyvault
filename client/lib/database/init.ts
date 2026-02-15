@@ -2,7 +2,7 @@
 
 import { Pool } from "pg";
 import { log } from "../logger";
-import { config } from "../../config/configuration";
+import { config } from "@/config/configuration";
 
 declare global {
   var pgPool: Pool | undefined;

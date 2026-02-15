@@ -1,52 +1,38 @@
 "use server";
 
 import { NextResponse } from "next/server";
-import { getDB } from "../../../lib/database/db";
+import { getDB } from "@/lib/database/db";
 
 export async function GET(req: Request) {
-    try {
-        const seatchParams = new URL(req.url)
-        const name = searchParams.get("name");
-        const db = await getDB();
-        if (name) {
-            const result = await db.query(`
-                SELECT id, name, slug, price, description, image_url, category_id FROM products LIMIT 1`, [name]
-            );
+  try {
+    const { searchParams } = new URL(req.url);
+    const name = searchParams.get("name");
 
-            if (result.rows.length === 0) {
-                return NextResponse.json(
-                    { ok: false, error: "NOT_FOUND" },
-                    { status: 404 }
-                );
-            }
+    const db = await getDB();
 
-            return NextResponse.json({
-                ok: true,
-                product: result.rows[0],
-            });
-        } else {
-            const result = await db.query(`
-                SELECT id, name, slug, price, description, image_url, category_id FROM products`,
-            );
+    if (name && name.trim().length > 0) {
+      const prefix = name.trim().slice(0, 3);
+      const result = await db.query(`SELECT id,name,slug FROM products WHERE name ILIKE $1 ORDER BY name ASC LIMIT 10`,
+        [`${prefix}%`]
+      );
 
-            if (result.rows.length === 0) {
-                return NextResponse.json(
-                    { ok: false, error: "NOT_FOUND" },
-                    { status: 404 }
-                );
-            }
-
-            return NextResponse.json({
-                ok: true,
-                product: result.rows,
-            });
-        }
-    } catch {
-        console.error(err);
-        return NextResponse.json(
-            { ok: false, error: "INTERNAL_ERROR" },
-            { status: 500 }
-        );
+      return NextResponse.json({
+        ok: true,
+        product: result.rows,
+      });
     }
 
+    const result = await db.query(`SELECT * FROM products ORDER BY created_at LIMIT 50`);
+    return NextResponse.json({
+      ok: true,
+      product: result.rows,
+    });
+
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json(
+      { ok: false, error: "INTERNAL_ERROR" },
+      { status: 500 }
+    );
+  }
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDB } from "../../lib/database/db";
+import { getDB } from "@/lib/database/db";
 
 export async function GET(req: Request) {
     const url = new URL(req.url);
@@ -10,11 +10,11 @@ export async function GET(req: Request) {
     const db = getDB();
 
     if (!id) {
-        const { rows } = await db.query(`SELECT id, name FROM categories WHERE id = $1 LIMIT 1`, [id]);
-        return NextResponse.json(rows);
+        const { rows } = await db.query(`SELECT id,name,slug FROM categories ORDER BY name ASC`);
+        return NextResponse.json({ ok: true, product: rows });
     } else {
-        const { rows } = await db.query(`SELECT id, name FROM categories ORDER BY name ASC`);
+        const { rows } = await db.query(`SELECT * FROM categories ORDER BY name ASC WHERE id = $1`, [id]);
         if(rows.length === 0) return NextResponse.json({error: "NO_RESULTS", ok: false });
-        return NextResponse.json(rows);
+        return NextResponse.json({ ok: true, product: rows });
     }
 }

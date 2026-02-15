@@ -3,7 +3,7 @@
 import "./login.css";
 import "./modal.css";
 import { FaDiscord } from "react-icons/fa";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -14,6 +14,18 @@ export default function Login() {
 
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setCooldown((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [cooldown]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,6 +46,7 @@ export default function Login() {
         setMsg("Código enviado para seu email");
         setCode("");
         setIsModalOpen(true);
+        setCooldown(60);
       } else {
         setMsg(data.error || "Erro ao enviar email");
       }
@@ -47,6 +60,35 @@ export default function Login() {
   function closeModal() {
     setIsModalOpen(false);
     setCode("");
+  }
+
+  async function resendEmail() {
+    if (cooldown > 0) return;
+
+    setIsSending(true);
+    setMsg("Enviando email...");
+
+    try {
+      const res = await fetch("/api/auth/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMsg("Código reenviado para seu email");
+        setCode("");
+        setCooldown(60);
+      } else {
+        setMsg(data.error || "Erro ao enviar email");
+      }
+    } catch {
+      setMsg("Erro de rede. Tente novamente.");
+    } finally {
+      setIsSending(false);
+    }
   }
 
   async function handleVerifyCode() {
@@ -103,7 +145,9 @@ export default function Login() {
             </button>
           </div>
         </form>
+
         <p>OU</p>
+
         <div className="discord">
           <button
             type="button"
@@ -137,8 +181,23 @@ export default function Login() {
             />
 
             <div className="modalActions">
-              <button type="button" onClick={closeModal} className="modalCancel">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="modalCancel"
+              >
                 Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={resendEmail}
+                disabled={cooldown > 0 || isSending}
+                className="modalResend"
+              >
+                {cooldown > 0
+                  ? `Reenviar em ${cooldown}s`
+                  : "Reenviar Email"}
               </button>
 
               <button

@@ -2,9 +2,10 @@
 
 import "./dashboard.css";
 import "./modal.css";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Sidebar, { type DashboardTab } from "./components/Sidebar";
+import DashboardTabs from "./components/DashboardTabs";
 
 type TypeKey = "products" | "categories" | "coupon";
 
@@ -12,6 +13,7 @@ type Item = {
   id: number;
   name: string;
   slug?: string;
+  position?: number | null;
 };
 
 type Stats = {
@@ -20,21 +22,31 @@ type Stats = {
   arrecadados: number;
 };
 
+type StoreSettings = {
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundType: "lines" | "dots";
+  backgroundImageUrl: string;
+  backgroundCss: string;
+};
+
+type Admin = {
+  id: number;
+  email: string;
+};
+
 export default function Dashboard() {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState<TypeKey>("products");
+  const [selectedTab, setSelectedTab] = useState<DashboardTab>("inicio");
 
   const [items, setItems] = useState<Item[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [itemsError, setItemsError] = useState("");
 
-  const [stats, setStats] = useState<Stats>({
-    acessos: 0,
-    vendidos: 0,
-    arrecadados: 0,
-  });
+  const [stats, setStats] = useState<Stats>({ acessos: 0, vendidos: 0, arrecadados: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState("");
 
@@ -42,13 +54,26 @@ export default function Dashboard() {
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    primaryColor: "#b700ff",
+    secondaryColor: "#6400ff",
+    backgroundType: "lines",
+    backgroundImageUrl: "",
+    backgroundCss: "",
+  });
+  const [colorTarget, setColorTarget] = useState<"primary" | "secondary">("primary");
+  const [selectedColor, setSelectedColor] = useState("#b700ff");
+  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
+
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [orderedProducts, setOrderedProducts] = useState<Item[]>([]);
+  const [draggedProductId, setDraggedProductId] = useState<number | null>(null);
+
   async function loadStats() {
     try {
       setLoadingStats(true);
       setStatsError("");
-
       const res = await fetch("/api/stats", { method: "GET" });
-
       if (!res.ok) {
         setStatsError("Falha ao carregar estatísticas.");
         setStats({ acessos: 0, vendidos: 0, arrecadados: 0 });
@@ -56,7 +81,6 @@ export default function Dashboard() {
       }
 
       const data = (await res.json()) as Partial<Stats>;
-
       setStats({
         acessos: Number(data.acessos) || 0,
         vendidos: Number(data.vendidos) || 0,
@@ -64,23 +88,20 @@ export default function Dashboard() {
       });
     } catch {
       setStatsError("Erro de rede ao carregar estatísticas.");
-      setStats({ acessos: 0, vendidos: 0, arrecadados: 0 });
     } finally {
       setLoadingStats(false);
     }
   }
 
-  async function loadItems(query?: string) {
+  const loadItems = useCallback(async (query?: string) => {
     try {
       setLoadingItems(true);
       setItemsError("");
-
       const url = query?.trim()
         ? `/api/${type}?name=${encodeURIComponent(query.trim())}`
         : `/api/${type}`;
 
       const res = await fetch(url, { method: "GET" });
-
       if (!res.ok) {
         setItemsError("Falha ao carregar dados.");
         setItems([]);
@@ -88,30 +109,64 @@ export default function Dashboard() {
       }
 
       const json = await res.json();
-
       const data = (json.product ?? json.products ?? json.items ?? json.data) as Item[];
-
-      setItems(Array.isArray(data) ? data : []);
+      const loadedItems = Array.isArray(data) ? data : [];
+      setItems(loadedItems);
+      if (type === "products" && !query?.trim()) {
+        setOrderedProducts(loadedItems);
+      }
     } catch {
       setItemsError("Erro de rede.");
       setItems([]);
     } finally {
       setLoadingItems(false);
     }
+  }, [type]);
+
+  const loadStoreSettings = useCallback(async () => {
+    const response = await fetch("/api/store-settings", { cache: "no-store" });
+    if (!response.ok) return;
+
+    const data = (await response.json()) as Partial<StoreSettings>;
+    const nextSettings: StoreSettings = {
+      primaryColor: data.primaryColor ?? "#b700ff",
+      secondaryColor: data.secondaryColor ?? "#6400ff",
+      backgroundType: data.backgroundType ?? "lines",
+      backgroundImageUrl: data.backgroundImageUrl ?? "",
+      backgroundCss: data.backgroundCss ?? "",
+    };
+
+    setStoreSettings(nextSettings);
+    setSelectedColor(colorTarget === "primary" ? nextSettings.primaryColor : nextSettings.secondaryColor);
+    document.documentElement.style.setProperty("--primary", nextSettings.primaryColor);
+    document.documentElement.style.setProperty("--secondary", nextSettings.secondaryColor);
+  }, [colorTarget]);
+
+  async function loadAdmins() {
+    const response = await fetch("/api/admins", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = (await response.json()) as { admins?: Admin[] };
+    setAdmins(data.admins ?? []);
   }
 
   useEffect(() => {
-    loadItems();
-    loadStats();
-  }, []);
+    void loadItems();
+    void loadStats();
+    void loadStoreSettings();
+    void loadAdmins();
+  }, [loadItems, loadStoreSettings]);
 
   useEffect(() => {
     const delay = setTimeout(() => {
-      loadItems(search);
+      void loadItems(search);
     }, 400);
 
     return () => clearTimeout(delay);
-  }, [search, type]);
+  }, [search, type, loadItems]);
+
+  useEffect(() => {
+    setSelectedColor(colorTarget === "primary" ? storeSettings.primaryColor : storeSettings.secondaryColor);
+  }, [colorTarget, storeSettings.primaryColor, storeSettings.secondaryColor]);
 
   function handleEdit(slugOrId: string | number | undefined) {
     if (!slugOrId) return;
@@ -131,20 +186,14 @@ export default function Dashboard() {
 
   async function confirmDelete() {
     if (!itemToDelete) return;
-
     try {
       setIsDeleting(true);
-
-      const res = await fetch(`/api/${type}/remove/${itemToDelete}`, {
-        method: "DELETE",
-      });
-
+      const res = await fetch(`/api/${type}/remove/${itemToDelete}`, { method: "DELETE" });
       if (res.ok) {
         closeDeleteModal();
-        loadItems(search);
+        void loadItems(search);
       } else {
-        const msg = await res.text().catch(() => "");
-        alert(msg || "Erro ao deletar.");
+        alert("Erro ao deletar.");
       }
     } catch {
       alert("Erro de rede.");
@@ -153,73 +202,121 @@ export default function Dashboard() {
     }
   }
 
-  const addButtonLabel =
-    type === "products"
-      ? "ADICIONAR PRODUTO"
-      : type === "categories"
-      ? "ADICIONAR CATEGORIA"
-      : "ADICIONAR CUPOM";
+  async function saveColors() {
+    const payload = {
+      primaryColor: colorTarget === "primary" ? selectedColor : storeSettings.primaryColor,
+      secondaryColor: colorTarget === "secondary" ? selectedColor : storeSettings.secondaryColor,
+    };
 
-  const addButtonLink = `/dashboard/${type}/add`;
+    const response = await fetch("/api/store-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-  const deleteLabel =
-    type === "products"
-      ? "produto"
-      : type === "categories"
-      ? "categoria"
-      : "cupom";
+    if (response.ok) {
+      await loadStoreSettings();
+    }
+  }
+
+  async function saveBackground() {
+    const formData = new FormData();
+    formData.append("backgroundType", storeSettings.backgroundType);
+    formData.append("backgroundCss", storeSettings.backgroundCss);
+    if (backgroundImageFile) {
+      formData.append("backgroundImage", backgroundImageFile);
+    }
+
+    const response = await fetch("/api/store-settings", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      await loadStoreSettings();
+      setBackgroundImageFile(null);
+    }
+  }
+
+  function moveDraggedProduct(targetId: number) {
+    if (draggedProductId === null || draggedProductId === targetId) return;
+
+    const current = [...orderedProducts];
+    const draggedIndex = current.findIndex((product) => product.id === draggedProductId);
+    const targetIndex = current.findIndex((product) => product.id === targetId);
+    if (draggedIndex < 0 || targetIndex < 0) return;
+
+    const [draggedItem] = current.splice(draggedIndex, 1);
+    current.splice(targetIndex, 0, draggedItem);
+    setOrderedProducts(current);
+  }
+
+  async function savePositions() {
+    const payload = orderedProducts.map((product, index) => ({ id: product.id, position: index + 1 }));
+    const response = await fetch("/api/products/order", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      await loadItems();
+    }
+  }
+
+  const deleteLabel = type === "products" ? "produto" : type === "categories" ? "categoria" : "cupom";
+
+  const previewProducts = useMemo(() => orderedProducts.length > 0 ? orderedProducts : items, [items, orderedProducts]);
 
   return (
     <div className="app">
       <header className="topbar">
         {loadingStats && <div>Carregando estatísticas...</div>}
         {statsError && <div>{statsError}</div>}
-
         <div className="stats">
-          <div className="statCard">
-            <div className="statValue">
-              {stats.acessos.toLocaleString("pt-BR")}
-            </div>
-            <div className="statLabel">
-              ACESSOS
-              <br />
-              REGISTRADOS
-            </div>
-          </div>
-
-          <div className="statCard">
-            <div className="statValue">
-              {stats.vendidos.toLocaleString("pt-BR")}
-            </div>
-            <div className="statLabel">
-              PRODUTOS
-              <br />
-              VENDIDOS
-            </div>
-          </div>
-
-          <div className="statCard">
-            <div className="statValue">
-              R$ {stats.arrecadados.toLocaleString("pt-BR")}
-            </div>
-            <div className="statLabel">ARRECADADOS</div>
-          </div>
+          <div className="statCard"><div className="statValue">{stats.acessos.toLocaleString("pt-BR")}</div><div className="statLabel">ACESSOS<br />REGISTRADOS</div></div>
+          <div className="statCard"><div className="statValue">{stats.vendidos.toLocaleString("pt-BR")}</div><div className="statLabel">PRODUTOS<br />VENDIDOS</div></div>
+          <div className="statCard"><div className="statValue">R$ {stats.arrecadados.toLocaleString("pt-BR")}</div><div className="statLabel">ARRECADADOS</div></div>
         </div>
       </header>
 
       <main className="content">
         <section className="mainArea">
-          <div className="actions">
-            <Link href={addButtonLink}>
-              <button className="btn btnAdd" type="button">
-                {addButtonLabel}
-              </button>
-            </Link>
+          <div className="dashboardBuilder">
+            <Sidebar selectedTab={selectedTab} onSelect={setSelectedTab} />
+            <DashboardTabs
+              selectedTab={selectedTab}
+              previewProducts={previewProducts}
+              colorTarget={colorTarget}
+              selectedColor={selectedColor}
+              onChangeColorTarget={setColorTarget}
+              onChangeSelectedColor={setSelectedColor}
+              onSaveColors={saveColors}
+              storeSettings={storeSettings}
+              onBackgroundTypeChange={(backgroundType) => setStoreSettings((prev) => ({ ...prev, backgroundType }))}
+              onBackgroundCssChange={(backgroundCss) => setStoreSettings((prev) => ({ ...prev, backgroundCss }))}
+              onBackgroundImageChange={setBackgroundImageFile}
+              onSaveBackground={saveBackground}
+              orderedProducts={orderedProducts}
+              onDragStart={setDraggedProductId}
+              onDrop={moveDraggedProduct}
+              onSavePositions={savePositions}
+              admins={admins}
+            />
           </div>
         </section>
 
         <aside className="sidebar">
           <div className="searchRow">
+            <button
+              className="iconBtn iconAdd"
+              type="button"
+              aria-label="Adicionar produto"
+              onClick={() => router.push("/dashboard/products/add")}
+            >
+              +
+            </button>
+
             <input
               className="searchInput"
               type="text"
@@ -228,11 +325,7 @@ export default function Dashboard() {
               onChange={(e) => setSearch(e.target.value)}
             />
 
-            <select
-              className="searchSelect"
-              value={type}
-              onChange={(e) => setType(e.target.value as TypeKey)}
-            >
+            <select className="searchSelect" value={type} onChange={(e) => setType(e.target.value as TypeKey)}>
               <option value="products">Produtos</option>
               <option value="categories">Categorias</option>
               <option value="coupon">Cupons</option>
@@ -242,31 +335,15 @@ export default function Dashboard() {
           <div className="productList">
             {loadingItems && <div>Carregando...</div>}
             {itemsError && <div>{itemsError}</div>}
-            {!loadingItems && items.length === 0 && (
-              <div>Nenhum resultado encontrado</div>
-            )}
+            {!loadingItems && items.length === 0 && <div>Nenhum resultado encontrado</div>}
 
             {!loadingItems &&
               items.map((item) => (
                 <div className="productItem" key={item.id}>
                   <a className="productName">{item.name}</a>
-
                   <div className="productActions">
-                    <button
-                      className="iconBtn iconEdit"
-                      type="button"
-                      onClick={() => handleEdit(item.slug ?? item.id)}
-                    >
-                      ✎
-                    </button>
-
-                    <button
-                      className="iconBtn iconRemove"
-                      type="button"
-                      onClick={() => openDeleteModal(item.id)}
-                    >
-                      ✕
-                    </button>
+                    <button className="iconBtn iconEdit" type="button" onClick={() => handleEdit(item.slug ?? item.id)} aria-label={`Editar ${item.name}`}>✎</button>
+                    <button className="iconBtn iconRemove" type="button" onClick={() => openDeleteModal(item.id)} aria-label={`Remover ${item.name}`}>✕</button>
                   </div>
                 </div>
               ))}
@@ -276,33 +353,12 @@ export default function Dashboard() {
 
       {isDeleteOpen && (
         <div className="modalOverlay" onClick={closeDeleteModal}>
-          <div
-            className="modalBox"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
+          <div className="modalBox" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <h3>Confirmar exclusão</h3>
             <p>Tem certeza que deseja deletar este {deleteLabel}?</p>
-
             <div className="modalActions">
-              <button
-                className="btnCancel"
-                type="button"
-                onClick={closeDeleteModal}
-                disabled={isDeleting}
-              >
-                Cancelar
-              </button>
-
-              <button
-                className="btnConfirm"
-                type="button"
-                onClick={confirmDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deletando..." : "Confirmar"}
-              </button>
+              <button className="btnCancel" type="button" onClick={closeDeleteModal} disabled={isDeleting}>Cancelar</button>
+              <button className="btnConfirm" type="button" onClick={() => void confirmDelete()} disabled={isDeleting}>{isDeleting ? "Deletando..." : "Confirmar"}</button>
             </div>
           </div>
         </div>

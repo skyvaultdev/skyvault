@@ -136,9 +136,10 @@
 
     }
 
-   .navcenter input::placeholder {
-       padding: 0 30px;
-   } 
+    .navcenter input::placeholder {
+        padding: 0 30px;
+    }
+
     .lateral span,
     span,
     span {
@@ -149,55 +150,56 @@
         background-color: white;
         border-radius: 2px;
     }
-.menumob {
-  position: absolute;
-  top: 70px;
-  left: 0px;
-  width: 80px;
-  height: 100px;
-  background-color: rgba(0, 0, 0, 0.85);
-  border: 1px solid rgba(183, 0, 255, 0.7);
-  border-radius: 10px;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
-  padding: 10px;
-  z-index: 999;
-}
 
-.menumob ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
+    .menumob {
+        position: absolute;
+        top: 70px;
+        left: 0px;
+        width: 80px;
+        height: 100px;
+        background-color: rgba(0, 0, 0, 0.85);
+        border: 1px solid rgba(183, 0, 255, 0.7);
+        border-radius: 10px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+        padding: 10px;
+        z-index: 999;
+    }
 
-.menumob li {
-  padding: 10px;
-  border-radius: 8px;
-}
+    .menumob ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
 
-.menumob li:hover {
-  background-color: rgba(183, 0, 255, 0.25);
-}
+    .menumob li {
+        padding: 10px;
+        border-radius: 8px;
+    }
 
-.menumob a {
-  color: white;
-  text-decoration: none;
-  font-family: poppins, sans-serif;
-  font-size: 16px;
-  display: block;
-}
+    .menumob li:hover {
+        background-color: rgba(183, 0, 255, 0.25);
+    }
 
-.userBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+    .menumob a {
+        color: white;
+        text-decoration: none;
+        font-family: poppins, sans-serif;
+        font-size: 16px;
+        display: block;
+    }
 
-.userIcon {
-  font-size: 22px;
-}
+    .userBtn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .userIcon {
+        font-size: 22px;
+    }
 
 
-    
+
 
     @media (max-width: 480px) {
 
@@ -255,6 +257,6 @@
             position: absolute;
             top: 30px;
 
-            
+
         }
     }

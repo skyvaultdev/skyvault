@@ -8,6 +8,7 @@ import Footer from "./(components)/footer/page";
 
 import "./globals.css";
 import { initApp } from "@/lib/database/init";
+import StoreThemeLoader from "./components/StoreThemeLoader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default async function RootLayout({ children,}: Readonly<{children: React
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <StoreThemeLoader />
         <Header />
         {children}
         <div className="background">

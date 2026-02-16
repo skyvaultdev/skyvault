@@ -79,12 +79,13 @@ export default function Dashboard() {
         setStats({ acessos: 0, vendidos: 0, arrecadados: 0 });
         return;
       }
+      const data = (await res.json()) as { ok?: boolean; data?: Partial<Stats> };
+      const payload = data.data ?? {};
 
-      const data = (await res.json()) as Partial<Stats>;
       setStats({
-        acessos: Number(data.acessos) || 0,
-        vendidos: Number(data.vendidos) || 0,
-        arrecadados: Number(data.arrecadados) || 0,
+        acessos: Number(payload.acessos) || 0,
+        vendidos: Number(payload.vendidos) || 0,
+        arrecadados: Number(payload.arrecadados) || 0,
       });
     } catch {
       setStatsError("Erro de rede ao carregar estatísticas.");
@@ -108,8 +109,8 @@ export default function Dashboard() {
         return;
       }
 
-      const json = await res.json();
-      const data = (json.product ?? json.products ?? json.items ?? json.data) as Item[];
+      const json = (await res.json()) as { ok?: boolean; data?: Item[] };
+      const data = json.data as Item[];
       const loadedItems = Array.isArray(data) ? data : [];
       setItems(loadedItems);
       if (type === "products" && !query?.trim()) {
@@ -127,13 +128,14 @@ export default function Dashboard() {
     const response = await fetch("/api/store-settings", { cache: "no-store" });
     if (!response.ok) return;
 
-    const data = (await response.json()) as Partial<StoreSettings>;
+    const json = (await response.json()) as { ok?: boolean; data?: Record<string, unknown> };
+    const data = json.data ?? {};
     const nextSettings: StoreSettings = {
-      primaryColor: data.primaryColor ?? "#b700ff",
-      secondaryColor: data.secondaryColor ?? "#6400ff",
-      backgroundType: data.backgroundType ?? "lines",
-      backgroundImageUrl: data.backgroundImageUrl ?? "",
-      backgroundCss: data.backgroundCss ?? "",
+      primaryColor: String(data.primary_color ?? "#b700ff"),
+      secondaryColor: String(data.secondary_color ?? "#6400ff"),
+      backgroundType: (String(data.background_style ?? "lines") === "dots" ? "dots" : "lines"),
+      backgroundImageUrl: String(data.background_img_url ?? ""),
+      backgroundCss: String(data.background_css ?? ""),
     };
 
     setStoreSettings(nextSettings);
@@ -145,8 +147,8 @@ export default function Dashboard() {
   async function loadAdmins() {
     const response = await fetch("/api/admins", { cache: "no-store" });
     if (!response.ok) return;
-    const data = (await response.json()) as { admins?: Admin[] };
-    setAdmins(data.admins ?? []);
+    const data = (await response.json()) as { ok?: boolean; data?: Admin[] };
+    setAdmins(data.data ?? []);
   }
 
   useEffect(() => {
@@ -206,6 +208,7 @@ export default function Dashboard() {
     const payload = {
       primaryColor: colorTarget === "primary" ? selectedColor : storeSettings.primaryColor,
       secondaryColor: colorTarget === "secondary" ? selectedColor : storeSettings.secondaryColor,
+      backgroundStyle: storeSettings.backgroundType,
     };
 
     const response = await fetch("/api/store-settings", {
@@ -221,7 +224,7 @@ export default function Dashboard() {
 
   async function saveBackground() {
     const formData = new FormData();
-    formData.append("backgroundType", storeSettings.backgroundType);
+    formData.append("backgroundStyle", storeSettings.backgroundType);
     formData.append("backgroundCss", storeSettings.backgroundCss);
     if (backgroundImageFile) {
       formData.append("backgroundImage", backgroundImageFile);
@@ -265,7 +268,6 @@ export default function Dashboard() {
   }
 
   const deleteLabel = type === "products" ? "produto" : type === "categories" ? "categoria" : "cupom";
-
   const previewProducts = useMemo(() => orderedProducts.length > 0 ? orderedProducts : items, [items, orderedProducts]);
 
   return (

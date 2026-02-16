@@ -3,261 +3,115 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import "./add.css";
+import { slugify } from "@/lib/utils/slugify";
 
-type Category = {
-  id: string; 
-  name: string;
-  slug: string;
-};
-
+type Category = { id: number; name: string; slug: string };
 type FormState = {
   name: string;
   slug: string;
   description: string;
   price: string;
-  imageFile: File | null;
   categoryId: string;
   active: boolean;
 };
 
-const initialForm: FormState = {
-  name: "",
-  slug: "",
-  description: "",
-  price: "",
-  imageFile: null,
-  categoryId: "",
-  active: true,
-};
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export default function AddProductPage() {
-  const [form, setForm] = useState<FormState>(initialForm);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [hasError, setHasError] = useState(false);
-
+  const [form, setForm] = useState<FormState>({ name: "", slug: "", description: "", price: "", categoryId: "", active: true });
+  const [images, setImages] = useState<File[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [categoriesError, setCategoriesError] = useState("");
+  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     async function loadCategories() {
-      try {
-        setLoadingCategories(true);
-        setCategoriesError("");
-
-        const res = await fetch("/api/categories", { method: "GET" });
-
-        if (!res.ok) {
-          setCategoriesError("Falha ao carregar categorias.");
-          return;
-        }
-
-        const data = (await res.json()).product as Category[];
-        setCategories(Array.isArray(data) ? data : []);
-      } catch {
-        setCategoriesError("Erro de rede ao carregar categorias.");
-      } finally {
-        setLoadingCategories(false);
-      }
+      const response = await fetch("/api/categories");
+      const json = await response.json();
+      if (json.ok && Array.isArray(json.data)) setCategories(json.data);
     }
-
-    loadCategories();
+    void loadCategories();
   }, []);
 
-  const isFormValid = useMemo(() => {
-    const parsedPrice = Number(form.price);
+  const previews = useMemo(() => images.map((file) => URL.createObjectURL(file)), [images]);
 
-    return (
-      form.name.trim().length > 0 &&
-      Number.isFinite(parsedPrice) &&
-      parsedPrice > 0
-    );
-  }, [form.name, form.price]);
-
-  function handleNameChange(value: string) {
-    setForm((prev) => {
-      const nextSlug = prev.slug.trim().length > 0 ? prev.slug : slugify(value);
-
-      return {
-        ...prev,
-        name: value,
-        slug: nextSlug,
-      };
-    });
+  function reorderImage(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= images.length) return;
+    const next = [...images];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    setImages(next);
   }
 
-  function resetForm() {
-    setForm(initialForm);
+  function removeImage(index: number) {
+    setImages((prev) => prev.filter((_, current) => current !== index));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    const formData = new FormData();
+    formData.append("name", form.name.trim());
+    formData.append("slug", slugify(form.slug || form.name));
+    formData.append("description", form.description);
+    formData.append("price", form.price);
+    formData.append("category_id", form.categoryId);
+    formData.append("active", String(form.active));
 
-    if (!isFormValid) {
-      setHasError(true);
-      setFeedback("Preencha nome e preço corretamente.");
-      return;
-    }
+    images.forEach((file) => formData.append("images", file));
 
-    try {
-      setIsSubmitting(true);
-      setHasError(false);
-      setFeedback(null);
-
-      const formData = new FormData();
-
-      formData.append("name", form.name.trim());
-      formData.append("slug", slugify(form.name.trim()));
-      formData.append("description", form.description.trim());
-      formData.append("price", form.price);
-      formData.append("category_id", form.categoryId);
-      formData.append("active", String(form.active));
-
-      if (form.imageFile) {
-        formData.append("image", form.imageFile);
-      }
-
-      const response = await fetch("/api/products/add", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data?.error || "Não foi possível cadastrar o produto.");
-      }
-
-      setFeedback("Produto cadastrado com sucesso.");
-      resetForm();
-
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Erro inesperado";
-      setHasError(true);
-      setFeedback(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    const response = await fetch("/api/products", { method: "POST", body: formData });
+    const json = await response.json();
+    setFeedback(json.ok ? "Produto criado com sucesso." : "Erro ao criar produto.");
   }
 
   return (
-    <div className="addProductPage">
-      <header className="addProductHeader">
-        <h1>Novo produto</h1>
-      </header>
+    <main className="addProductLayout">
+      <div className="addProductMain">
+        <header className="addHeader">
+          <h1>Novo produto</h1>
+          <Link href="/dashboard">Voltar</Link>
+        </header>
 
-      <Link className="backLink" href="/dashboard">
-        Voltar ao dashboard
-      </Link>
+        <form onSubmit={handleSubmit} className="addForm">
+          <label>Nome<input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value, slug: slugify(event.target.value) }))} required /></label>
+          <label>Slug<input value={form.slug} onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))} /></label>
+          <label>Preço<input type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))} required /></label>
+          <label>Categoria
+            <select value={form.categoryId} onChange={(event) => setForm((prev) => ({ ...prev, categoryId: event.target.value }))}>
+              <option value="">Selecione</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          <label className="full">Descrição<textarea value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} rows={5} /></label>
+          <label className="full">Imagens
+            <input type="file" accept="image/*" multiple onChange={(event) => setImages(Array.from(event.target.files ?? []))} />
+          </label>
 
-      <form className="addProductForm" onSubmit={handleSubmit}>
-        <label className="fieldGroup">
-          <span>Nome do produto</span>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(event) => handleNameChange(event.target.value)}
-            placeholder="Nome do Produto"
-            required
-          />
-        </label>
-
-        <label className="fieldGroup">
-          <span>Preço</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.price}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, price: event.target.value }))
-            }
-            placeholder="Preço (EX: 99.90)"
-            required
-          />
-        </label>
-
-        <label className="fieldGroup fieldGroupFull">
-          <span>Descrição</span>
-          <textarea
-            value={form.description}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, description: event.target.value }))
-            }
-            placeholder="Descreva o produto..."
-            rows={4}
-          />
-        </label>
-
-        <label className="fieldGroup fieldGroupFull">
-          <span>Imagem</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0] ?? null;
-              setForm((prev) => ({ ...prev, imageFile: file }));
-            }}
-          />
-        </label>
-
-        <div className="fieldGroup">
-          <span>Categoria</span>
-
-          <select
-            value={form.categoryId}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                categoryId: event.target.value,
-              }))
-            }
-            disabled={loadingCategories}
-          >
-            <option value="">
-              {loadingCategories ? "Carregando..." : "Selecione uma categoria"}
-            </option>
-
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
+          <div className="thumbList full">
+            {previews.map((preview, index) => (
+              <div key={preview} className="thumbItem">
+                <img src={preview} alt={`Preview ${index + 1}`} />
+                <div>
+                  <button type="button" onClick={() => reorderImage(index, -1)}>↑</button>
+                  <button type="button" onClick={() => reorderImage(index, 1)}>↓</button>
+                  <button type="button" onClick={() => removeImage(index)}>Remover</button>
+                </div>
+              </div>
             ))}
-          </select>
+          </div>
 
-          {categoriesError ? (
-            <small className="feedback feedbackError">{categoriesError}</small>
-          ) : null}
-        </div>
+          <button type="submit">Salvar</button>
+          {feedback ? <p>{feedback}</p> : null}
+        </form>
+      </div>
 
-        {feedback ? (
-          <p className={hasError ? "feedback feedbackError" : "feedback feedbackSuccess"}>
-            {feedback}
-          </p>
-        ) : null}
-
-        <div className="actionsRow">
-          <button className="btn btnGhost" type="button" onClick={resetForm}>
-            Limpar
-          </button>
-
-          <button className="btn btnPrimary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Salvando..." : "Salvar produto"}
-          </button>
-        </div>
-      </form>
-    </div>
+      <aside className="livePreview">
+        <h2>Preview da compra</h2>
+        <img src={previews[0] || "/download.jpg"} alt={form.name || "preview"} />
+        <h3>{form.name || "Nome do produto"}</h3>
+        <p>R$ {form.price || "0,00"}</p>
+        <p>{form.description || "Descrição do produto"}</p>
+        <button type="button">Comprar agora</button>
+        <button type="button">Adicionar ao carrinho</button>
+      </aside>
+    </main>
   );
 }

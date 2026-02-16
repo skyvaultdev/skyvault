@@ -130,12 +130,10 @@ export default function ProductPage() {
     <main style={{ color: "white", padding: 24, display: "grid", gap: 24 }}>
       <section style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 320px", gap: 16 }}>
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={currentImage} alt={product.name} style={{ width: "100%", height: 380, objectFit: "cover", borderRadius: 12 }} />
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             {product.images.map((image, index) => (
               <button key={image.id} type="button" onClick={() => setSelectedImage(index)} aria-label={`Selecionar imagem ${index + 1}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={image.url} alt={`${product.name} ${index + 1}`} style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 8 }} />
               </button>
             ))}

@@ -1,49 +1,32 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
+import { fail, ok } from "@/lib/api/response";
 
-type ProductOrderPayload = {
-  id: number;
-  position: number;
-};
-
-async function ensurePositionColumn() {
-  const db = getDB();
-  await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS position INT");
-  return db;
-}
+type ProductOrderPayload = { id: number; position: number };
 
 export async function PATCH(req: Request) {
   try {
-    const db = await ensurePositionColumn();
-    const payload = (await req.json()) as ProductOrderPayload[];
+    const db = getDB();
+    await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS position INT");
 
-    if (!Array.isArray(payload)) {
-      return NextResponse.json({ error: "INVALID_PAYLOAD" }, { status: 400 });
-    }
+    const payload = (await req.json()) as ProductOrderPayload[];
+    if (!Array.isArray(payload)) return fail("INVALID_PAYLOAD", 400);
 
     await db.query("BEGIN");
-
     for (const item of payload) {
-      if (typeof item.id !== "number" || typeof item.position !== "number") {
+      if (!Number.isFinite(item.id) || !Number.isFinite(item.position)) {
         await db.query("ROLLBACK");
-        return NextResponse.json({ error: "INVALID_ITEM" }, { status: 400 });
+        return fail("INVALID_ITEM", 400);
       }
-
-      await db.query("UPDATE products SET position = $1 WHERE id = $2", [
-        item.position,
-        item.id,
-      ]);
+      await db.query("UPDATE products SET position = $1 WHERE id = $2", [item.position, item.id]);
     }
-
     await db.query("COMMIT");
 
-    return NextResponse.json({ ok: true });
+    return ok({ updated: payload.length });
   } catch (error) {
-    const db = getDB();
-    await db.query("ROLLBACK").catch(() => undefined);
     console.error(error);
-    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+    getDB().query("ROLLBACK").catch(() => undefined);
+    return fail("INTERNAL_ERROR", 500);
   }
 }

@@ -10,6 +10,7 @@ import "./globals.css";
 import { initApp } from "@/lib/database/init";
 import StoreThemeLoader from "./(components)/therme/StoreThemeLoader";
 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

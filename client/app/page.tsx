@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDB } from "@/lib/database/db";
+import "./home.css";
 
 async function getHomeData() {
   const db = getDB();
@@ -23,15 +24,15 @@ export default async function Home() {
   const { banners, products, categories } = await getHomeData();
 
   return (
-    <main style={{ color: "white", padding: "24px" }}>
+    <main className="homePage">
       {banners.length > 0 ? (
-        <section style={{ display: "grid", gap: 12 }}>
+        <section className="bannerList">
           {banners.map((banner: { id: number; title: string; subtitle: string | null; image_url: string; link: string | null }) => (
-            <Link key={banner.id} href={banner.link || "#"} style={{ textDecoration: "none", color: "white" }}>
-              <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #333", position: "relative" }}>
+            <Link key={banner.id} href={banner.link || "#"} className="bannerLink">
+              <div className="bannerCard">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={banner.image_url} alt={banner.title} style={{ width: "100%", maxHeight: 320, objectFit: "cover" }} />
-                <div style={{ position: "absolute", left: 16, bottom: 16 }}>
+                <img src={banner.image_url} alt={banner.title} className="bannerImage" />
+                <div className="bannerContent">
                   <h2>{banner.title}</h2>
                   {banner.subtitle ? <p>{banner.subtitle}</p> : null}
                 </div>
@@ -41,28 +42,28 @@ export default async function Home() {
         </section>
       ) : null}
 
-      <aside style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
-        <form action="/catalog" method="get">
-          <select name="category" defaultValue="" aria-label="Selecionar categoria" style={{ padding: 8, borderRadius: 8 }}>
+      <aside className="categoryFilterWrap">
+        <form action="/catalog" method="get" className="categoryFilterForm">
+          <select name="category" defaultValue="" aria-label="Selecionar categoria" className="homeSelect">
             <option value="">Todas categorias</option>
             {categories.map((category: { id: number; name: string; slug: string }) => (
               <option key={category.id} value={category.slug}>{category.name}</option>
             ))}
           </select>
-          <button type="submit" style={{ marginLeft: 8 }}>Filtrar</button>
+          <button type="submit" className="homeButton">Filtrar</button>
         </form>
       </aside>
 
-      <section style={{ marginTop: 20 }}>
+      <section>
         <h2>Produtos</h2>
-        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))" }}>
+        <div className="productsGrid">
           {products.map((product: { id: number; slug: string; name: string; price: number; image_url: string | null }) => (
-            <article key={product.id} style={{ border: "1px solid #333", borderRadius: 12, padding: 12, background: "#050505" }}>
+            <article key={product.id} className="productCard">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={product.image_url || "/download.jpg"} alt={product.name} style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 8 }} />
+              <img src={product.image_url || "/download.jpg"} alt={product.name} className="productThumb" />
               <h3>{product.name}</h3>
               <p>R$ {Number(product.price).toFixed(2)}</p>
-              <Link href={`/product/${product.slug}`}>Ver produto</Link>
+              <Link href={`/product/${product.slug}`} className="homeProductLink">Ver produto</Link>
             </article>
           ))}
         </div>

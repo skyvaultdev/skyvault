@@ -6,6 +6,7 @@ import Header from "./(components)/header/page";
 import "./(components)/footer/footer.css";
 import Footer from "./(components)/footer/page";
 
+
 import "./globals.css";
 import { initApp } from "@/lib/database/init";
 import StoreThemeLoader from "./(components)/therme/StoreThemeLoader";

@@ -314,7 +314,7 @@ export default function Dashboard() {
               className="iconBtn iconAdd"
               type="button"
               aria-label="Adicionar produto"
-              onClick={() => router.push("/dashboard/products/add")}
+              onClick={() => router.push(`/dashboard/${type}/add`)}
             >
               +
             </button>

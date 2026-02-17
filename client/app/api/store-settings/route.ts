@@ -8,9 +8,11 @@ import crypto from "crypto";
 
 async function ensureSchema() {
   const db = getDB();
+
+  // 1) garante a tabela (pra instalações novas)
   await db.query(`
     CREATE TABLE IF NOT EXISTS store_settings (
-      id BIGINT PRIMARY KEY,
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       primary_color TEXT NOT NULL DEFAULT '#b700ff',
       secondary_color TEXT NOT NULL DEFAULT '#6400ff',
       logo_url TEXT,
@@ -21,10 +23,20 @@ async function ensureSchema() {
     )
   `);
 
+  // 2) migração pra bancos antigos: adiciona colunas que podem não existir
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS primary_color TEXT NOT NULL DEFAULT '#b700ff'`);
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS secondary_color TEXT NOT NULL DEFAULT '#6400ff'`);
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS logo_url TEXT`);
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS background_style TEXT`);
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS background_img_url TEXT`);
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS background_css TEXT`);
+  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+  // 3) garante 1 linha (sem setar id)
   await db.query(`
-    INSERT INTO store_settings (id, primary_color, secondary_color)
-    VALUES (1, '#b700ff', '#6400ff')
-    ON CONFLICT (id) DO NOTHING
+    INSERT INTO store_settings (primary_color, secondary_color)
+    SELECT '#b700ff', '#6400ff'
+    WHERE NOT EXISTS (SELECT 1 FROM store_settings)
   `);
 
   return db;
@@ -33,7 +45,15 @@ async function ensureSchema() {
 export async function GET() {
   try {
     const db = await ensureSchema();
-    const result = await db.query("SELECT * FROM store_settings WHERE id = 1");
+
+    // pega a linha mais recente (singleton prático)
+    const result = await db.query(`
+      SELECT *
+      FROM store_settings
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+
     return ok(result.rows[0]);
   } catch (error) {
     console.error(error);
@@ -54,18 +74,26 @@ export async function POST(req: Request) {
 
     if (contentType.includes("multipart/form-data")) {
       const form = await req.formData();
-      primaryColor = String(form.get("primaryColor") ?? "") || undefined;
-      secondaryColor = String(form.get("secondaryColor") ?? "") || undefined;
-      backgroundStyle = String(form.get("backgroundStyle") ?? "") || undefined;
+
+      primaryColor = String(form.get("primaryColor") ?? "").trim() || undefined;
+      secondaryColor = String(form.get("secondaryColor") ?? "").trim() || undefined;
+      backgroundStyle = String(form.get("backgroundStyle") ?? "").trim() || undefined;
       backgroundCss = String(form.get("backgroundCss") ?? "") || undefined;
 
-      const image = form.get("backgroundImage") as File | null;
-      if (image && image.size > 0 && image.type.startsWith("image/")) {
+      const image = form.get("backgroundImage");
+      if (image instanceof File && image.size > 0 && image.type.startsWith("image/")) {
         const uploadDir = path.join(process.cwd(), "public/uploads");
         await mkdir(uploadDir, { recursive: true });
-        const fileName = `${crypto.randomUUID()}${path.extname(image.name || ".jpg")}`;
-        await writeFile(path.join(uploadDir, fileName), Buffer.from(await image.arrayBuffer()));
-        backgroundImgUrl = `/public/uploads/${fileName}`;
+
+        const ext = path.extname(image.name || ".jpg") || ".jpg";
+        const fileName = `${crypto.randomUUID()}${ext}`;
+        const filePath = path.join(uploadDir, fileName);
+
+        const bytes = Buffer.from(await image.arrayBuffer());
+        await writeFile(filePath, bytes);
+
+        // URL pública SEM /public
+        backgroundImgUrl = `/uploads/${fileName}`;
       }
     } else {
       const body = (await req.json()) as {
@@ -75,27 +103,44 @@ export async function POST(req: Request) {
         backgroundCss?: string;
         backgroundImgUrl?: string;
       };
-      primaryColor = body.primaryColor;
-      secondaryColor = body.secondaryColor;
-      backgroundStyle = body.backgroundStyle;
-      backgroundCss = body.backgroundCss;
-      backgroundImgUrl = body.backgroundImgUrl;
+
+      primaryColor = body.primaryColor?.trim() || undefined;
+      secondaryColor = body.secondaryColor?.trim() || undefined;
+      backgroundStyle = body.backgroundStyle?.trim() || undefined;
+      backgroundCss = body.backgroundCss || undefined;
+      backgroundImgUrl = body.backgroundImgUrl?.trim() || undefined;
     }
 
-    const current = await db.query("SELECT * FROM store_settings WHERE id = 1");
+    const current = await db.query(`
+      SELECT *
+      FROM store_settings
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+
     const row = current.rows[0];
+    if (!row) return fail("STORE_SETTINGS_NOT_FOUND", 404);
 
     const updated = await db.query(
-      `UPDATE store_settings
-       SET primary_color=$1, secondary_color=$2, background_style=$3, background_css=$4, background_img_url=$5, updated_at=NOW()
-       WHERE id=1
-       RETURNING *`,
+      `
+      UPDATE store_settings
+      SET
+        primary_color = $1,
+        secondary_color = $2,
+        background_style = $3,
+        background_css = $4,
+        background_img_url = $5,
+        updated_at = NOW()
+      WHERE id = $6
+      RETURNING *
+      `,
       [
         primaryColor ?? row.primary_color,
         secondaryColor ?? row.secondary_color,
         backgroundStyle ?? row.background_style,
         backgroundCss ?? row.background_css,
         backgroundImgUrl ?? row.background_img_url,
+        row.id,
       ]
     );
 

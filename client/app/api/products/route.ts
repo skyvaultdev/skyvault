@@ -18,10 +18,19 @@ type ProductBody = {
 
 async function ensureProductSchema() {
   const db = getDB();
+
   await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS position INT");
+
   await db.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_products_slug_unique ON products(slug)");
   await db.query("CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)");
+
+  await db.query(`
+    ALTER TABLE product_images
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `);
+
   await db.query("CREATE INDEX IF NOT EXISTS idx_product_images_product_position ON product_images(product_id, position)");
+
   return db;
 }
 
@@ -122,7 +131,7 @@ export async function POST(req: Request) {
           await writeFile(filePath, bytes);
           await db.query(
             `INSERT INTO product_images (product_id, url, position) VALUES ($1, $2, $3)`,
-            [productId, `/public/uploads/${fileName}`, index]
+            [productId, `/uploads/${fileName}`, index]
           );
         }
       }

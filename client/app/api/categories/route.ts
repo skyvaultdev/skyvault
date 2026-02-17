@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         const ext = path.extname(image.name || ".jpg");
         const fileName = `${crypto.randomUUID()}${ext}`;
         await writeFile(path.join(uploadDir, fileName), Buffer.from(await image.arrayBuffer()));
-        imageUrl = `/public/uploads/${fileName}`;
+        imageUrl = `/uploads/${fileName}`;
       }
     } else {
       const body = (await req.json()) as { name?: string; slug?: string; imageUrl?: string | null; productIds?: number[] };

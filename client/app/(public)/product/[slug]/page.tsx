@@ -39,6 +39,7 @@ export default function ProductPage() {
   const params = useParams<{ slug: string }>();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
 
   const [couponCode, setCouponCode] = useState("");
@@ -57,8 +58,13 @@ export default function ProductPage() {
 
       try {
         const res = await fetch(`/api/products/${encodeURIComponent(slug)}`, { method: "GET" });
-        if (!res.ok) return;
-
+        if (!res.ok) {
+          setProduct(null)
+          if (res.status === 404) {
+            setNotFound(true)
+          }
+          return
+        };
         const json = (await res.json()) as { ok?: boolean; data?: unknown };
         if (!json.ok || !json.data || cancelled) return;
 
@@ -102,7 +108,6 @@ export default function ProductPage() {
 
       try {
         const basePrice = Number(product.price);
-
         const res = await fetch(`/api/products?category=${encodeURIComponent(String(product.category_id))}`, {
           method: "GET",
         });
@@ -202,9 +207,8 @@ export default function ProductPage() {
     }
   }
 
-  if (!product) {
-    return <main style={{ color: "white", padding: 24 }}>Carregando...</main>;
-  }
+  if (notFound) return <main>Produto não encontrado</main>;
+  if (!product) return <main>Carregando...</main>;
 
   return (
     <main style={{ color: "white", padding: 24, display: "grid", gap: 24 }}>

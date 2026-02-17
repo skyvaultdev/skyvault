@@ -79,9 +79,9 @@ export default function Dashboard() {
         setStats({ acessos: 0, vendidos: 0, arrecadados: 0 });
         return;
       }
+
       const data = (await res.json()) as { ok?: boolean; data?: Partial<Stats> };
       const payload = data.data ?? {};
-
       setStats({
         acessos: Number(payload.acessos) || 0,
         vendidos: Number(payload.vendidos) || 0,

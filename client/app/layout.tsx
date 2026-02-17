@@ -8,7 +8,7 @@ import Footer from "./(components)/footer/page";
 
 import "./globals.css";
 import { initApp } from "@/lib/database/init";
-import StoreThemeLoader from "./components/StoreThemeLoader";
+import StoreThemeLoader from "./(components)/therme/StoreThemeLoader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

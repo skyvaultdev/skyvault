@@ -21,3 +21,17 @@ export async function verifyJWT(token: string) {
     return null;
   }
 }
+
+export async function hasPermission(token: string, permission: string) {
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    if(!payload) return false
+    
+    const setPerm = (payload.permissions as string[]) || [];
+    if (!setPerm.includes(permission)) {
+      return false;
+    } else return true;
+  } catch {
+    return false;
+  }
+}

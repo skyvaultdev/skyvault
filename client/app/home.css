@@ -1,10 +1,15 @@
+html {
+  overflow-x: hidden;
+}
+
 .homePage {
-  color: #fff;
-  padding: 24px;
-  display: grid;
-  gap: 20px;
-  max-width: 1200px;
+  width: 100%;
+  max-width: 1240px;
   margin: 0 auto;
+  padding: 28px 18px;
+  display: grid;
+  gap: 25px;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .bannerList {
@@ -20,11 +25,11 @@
 
 .bannerCard {
   position: relative;
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   min-height: 220px;
-  background: #0b0b0b;
+  background: rgba(12, 12, 14, 0.72);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -52,7 +57,12 @@
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
 }
 
-.bannerContent h2,
+.bannerContent h2 {
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
 .bannerContent h3 {
   margin: 0;
   line-height: 1.15;
@@ -67,128 +77,383 @@
 
 .categoryFilterWrap {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  justify-content: center;
 }
 
-.categoryFilterForm {
-  display: flex;
+.categoryFilterBar {
+  width: 100%;
+  max-width: 980px;
+  display: grid;
   gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(12, 12, 14, 0.70);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.30);
 }
 
-.homeSelect,
-.homeButton,
-.homeProductLink {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(10, 10, 10, 0.9);
-  color: #fff;
-  padding: 10px 12px;
-  font-size: 14px;
-  line-height: 1;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 120ms ease;
+.filterHint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.selectShell {
+  position: relative;
+  width: 100%;
 }
 
 .homeSelect {
-  min-width: 220px;
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 18, 20, 0.92);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 0 48px 0 16px;
+  font-size: 14px;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
-.homeSelect:focus-visible,
-.homeButton:focus-visible,
-.homeProductLink:focus-visible,
-.bannerLink:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.22);
-  outline-offset: 3px;
+.homeSelect:hover {
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
-.homeButton,
-.homeProductLink {
-  cursor: pointer;
-  text-decoration: none;
+.homeSelect:focus-visible {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.15);
+}
+
+.selectShell::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translateY(-55%) rotate(45deg);
+  border-right: 2px solid rgba(255, 255, 255, 0.65);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
+.pillLink {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 20, 0.85);
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: none;
+  font-size: 12px;
+  transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
 }
 
-.homeButton:hover,
-.homeProductLink:hover {
+.pillLink:hover {
   border-color: var(--primary);
   color: var(--primary);
-  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.10);
+  transform: translateY(-1px);
 }
 
-.homeButton:active,
-.homeProductLink:active {
-  transform: translateY(1px);
-}
-
-.productsGrid {
+.highlights {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
 }
 
-.productCard {
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 14px;
-  padding: 12px;
-  background: rgba(6, 6, 6, 0.9);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  display: grid;
+.highlightsTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.highlightsTitle {
+  display: flex;
+  align-items: flex-start;
   gap: 10px;
 }
 
+.badgeStar {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(183, 0, 255, 0.15);
+  border: 1px solid rgba(183, 0, 255, 0.25);
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.highlightsTitle h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.highlightsTitle p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.highlightsRow {
+  display: grid;
+  gap: 25px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.highlightCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(12, 12, 14, 0.72);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  min-height: 240px;
+}
+
+.highlightImage {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.80);
+  transform: scale(1.02);
+}
+
+.highlightOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  padding: 14px;
+  background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.15), rgba(0,0,0,0));
+}
+
+.highlightMeta {
+  display: grid;
+  gap: 6px;
+}
+
+.categorySection {
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.categoryHeaderRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.categoryTitle {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.productsGrid {
+  width: 100%;
+  display: grid;
+  justify-content: center;
+  gap: 55px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 360px));
+}
+
+.productCard {
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(12, 12, 14, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+
 .productCard:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.45);
 }
 
 .productThumb {
   width: 100%;
-  height: 160px;
+  height: 210px;
   object-fit: cover;
-  border-radius: 10px;
   display: block;
-  background: #111;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: transform 220ms ease, filter 220ms ease;
 }
 
-.productCard h3,
-.productCard h4 {
+.productCard:hover .productThumb {
+  transform: scale(1.03);
+  filter: brightness(1.08);
+}
+
+.productCategory {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  margin-left: -5px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.productTitle {
   margin: 0;
-  line-height: 1.2;
+  font-size: 16px;
+  letter-spacing: -0.02em;
 }
 
-.productCard p {
+.productPrice {
   margin: 0;
-  color: rgba(255, 255, 255, 0.82);
-  line-height: 1.35;
+  font-size: 14px;
+  color: var(--primary);
 }
 
-@media (max-width: 720px) {
+.buyButton {
+  width: 100%;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  background: rgba(18, 18, 20, 0.92);
+  color: rgba(255, 255, 255, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.45s ease,
+    box-shadow 0.2s ease;
+}
+
+.buyButton:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.12);
+  transform: scale(1.02);
+}
+
+.buyButton:active {
+  transform: translateY(0px);
+}
+
+@media (max-width: 820px)  {
+
   .homePage {
-    padding: 16px;
+    padding: 12px 10px;
     gap: 16px;
   }
 
-  .categoryFilterWrap {
-    justify-content: flex-start;
+  .categorySection {
+    gap: 10px;
   }
 
-  .homeSelect {
-    min-width: 100%;
+  .categoryHeaderRow {
+    align-items: center;
+  }
+
+  .categoryFilterWrap{
+    position: relative; left: -10px;
   }
 
   .productsGrid {
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    grid-template-columns: 1fr;
+    gap: 18px;
   }
 
-  .bannerContent {
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
+  .productCard {
+    padding: 12px;
+    gap: 8px;
+    border-radius: 16px;
+  }
+
+  .productThumb {
+    height: 140px;
+    border-radius: 14px;
+  }
+
+  .productCategory {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .productTitle {
+    font-size: 14px;
+  }
+
+  .productPrice {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .buyButton {
+    height: 38px;
+    border-radius: 12px;
+    font-size: 13px;
+    background: rgba(255,255,255,0.06);
+  }
+
+  .buyButton:hover {
+    background: var(--primary);
+    color: #000;
+    border-color: var(--primary);
+    box-shadow: none;
+  }
+.highlightsTitle {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pillLink {
+    display: none;
+  }
+
+  .pillLink span{
+    display: none;
+  }
+  
+  .highlightsRow {
+    width: 95%;
+    gap: 16px;
+  }
+
+  .categorySection {
+    width: 90%;
+    gap: 16px;
+  }
+
+  .highlightImage {
+    height: 170px;
+  }
+
+  .highlightOverlay {
+    padding: 12px;
   }
 }

@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { config } from "@/config/configuration";
 import { getDB } from "@/lib/database/db";
 import { signJWT } from "@/lib/jwt/init";
+import { ROLES } from "@/lib/jwt/permissions"
 const discord = config.discord;
+type Role = keyof typeof ROLES
 
 async function sendWebhookLog(content: any) {
   try {
@@ -107,10 +109,11 @@ export async function GET(req: Request) {
 
     const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
     if (adminRow.rows.length > 0) {
+        const role: Role = adminRow.rows[0].role
         const token = await signJWT({
             email: email,
-            role: "admin",
-            permissions: ["admin"]
+            role: Object.keys(ROLES[role]) || "regular_citzen",
+            permissions: ROLES[role] || []
         });
 
         const res = NextResponse.redirect(config.WEBSITE_URL);
@@ -129,6 +132,8 @@ export async function GET(req: Request) {
             role: "regular_citzen",
             permissions: []
         });
+
+        console.log(token)
 
         const res = NextResponse.redirect(config.WEBSITE_URL);
         res.cookies.set("auth_token", token, {

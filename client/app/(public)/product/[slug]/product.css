@@ -1,0 +1,422 @@
+/* ===== VARIÁVEIS ===== */
+:root {
+  --primary: #b700ff;
+  --bg-glass: rgba(12, 12, 14, 0.7);
+  --bg-card: rgba(18, 18, 20, 0.55);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --border-active: rgba(255, 255, 255, 0.22);
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 22px 70px rgba(0, 0, 0, 0.45);
+  --radius: 18px;
+  --radius-sm: 14px;
+  --radius-xs: 12px;
+  --transition: 160ms ease;
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.75);
+  --text-body: rgba(255, 255, 255, 0.86);
+}
+
+/* ===== RESET ===== */
+html {
+  overflow-x: hidden;
+}
+
+/* ===== LAYOUT PRINCIPAL ===== */
+.productPage {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 26px 18px 60px;
+  display: grid;
+  gap: 18px;
+  color: var(--text-primary);
+}
+
+.breadcrumbs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.productLayout {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ===== BASE DOS CARDS ===== */
+.card,
+.galleryCard,
+.infoCard,
+.descriptionCard,
+.similarCard {
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.card:hover,
+.galleryCard:hover,
+.infoCard:hover,
+.descriptionCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ===== GALERIA ===== */
+.mainImage {
+  width: 100%;
+  height: 330px;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thumbRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.thumbBtn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.thumbImg {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  transition: transform var(--transition), border-color var(--transition), filter var(--transition);
+}
+
+.thumbBtn:hover .thumbImg {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.18);
+  filter: brightness(1.05);
+}
+
+.thumbImgActive {
+  outline: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+/* ===== INFORMAÇÕES DO PRODUTO ===== */
+.productTitle {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.productPrice {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.productPrice strong {
+  color: var(--primary);
+}
+
+.productDesc {
+  margin: 0;
+  opacity: var(--text-body);
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+/* ===== VARIAÇÕES ===== */
+.variationBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.variationLabel {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.variationList {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.variationItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: var(--radius-xs);
+  padding: 16px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  color: white;
+  transition: all 0.2s;
+}
+
+.variationItem:hover {
+  transform: translateY(-1px);
+  background: rgba(30, 30, 35, 0.9);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.variationItemActive {
+  border-color: var(--primary);
+  background: rgba(183, 0, 255, 0.1);
+}
+
+.variationDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.variationItemActive .variationDot::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.variationMeta {
+  display: grid;
+  gap: 2px;
+}
+
+.variationInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.variationName {
+  font-weight: 600;
+  font-size: 16px;
+  color: white;
+  margin: 0;
+}
+
+.variationStock {
+  font-size: 12px;
+  color: #4caf50;
+  margin: 0;
+}
+
+.variationPrice {
+  color: var(--primary);
+  font-weight: bold;
+  font-size: 18px;
+}
+
+/* ===== BOTÕES ===== */
+.actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btnPrimary,
+.btnSecondary {
+  width: 100%;
+  height: 44px;
+  border-radius: var(--radius-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.btnPrimary {
+  border: 1px solid var(--border-color);
+  background: var(--primary);
+  color: #0b0b0c;
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.btnSecondary {
+  border: 1px solid var(--border-active);
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.btnSecondary:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ===== CUPOM ===== */
+.couponBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.couponRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.couponInput,
+.couponBtn {
+  height: 42px;
+  border-radius: var(--radius-xs);
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.couponBtn {
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.couponMsg {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ===== SIDEBAR ===== */
+.sideBar {
+  display: grid;
+  gap: 16px;
+}
+
+.sideCard h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sideCard p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+/* ===== DESCRIÇÃO ===== */
+.descriptionCard h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.descriptionCard p,
+.descriptionCard li {
+  font-size: 13px;
+  opacity: 0.9;
+  line-height: 1.45;
+}
+
+/* ===== SIMILARES ===== */
+.similarSection {
+  display: grid;
+  gap: 12px;
+}
+
+.similarGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.similarThumb {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.similarName {
+  margin: 0;
+  font-size: 13px;
+}
+
+.similarPrice {
+  margin: 0;
+  color: var(--primary);
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  margin-top: 15%;
+  padding: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 1024px) {
+  .productLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .sideBar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mainImage {
+    height: 300px;
+  }
+}
+
+@media (max-width: 640px) {
+  .productPage {
+    padding: 14px 10px 40px;
+    gap: 14px;
+  }
+
+  .sideBar {
+    grid-template-columns: 1fr;
+  }
+
+  .mainImage {
+    height: 220px;
+  }
+
+  .thumbImg {
+    width: 56px;
+    height: 56px;
+  }
+
+  .productPrice {
+    font-size: 20px;
+  }
+
+  .couponRow {
+    grid-template-columns: 1fr;
+  }
+}

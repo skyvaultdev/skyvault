@@ -2,86 +2,165 @@
 
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
-import { writeFile, mkdir } from "fs/promises";
+import { fail, ok } from "@/lib/api/response";
+import { slugify } from "@/lib/utils/slugify";
+import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
+type Variation = {
+  name: string;
+  price: number;
+};
+
+type ProductBody = {
+  name: string;
+  slug?: string;
+  description?: string;
+  price: number;
+  categoryId?: number | null;
+  active?: boolean;
+  variations?: Variation[];
+};
+
+async function ensureProductSchema() {
+  const db = getDB();
+
+  await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS position INT");
+  await db.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_products_slug_unique ON products(slug)");
+  await db.query("CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)");
+  await db.query("CREATE INDEX IF NOT EXISTS idx_variations_product ON product_variations(product_id)");
+
+  return db;
+}
+
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
+    const db = await ensureProductSchema();
+    const contentType = req.headers.get("content-type") ?? "";
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
 
-    const name = formData.get("name") as string;
-    const slug = formData.get("slug") as string;
-    const description = formData.get("description") as string | null;
-    const price = Number(formData.get("price"));
-    const category_id = formData.get("category_id") || null;
-    const active = formData.get("active") !== "false";
-    const image = formData.get("image") as File | null;
+      const name = String(formData.get("name") ?? "").trim();
+      const rawSlug = String(formData.get("slug") ?? "").trim();
+      const description = String(formData.get("description") ?? "").trim();
+      const price = Number(formData.get("price") ?? 0);
+      const categoryIdRaw = formData.get("category_id");
+      const active = String(formData.get("active") ?? "true") !== "false";
+      const categoryId = categoryIdRaw ? Number(categoryIdRaw) : null;
 
-    if (!name || !slug || !price) {
-      return NextResponse.json(
-        { error: "MISSING_FIELDS" },
-        { status: 400 }
+      const variationsRaw = formData.get("variations");
+      let variations: Variation[] = [];
+
+      if (variationsRaw) {
+        try {
+          variations = JSON.parse(String(variationsRaw));
+        } catch {
+          variations = [];
+        }
+      }
+
+      if (!name || !Number.isFinite(price) || price <= 0) {
+        return fail("MISSING_FIELDS", 400);
+      }
+
+      const slug = slugify(rawSlug || name);
+      const productResult = await db.query(
+        `INSERT INTO products (name, slug, description, price, category_id, active)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [name, slug, description || null, price, categoryId, active]
       );
+
+      const productId: number = productResult.rows[0].id;
+      if (Array.isArray(variations) && variations.length > 0) {
+        for (const variation of variations) {
+          const variationName = variation.name?.trim();
+          const variationPrice = Number(variation.price);
+
+          if (!variationName || !Number.isFinite(variationPrice) || variationPrice <= 0) {
+            continue;
+          }
+
+          await db.query(
+            `INSERT INTO product_variations (product_id, name, price)
+             VALUES ($1, $2, $3)`,
+            [productId, variationName, variationPrice]
+          );
+        }
+      }
+
+      const images = formData.getAll("images").filter((item) => item instanceof File) as File[];
+      if (images.length > 0) {
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+
+        for (let index = 0; index < images.length; index++) {
+          const image = images[index];
+          if (!image.type.startsWith("image/")) continue;
+
+          const ext = path.extname(image.name || ".jpg");
+          const fileName = `${crypto.randomUUID()}${ext}`;
+          const filePath = path.join(uploadDir, fileName);
+
+          const bytes = Buffer.from(await image.arrayBuffer());
+          await writeFile(filePath, bytes);
+
+          await db.query(
+            `INSERT INTO product_images (product_id, url, position)
+             VALUES ($1, $2, $3)`,
+            [productId, `/uploads/${fileName}`, index]
+          );
+        }
+      }
+
+      return ok({ id: productId }, 201);
     }
 
-    const db = getDB();
-    const productResult = await db.query(`INSERT INTO products (name, slug, description, price, category_id, active)
+    const body = (await req.json()) as ProductBody;
+    const name = body.name?.trim();
+    const price = Number(body.price);
+
+    if (!name || !Number.isFinite(price) || price <= 0) {
+      return fail("MISSING_FIELDS", 400);
+    }
+
+    const slug = slugify(body.slug || name);
+    const result = await db.query(
+      `INSERT INTO products (name, slug, description, price, category_id, active)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
       [
         name,
         slug,
-        description ?? null,
+        body.description?.trim() || null,
         price,
-        category_id || null,
-        active,
+        body.categoryId ?? null,
+        body.active ?? true,
       ]
     );
 
-    const productId = productResult.rows[0].id;
-    if (image && image.size > 0) {
+    const productId = result.rows[0].id;
+    if (Array.isArray(body.variations)) {
+      for (const variation of body.variations) {
+        const variationName = variation.name?.trim();
+        const variationPrice = Number(variation.price);
 
-      if (!image.type.startsWith("image/")) {
-        return NextResponse.json(
-          { error: "INVALID_FILE_TYPE" },
-          { status: 400 }
+        if (!variationName || !Number.isFinite(variationPrice) || variationPrice <= 0) {
+          continue;
+        }
+
+        await db.query(
+          `INSERT INTO product_variations (product_id, name, price)
+           VALUES ($1, $2, $3)`,
+          [productId, variationName, variationPrice]
         );
       }
-
-      if (image.size > 5_000_000) {
-        return NextResponse.json(
-          { error: "FILE_TOO_LARGE" },
-          { status: 400 }
-        );
-      }
-
-      const bytes = await image.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      const uploadDir = path.join(process.cwd(), "public/uploads");
-      await mkdir(uploadDir, { recursive: true });
-
-      const ext = path.extname(image.name);
-      const fileName = `${crypto.randomUUID()}${ext}`;
-      const filePath = path.join(uploadDir, fileName);
-      await writeFile(filePath, buffer);
-
-      const imageUrl = `/public/uploads/${fileName}`;
-      await db.query(
-        `INSERT INTO product_images (product_id, url)
-         VALUES ($1, $2)`,
-        [productId, imageUrl]
-      );
     }
 
-    return NextResponse.json({ ok: true }, { status: 200 });
-
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json(
-      { error: "INTERNAL_ERROR" },
-      { status: 500 }
-    );
+    return ok({ id: productId }, 201);
+  } catch (error) {
+    console.error(error);
+    return fail("INTERNAL_ERROR", 500);
   }
 }

@@ -5,6 +5,8 @@ import { createHash } from "crypto";
 import { getDB } from "@/lib/database/db";
 import { config } from "@/config/configuration"
 import { signJWT, verifyJWT } from "@/lib/jwt/init";
+import { ROLES } from "@/lib/jwt/permissions"
+type Role = keyof typeof ROLES
 
 function hashCode(code: string) {
     return createHash("sha256").update(code).digest("hex");
@@ -42,11 +44,13 @@ export async function POST(req: Request) {
 
     const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
     if (adminRow.rows.length > 0) {
+        const role: Role = adminRow.rows[0].role
         const token = await signJWT({
             email: email,
-            role: "admin",
-            permissions: ["admin"]
+            role: Object.keys(ROLES[role]) || "regular_citzen",
+            permissions: ROLES[role] || []
         });
+
 
         const res = NextResponse.redirect(config.WEBSITE_URL);
         res.cookies.set("auth_token", token, {

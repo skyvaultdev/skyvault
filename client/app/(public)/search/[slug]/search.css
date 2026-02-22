@@ -1,0 +1,210 @@
+/* Mantém consistência com a home */
+html {
+  overflow-x: hidden;
+}
+
+/* =========================
+   SEARCH / CONTAINER
+   ========================= */
+
+.searchPage {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+
+  padding: 28px 18px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.searchContainer {
+  width: 100%;
+  max-width: 1240px;
+  display: grid;
+  gap: 18px;
+}
+
+.searchContainer h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+/* =========================
+   INFO
+   ========================= */
+
+.infoText {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.70);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* =========================
+   GRID (mesmo padrão da home)
+   ========================= */
+
+.productsGrid {
+  width: 100%;
+  display: grid;
+  justify-content: center;
+  gap: 55px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 360px));
+}
+
+/* =========================
+   CARD (igual home)
+   ========================= */
+
+.productCard {
+  width: 100%;
+  max-height: 500px;
+  border-radius: 20px;
+  overflow: hidden;
+
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(12, 12, 14, 0.72);
+  backdrop-filter: blur(10px);
+
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+
+  transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+
+.productCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.45);
+}
+
+.productCard img {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+  display: block;
+
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+
+  transition: transform 220ms ease, filter 220ms ease;
+}
+
+.productCard:hover img {
+  transform: scale(1.03);
+  filter: brightness(1.08);
+}
+
+.productCard h3 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.productCard p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--primary);
+}
+
+/* =========================
+   CTA (mesmo estilo do buyButton)
+   ========================= */
+
+.viewButton {
+  width: 100%;
+  height: 46px;
+
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+
+  background: rgba(18, 18, 20, 0.92);
+  color: rgba(255, 255, 255, 0.92);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  text-decoration: none;
+  cursor: pointer;
+
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.45s ease,
+    box-shadow 0.2s ease;
+}
+
+.viewButton:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.12);
+  transform: scale(1.02);
+}
+
+.viewButton:active {
+  transform: translateY(0px);
+}
+
+.viewButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.18);
+}
+
+/* =========================
+   MOBILE (mesma pegada da home)
+   ========================= */
+
+@media (max-width: 820px) {
+  .searchPage {
+    padding: 12px 10px;
+  }
+
+  .searchContainer {
+    gap: 14px;
+  }
+
+  .productsGrid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .productCard {
+    padding: 12px;
+    gap: 8px;
+    border-radius: 16px;
+  }
+
+  .productCard img {
+    height: 140px;
+    border-radius: 14px;
+  }
+
+  .productCard h3 {
+    font-size: 14px;
+  }
+
+  .productCard p {
+    font-size: 13px;
+  }
+
+  .viewButton {
+    height: 38px;
+    border-radius: 12px;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .viewButton:hover {
+    background: var(--primary);
+    color: #000;
+    border-color: var(--primary);
+    box-shadow: none;
+    transform: none;
+  }
+}

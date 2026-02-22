@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { DashboardTab } from "./Sidebar";
+import "./components.css";
 
 type ProductItem = {
   id: number;
@@ -87,10 +88,11 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     return (
       <section className="settingsPanel">
         <h3>Cores da loja</h3>
+
         <label className="fieldLabel" htmlFor="color-target">Grupo de cor</label>
         <select
           id="color-target"
-          value={colorTarget}
+          value={colorTarget ?? "primary"}
           onChange={(event) => onChangeColorTarget(event.target.value as "primary" | "secondary")}
           className="settingsInput"
         >
@@ -102,7 +104,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
         <input
           id="color-picker"
           type="color"
-          value={selectedColor}
+          value={selectedColor ?? "#b700ff"}
           onChange={(event) => onChangeSelectedColor(event.target.value)}
           className="colorPicker"
           aria-label="Selecionar cor da loja"
@@ -112,7 +114,9 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           Salvar cores
         </button>
 
-        <p className="helperText">Primária: {storeSettings.primaryColor} | Secundária: {storeSettings.secondaryColor}</p>
+        <p className="helperText">
+          Primária: {storeSettings.primaryColor ?? "#b700ff"} | Secundária: {storeSettings.secondaryColor ?? "#6400ff"}
+        </p>
       </section>
     );
   }
@@ -121,18 +125,20 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     return (
       <section className="settingsPanel">
         <h3>Background</h3>
+
         <label className="radioRow">
           <input
             type="radio"
-            checked={storeSettings.backgroundType === "lines"}
+            checked={(storeSettings.backgroundType ?? "lines") === "lines"}
             onChange={() => onBackgroundTypeChange("lines")}
           />
           Linhas
         </label>
+
         <label className="radioRow">
           <input
             type="radio"
-            checked={storeSettings.backgroundType === "dots"}
+            checked={(storeSettings.backgroundType ?? "lines") === "dots"}
             onChange={() => onBackgroundTypeChange("dots")}
           />
           Pontos
@@ -150,7 +156,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
         <label className="fieldLabel" htmlFor="background-css">CSS customizado</label>
         <textarea
           id="background-css"
-          value={storeSettings.backgroundCss}
+          value={storeSettings.backgroundCss ?? ""}
           onChange={(event) => onBackgroundCssChange(event.target.value)}
           className="settingsTextarea"
           rows={4}
@@ -191,6 +197,8 @@ export default function DashboardTabs(props: DashboardTabsProps) {
   return (
     <section className="settingsPanel">
       <h3>Equipe</h3>
+      <button type="button" className="addbtn">Adicionar Equipe</button>
+      <button type="button" className="removebtn">Remover Equipe</button>
       <table className="teamTable">
         <thead>
           <tr>

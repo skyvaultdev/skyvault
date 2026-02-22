@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import "./product.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type ProductImage = { id: number; url: string; position: number };
@@ -14,6 +15,13 @@ type Product = {
   price: number;
   category_id: number | null;
   images: ProductImage[];
+};
+
+type Variations = {
+  product_id: number;
+  name: string;
+  price: number;
+  position: number;
 };
 
 type Coupon = {
@@ -39,6 +47,9 @@ export default function ProductPage() {
   const params = useParams<{ slug: string }>();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [variations, setVariations] = useState<Variations[]>([]);
+  const [selectedVariationPos, setSelectedVariationPos] = useState<number | null>(null);
+
   const [notFound, setNotFound] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
 
@@ -58,27 +69,36 @@ export default function ProductPage() {
 
       try {
         const res = await fetch(`/api/products/${encodeURIComponent(slug)}`, { method: "GET" });
+
         if (!res.ok) {
-          setProduct(null)
-          if (res.status === 404) {
-            setNotFound(true)
+          if (!cancelled) {
+            setProduct(null);
+            if (res.status === 404) setNotFound(true);
           }
-          return
-        };
+          return;
+        }
+
         const json = (await res.json()) as { ok?: boolean; data?: unknown };
         if (!json.ok || !json.data || cancelled) return;
 
         const data = json.data as Product;
-
         const safeImages = Array.isArray(data.images) ? data.images : [];
         const normalized: Product = { ...data, images: safeImages };
 
-        setProduct(normalized);
-        setSelectedImage(0);
-        setCouponMessage("");
-        setFinalPrice(null);
+        if (!cancelled) {
+          setProduct(normalized);
+          setSelectedImage(0);
+          setCouponMessage("");
+          setFinalPrice(null);
+          setVariations([]);
+          setSelectedVariationPos(null);
+
+          similarLoadedRef.current = false;
+          setSimilar([]);
+          setNotFound(false);
+        }
       } catch {
-        if (cancelled) return;
+        // ignore
       }
     }
 
@@ -89,11 +109,66 @@ export default function ProductPage() {
     };
   }, [params.slug]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadVariations() {
+      if (!product?.id) return;
+
+      try {
+        const res = await fetch(`/api/products/variations/${encodeURIComponent(String(product.id))}`, {
+          method: "GET",
+        });
+
+        if (!res.ok) {
+          if (!cancelled) setVariations([]);
+          return;
+        }
+
+        const json = (await res.json()) as { ok?: boolean; data?: unknown };
+        if (!json.ok || cancelled) return;
+
+        const raw = json.data;
+        const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.values(raw) : [];
+
+        const cleaned = (list as Variations[])
+          .map((v) => ({
+            product_id: Number(v.product_id),
+            name: String(v.name),
+            price: Number(v.price),
+            position: Number(v.position),
+          }))
+          .sort((a, b) => a.position - b.position);
+
+        if (!cancelled) {
+          setVariations(cleaned);
+          if (cleaned.length > 0) setSelectedVariationPos(cleaned[0].position);
+        }
+      } catch {
+        if (!cancelled) setVariations([]);
+      }
+    }
+
+    void loadVariations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.id]);
+
   const currentImage = useMemo(() => {
     if (!product) return "/download.jpg";
     const img = product.images?.[selectedImage]?.url;
     return img || "/download.jpg";
   }, [product, selectedImage]);
+
+  const selectedVariation = useMemo(() => {
+    if (selectedVariationPos === null) return null;
+    return variations.find((v) => v.position === selectedVariationPos) ?? null;
+  }, [variations, selectedVariationPos]);
+
+  const basePrice = Number(selectedVariation?.price ?? product?.price ?? 0);
+  const displayedPrice = Number(finalPrice ?? basePrice);
 
   useEffect(() => {
     if (!product) return;
@@ -102,12 +177,10 @@ export default function ProductPage() {
     let cancelled = false;
 
     async function loadSimilar() {
-      if (similarLoadedRef.current) return;
-      if (!product) return;
+      if (similarLoadedRef.current || !product) return;
       similarLoadedRef.current = true;
 
       try {
-        const basePrice = Number(product.price);
         const res = await fetch(`/api/products?category=${encodeURIComponent(String(product.category_id))}`, {
           method: "GET",
         });
@@ -123,7 +196,7 @@ export default function ProductPage() {
           .map((item) => {
             const itemPrice = Number(item.price);
             const acceptable = itemPrice <= basePrice * 1.2;
-            const score = (acceptable ? 2 : 1);
+            const score = acceptable ? 2 : 1;
 
             return {
               id: Number(item.id),
@@ -139,7 +212,7 @@ export default function ProductPage() {
 
         setSimilar(cleaned);
       } catch {
-        if (cancelled) return;
+        // ignore
       }
     }
 
@@ -152,7 +225,7 @@ export default function ProductPage() {
       cancelled = true;
       window.removeEventListener("scroll", onScroll);
     };
-  }, [product]);
+  }, [product?.id, product?.category_id, basePrice]);
 
   async function applyCoupon() {
     if (!product) return;
@@ -173,9 +246,8 @@ export default function ProductPage() {
         return;
       }
 
-      const json = (await res.json()) as { ok?: boolean; data?: Coupon[] };
-      const list = Array.isArray(json.data) ? json.data : [];
-
+      const json = (await res.json()) as { ok?: boolean; data?: unknown };
+      const list = Array.isArray(json.data) ? (json.data as Coupon[]) : [];
       const coupon = list.find((c) => c.code === code && c.active);
 
       if (!coupon) {
@@ -194,12 +266,12 @@ export default function ProductPage() {
       }
 
       const minValue = Number(coupon.min_order_value ?? 0);
-      if (minValue > 0 && Number(product.price) < minValue) {
+      if (minValue > 0 && basePrice < minValue) {
         setCouponMessage("Valor mínimo para cupom não atingido");
         return;
       }
 
-      const discounted = Number(product.price) * (1 - Number(coupon.percent_off) / 100);
+      const discounted = basePrice * (1 - Number(coupon.percent_off) / 100);
       setFinalPrice(discounted);
       setCouponMessage(`Cupom aplicado: -${coupon.percent_off}%`);
     } catch {
@@ -207,100 +279,127 @@ export default function ProductPage() {
     }
   }
 
-  if (notFound) return <main>Produto não encontrado</main>;
-  if (!product) return <main>Carregando...</main>;
+  if (notFound) return <main className="productPage">Produto não encontrado</main>;
+  if (!product) return <main className="productPage">Carregando...</main>;
 
   return (
-    <main style={{ color: "white", padding: 24, display: "grid", gap: 24 }}>
-      <section style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 320px", gap: 16 }}>
-        <div>
-          <img
-            src={currentImage}
-            alt={product.name}
-            style={{ width: "100%", height: 380, objectFit: "cover", borderRadius: 12 }}
-          />
+    <main className="productPage">
+      <section className="productLayout">
+        {/* LEFT */}
+        <div className="card galleryCard">
+          <img src={currentImage} alt={product.name} className="mainImage" />
 
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <div className="thumbRow">
             {(Array.isArray(product.images) ? product.images : []).map((image, index) => (
               <button
                 key={image.id}
                 type="button"
                 onClick={() => setSelectedImage(index)}
                 aria-label={`Selecionar imagem ${index + 1}`}
-                style={{ padding: 0, border: 0, background: "transparent", cursor: "pointer" }}
+                className="thumbBtn"
               >
                 <img
                   src={image.url}
                   alt={`${product.name} ${index + 1}`}
-                  style={{
-                    width: 70,
-                    height: 70,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                    outline: index === selectedImage ? "2px solid #777" : "none",
-                  }}
+                  className={`thumbImg ${index === selectedImage ? "thumbImgActive" : ""}`}
                 />
               </button>
             ))}
           </div>
         </div>
 
-        <div>
-          <h1>{product.name}</h1>
-          <p style={{ fontSize: 22 }}>R$ {Number(finalPrice ?? product.price).toFixed(2)}</p>
+        {/* CENTER */}
+        {/* CENTER */}
+<div className="card infoCard">
+  <h1 className="productTitle">{product.name}</h1>
 
-          <p style={{ opacity: 0.9, whiteSpace: "pre-wrap" }}>{product.description || ""}</p>
+  <p className="productPrice">
+    <strong>R$ {displayedPrice.toFixed(2)}</strong>
+  </p>
 
-          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-            <button type="button">Comprar agora</button>
-            <button type="button">Adicionar ao carrinho</button>
-          </div>
+  <p className="productDesc">{product.description || ""}</p>
 
-          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                value={couponCode}
-                onChange={(event) => setCouponCode(event.target.value)}
-                placeholder="Cupom"
-              />
-              <button type="button" onClick={() => void applyCoupon()}>
-                Aplicar
-              </button>
+  {variations.length > 0 ? (
+    <div className="variationBlock">
+      <span className="variationLabel">Variações disponíveis:</span>
+
+      <div className="variationList">
+        {variations.map((v, index) => (
+          <button
+            key={`${v.product_id}-${v.position}-${index}`}
+            type="button"
+            className={`variationItem ${selectedVariationPos === v.position ? "variationItemActive" : ""}`}
+            onClick={() => {
+              setSelectedVariationPos(v.position);
+              setFinalPrice(null);
+              setCouponMessage("");
+            }}
+          >
+            <div className="variationInfo">
+              <p className="variationName">{v.name}</p>
+              <p className="variationStock">+Estoque ilimitado</p>
             </div>
+            <span className="variationPrice">R$ {Number(v.price).toFixed(2)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null}
 
-            {couponMessage ? <p>{couponMessage}</p> : null}
-            {finalPrice !== null ? <p>Preço final: R$ {finalPrice.toFixed(2)}</p> : null}
-          </div>
-        </div>
+  <div className="actions">
+    <button type="button" className="btnPrimary">
+      Comprar agora
+    </button>
 
-        <aside style={{ display: "grid", gap: 12 }}>
-          <article style={{ border: "1px solid #333", borderRadius: 12, padding: 12 }}>
+    <button type="button" className="btnSecondary">
+      Adicionar ao carrinho
+    </button>
+  </div>
+
+  <div className="couponBox">
+    <div className="couponRow">
+      <input
+        className="couponInput"
+        value={couponCode}
+        onChange={(event) => setCouponCode(event.target.value)}
+        placeholder="Cupom"
+      />
+
+      <button type="button" className="couponBtn" onClick={() => void applyCoupon()}>
+        Aplicar
+      </button>
+    </div>
+
+    {couponMessage ? <p className="couponMsg">{couponMessage}</p> : null}
+    {finalPrice !== null ? <p className="couponMsg">Preço final: R$ {finalPrice.toFixed(2)}</p> : null}
+  </div>
+</div>
+
+        {/* RIGHT */}
+        <aside className="sideBar">
+          <article className="sideCard">
             <h3>Compra segura</h3>
-            <p>Pagamento criptografado e suporte dedicado.</p>
+            <p>Sua compra é protegida por criptografia SSL</p>
           </article>
 
-          <article style={{ border: "1px solid #333", borderRadius: 12, padding: 12 }}>
-            <h3>Métodos de pagamento</h3>
-            <p>Cartão, Pix e boleto.</p>
+          <article className="sideCard">
+            <h3>Métodos de pagamentos</h3>
+            <p>Pix, cartão e boleto</p>
           </article>
         </aside>
       </section>
 
       {similar.length > 0 && (
-        <section>
+        <section className="similarSection">
           <h2>Produtos similares</h2>
 
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+          <div className="similarGrid">
             {similar.map((item) => (
-              <article key={item.id} style={{ border: "1px solid #333", borderRadius: 12, padding: 10 }}>
-                <img
-                  src={item.image_url || "/download.jpg"}
-                  alt={item.name}
-                  style={{ width: "100%", height: 130, objectFit: "cover", borderRadius: 10 }}
-                />
+              <article key={item.id} className="similarCard">
+                <img src={item.image_url || "/download.jpg"} alt={item.name} className="similarThumb" />
 
-                <h4 style={{ margin: "10px 0 6px" }}>{item.name}</h4>
-                <p style={{ margin: 0 }}>R$ {Number(item.price).toFixed(2)}</p>
+                <h4 className="similarName">{item.name}</h4>
+                <p className="similarPrice">R$ {Number(item.price).toFixed(2)}</p>
 
                 <Link href={`/product/${item.slug}`}>Ver</Link>
               </article>

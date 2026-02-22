@@ -4,6 +4,10 @@ import { fail, ok } from "@/lib/api/response";
 import { slugify } from "@/lib/utils/slugify";
 
 type Params = { params: Promise<{ id: string }> };
+type Variation = {
+    name: string;
+    price: number;
+};
 
 export async function PATCH(req: Request, { params }: Params) {
     try {
@@ -18,6 +22,7 @@ export async function PATCH(req: Request, { params }: Params) {
             price?: number;
             categoryId?: number | null;
             active?: boolean;
+            variations?: Variation[];
         };
 
         const current = await db.query("SELECT * FROM products WHERE id = $1", [Number(id)]);
@@ -26,12 +31,9 @@ export async function PATCH(req: Request, { params }: Params) {
 
         const name = body.name?.trim() || row.name;
         const slug = slugify(body.slug || name);
-
-        const result = await db.query(
-            `UPDATE products
-       SET name = $1, slug = $2, description = $3, price = $4, category_id = $5, active = $6
-       WHERE id = $7
-       RETURNING *`,
+        const result = await db.query(`UPDATE products SET 
+            name = $1, slug = $2, description = $3, price = $4, category_id = $5, active = $6 WHERE id = $7
+            RETURNING *`,
             [
                 name,
                 slug,

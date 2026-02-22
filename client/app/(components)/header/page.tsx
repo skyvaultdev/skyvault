@@ -3,10 +3,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import "./header.css";
 import { FaUserCircle } from "react-icons/fa";
+import { useRouter } from "next/navigation";
 
 export default function Header() {
   const [menuAberto, setMenuAberto] = useState(false);
   const [isLogged, setIsLogged] = useState(false);
+  const [search, setSearch] = useState(""); // ✅ estado do input
+  const router = useRouter(); // ✅ navegação client-side
 
   useEffect(() => {
     let cancelado = false;
@@ -27,6 +30,13 @@ export default function Header() {
       cancelado = true;
     };
   }, []);
+
+  function searchSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const q = search.trim();
+    if (!q) return;
+    router.push(`/search/${encodeURIComponent(q)}`);
+  }
 
   return (
     <header className="navcontainer">
@@ -61,14 +71,20 @@ export default function Header() {
       </nav>
 
       <nav className="navcenter">
-        <input type="search" placeholder="Pesquisar por produto" />
+        <form onSubmit={searchSubmit} className="searchForm">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Pesquisar por produto"
+          />
+        </form>
       </nav>
 
       <nav className="navright">
         <ul>
           <li>
             {isLogged ? (
-              
               <Link href="/dashboard" aria-label="Minha conta" className="userBtn">
                 <FaUserCircle className="userIcon" />
               </Link>

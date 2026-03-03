@@ -5,7 +5,8 @@ export const ROLES = {
     "products.write",
     "orders.read",
     "orders.manage",
-    "users.manage"
+    "users.manage",
+    "team.manage"
   ],
   admin: [
     "dashboard.access",

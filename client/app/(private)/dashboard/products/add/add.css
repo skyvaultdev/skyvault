@@ -15,7 +15,11 @@
   width: 100%;
 }
 
-
+.productDesc,
+.previewDesc {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
 
 .addHeader {
   display: flex;
@@ -436,6 +440,68 @@ input[type="number"] {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.05);
 }
+
+/* Overlay que escurece o fundo */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+/* Caixa do Modal */
+.modalContent {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  animation: modalIn 0.3s ease-out;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modalIcon {
+  background: #4caf50;
+  color: white;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  margin: 0 auto 1rem;
+}
+
+.modalButtons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modalButtons button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.primaryBtn { background: #000; color: #fff; border: none; }
+.secondaryBtn { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
 
 @media (max-width: 520px) {
 

@@ -7,7 +7,10 @@ import "./components.css";
 type ProductItem = {
   id: number;
   name: string;
+  slug?: string;
   position?: number | null;
+  stock_type?: 'key' | 'file' | 'infinite';
+  stock_count?: number;
 };
 
 type AdminItem = {
@@ -22,6 +25,7 @@ type StoreSettings = {
   backgroundCss: string;
   backgroundImageUrl: string;
 };
+
 
 type DashboardTabsProps = {
   selectedTab: DashboardTab;
@@ -41,6 +45,9 @@ type DashboardTabsProps = {
   onDrop: (id: number) => void;
   onSavePositions: () => Promise<void>;
   admins: AdminItem[];
+  onOpenStock: (product: ProductItem) => void;
+  onAddAdmin?: (email: string) => Promise<void>;
+  onRemoveAdmin?: (id: number) => Promise<void>;
 };
 
 export default function DashboardTabs(props: DashboardTabsProps) {
@@ -60,11 +67,63 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     orderedProducts,
     onDragStart,
     onDrop,
+    onOpenStock,
     onSavePositions,
     admins,
   } = props;
 
   const previewCards = useMemo(() => previewProducts.slice(0, 4), [previewProducts]);
+
+  if (selectedTab === "estoque") {
+    return (
+      <section className="settingsPanel">
+        <div className="tabHeader">
+          <h3>Gerenciar Estoque</h3>
+          <p className="helperText">Configure a entrega de keys, arquivos ou estoque infinito para cada produto.</p>
+        </div>
+
+        <div className="inventoryGrid">
+          <table className="teamTable">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Status Atual</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orderedProducts.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <div className="productInfoCell">
+                      <strong>{product.name}</strong>
+                      <span>ID: {product.id}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`stockBadge ${product.stock_type || 'none'}`}>
+                      {product.stock_type === 'key' ? `Keys (${product.stock_count || 0})` :
+                        product.stock_type === 'file' ? 'Arquivo' :
+                          product.stock_type === 'infinite' ? 'Infinito' : 'Não configurado'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className="btnEditSmall"
+                      onClick={() => onOpenStock(product)}
+                    >
+                      Configurar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {orderedProducts.length === 0 && <p className="emptyMsg">Nenhum produto encontrado.</p>}
+        </div>
+      </section>
+    );
+  }
 
   if (selectedTab === "inicio") {
     return (

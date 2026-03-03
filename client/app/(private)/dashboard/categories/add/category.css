@@ -1,0 +1,157 @@
+body{
+  overflow-x: hidden;
+}
+
+.categoryPage {
+  display: grid;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  max-width: 1240px;
+  padding: 28px 38px;
+  margin: 0 auto;
+  color: white;
+}
+
+.categoryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.backBtn {
+  text-decoration: none;
+  color: white;
+  opacity: 0.7;
+}
+
+.categoryCard {
+  background: #111;
+  padding: 24px;
+  border-radius: 14px;
+  width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.input {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #1c1c1c;
+  color: white;
+}
+
+.productGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.productSelect {
+  padding: 10px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+  border: 1px solid transparent;
+}
+
+.productSelect:hover {
+  background: #242424;
+}
+
+.productSelect.active {
+  border: 1px solid var(--primary);
+  background: rgba(183, 0, 255, 0.15);
+}
+
+.saveBtn {
+  margin-top: 12px;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--secondary);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.45s ease,
+            border-color 0.3s ease,
+            box-shadow 0.2s ease;
+        background-color: 0.3s ease;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: var(--primary);
+ transform: scale(1.01);
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.empty {
+  opacity: 0.6;
+}
+
+/* MODAL */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalBox {
+  background: #111;
+  padding: 28px;
+  border-radius: 14px;
+  width: 360px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transparency-box {
+  border: solid 1px transparent;
+  padding: 140px;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media screen and (max-width: 868px) {
+
+  html{
+    overflow: hidden;
+  }
+
+  .transparency-box {
+    padding: 100px;
+    max-width: 60%;
+  }
+
+  .categoryCard {
+    margin-left: -15px;
+    width: 100%;
+  }
+
+  .backBtn {
+    margin-left: 15px;
+  }
+  
+}

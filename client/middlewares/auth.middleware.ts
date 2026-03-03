@@ -1,32 +1,64 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT } from "@/lib/jwt/init";
-import { isPrivateRoute } from "./routeMap"
-import { ROLES } from "@/lib/jwt/permissions"
+import { verifyJWT, signJWT } from "@/lib/jwt/init";
+import { isPrivateRoute } from "./routeMap";
 
 export async function authMiddleware(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
   const { pathname } = req.nextUrl;
 
-  const isPrivate = isPrivateRoute(pathname)
-  const uncriptedToken = await verifyJWT(token)
-  const role = uncriptedToken?.role
-  const admin = Object.keys(ROLES)[0] as string
-  const hasAdmin = role === admin;
+  const isPrivate = isPrivateRoute(pathname);
 
-  if (isPrivate && !hasAdmin) {
-    if(uncriptedToken?.permissions) {
-      const hasAccess = uncriptedToken.permissions?.includes("dashboard.acess")
-      if(hasAccess) {
-        return NextResponse.next()
-      }
+  if (!token) {
+    if (isPrivate) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     }
-    const url = req.nextUrl.clone();
-    token? url.pathname = "/" : url.pathname = "/login"; 
+    return NextResponse.next();
+  }
 
+  const decrypted = await verifyJWT(token);
+  if (!decrypted) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  let response = NextResponse.next();
+  const syncRes = await fetch(
+    new URL("/api/internal/sync-user", req.url),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: decrypted.email }),
+    }
+  );
+
+  const { role, permissions } = await syncRes.json();
+  const roleChanged = decrypted.role !== role;
+  const permsChanged = JSON.stringify(decrypted.permissions) !== JSON.stringify(permissions);
+
+  if (roleChanged || permsChanged) {
+    const newToken = await signJWT({
+      email: decrypted.email,
+      role,
+      permissions,
+    });
+
+    response.cookies.set("auth_token", newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+  }
+
+  if (isPrivate && !permissions.includes("dashboard.access")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+
+  return response;
 }

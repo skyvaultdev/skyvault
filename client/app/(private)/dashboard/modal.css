@@ -36,13 +36,24 @@
   gap: 10px;
 }
 
-.btnCancel {
-  padding: 8px 14px;
-  background: #2a2a2a;
+.btnSecondary {
+  padding: 14px 14px;
+  background: #202020;
   border: none;
   border-radius: 8px;
   color: #fff;
   cursor: pointer;
+  margin-left: -8px;
+  position: relative;
+  left: -68px;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.btnSecondary:hover {
+  border-color: #2a2a2a;
+  background-color: #2a2a2a;
+  transform: scale(1.05) translateY(-2px);
 }
 
 .btnConfirm {
@@ -58,11 +69,188 @@
   background: #be123c;
 }
 
+.stockModal {
+  background: #0a0a0a;
+  /* Fundo escuro igual ao seu dashboard */
+  border: 1px solid var(--primary);
+  /* Borda verde neon */
+  padding: 25px;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.stockTypeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.typeBtn {
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 10px 10px;
+  border-radius: 15px;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.typeBtn.active {
+  border-color: var(--primary);
+  background: rgba(30, 215, 96, 0.1);
+  color: var(--primary);
+}
+
+.typeBtn:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  scale: calc(1.05);
+}
+
+.labelRow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+.miniBtn {
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 10px 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.miniBtn:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  transform: scale(1.05) translateY(-2px);
+}
+
+.settingsTextarea {
+  margin-top: 15px;
+  width: 450px;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.settingsTextarea:hover {
+  border-color: var(--secondary);
+  transform: scale(1.05) translateY(-2px)
+}
+
+.textBtn {
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 10px 10px;
+  border-radius: 10px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.textBtn:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  transform: scale(1.05) translateY(-2px);
+}
+
+.closeBtn {
+  font-size: 25;
+  margin-top: -5px;
+  position: absolute;
+  top: 180px;
+  left: 250px;
+}
+
+.btnDanger {
+  padding: 12px 14px;
+  background: #e11d48;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  margin-right: 15px;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.btnDanger:hover {
+  border-color: #be123c;
+  background-color: #be123c;
+  transform: scale(1.05) translateY(-2px);
+}
+
+.btnConfirm2 {
+  padding: 12px 14px;
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  margin-right: 15px;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.btnConfirm2:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  transform: scale(1.05) translateY(-2px);
+}
+
+h4 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}
+
+.field {
+display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+   opacity: 0.6;
+    border: 1px dashed var(--primary);
+     border-radius: 8px;  
+}
+
+.settingsInput{
+    height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 18, 20, 0.9);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10 16px;
+  font-size: 14px;
+  transition: all 180ms ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  margin-left: 15px;
+  background-size: 18px;
+}
+
+
 @keyframes fadeIn {
   from {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);

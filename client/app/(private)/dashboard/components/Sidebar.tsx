@@ -1,6 +1,6 @@
 "use client";
 
-export type DashboardTab = "inicio" | "cores" | "background" | "posicao" | "equipe";
+export type DashboardTab = "inicio" | "cores" | "background" | "posicao" | "estoque" | "equipe";
 
 type SidebarProps = {
   selectedTab: DashboardTab;
@@ -12,6 +12,7 @@ const MENU_ITEMS: Array<{ key: DashboardTab; label: string }> = [
   { key: "cores", label: "Cores da loja" },
   { key: "background", label: "Background" },
   { key: "posicao", label: "Posição" },
+  { key: "estoque", label: "Estoque" },
   { key: "equipe", label: "Equipe" },
 ];
 

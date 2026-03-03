@@ -6,7 +6,7 @@ import { fail, ok } from "@/lib/api/response";
 export async function GET() {
   try {
     const db = getDB();
-    const result = await db.query("SELECT id, email FROM admin ORDER BY email ASC");
+    const result = await db.query("SELECT id, email, role FROM admin ORDER BY email ASC");
     return ok(result.rows);
   } catch (error) {
     console.error(error);

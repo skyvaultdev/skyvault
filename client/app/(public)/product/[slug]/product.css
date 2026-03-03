@@ -20,7 +20,7 @@
 
 /* ===== RESET ===== */
 html {
-  overflow-x: hidden;
+  overflow-y: scroll;
 }
 
 /* ===== LAYOUT PRINCIPAL ===== */
@@ -32,6 +32,7 @@ html {
   display: grid;
   gap: 18px;
   color: var(--text-primary);
+  min-height: 100vh;
 }
 
 .breadcrumbs {
@@ -155,6 +156,7 @@ html {
 
 .variationList {
   display: grid;
+  width:350px;
   gap: 10px;
   margin-top: 10px;
 }
@@ -239,14 +241,26 @@ html {
   margin-top: 6px;
 }
 
-.btnPrimary,
-.btnSecondary {
-  width: 100%;
+.btnPrimary{
+   width: 100%;
   height: 44px;
   border-radius: var(--radius-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.btnSecondary {
+  width: 100%;
+  height: 44px;
+  position-anchor: calc();
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0px;
   cursor: pointer;
   transition: transform 140ms ease;
 }
@@ -258,6 +272,8 @@ html {
 }
 
 .btnPrimary:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
   transform: translateY(-1px);
   filter: brightness(1.05);
 }
@@ -270,7 +286,8 @@ html {
 
 .btnSecondary:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: blue;
+  background-color: blue;
 }
 
 /* ===== CUPOM ===== */
@@ -313,9 +330,21 @@ html {
   gap: 16px;
 }
 
+.sideCard {
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
 .sideCard h3 {
   margin: 0;
   font-size: 14px;
+  color: white;
 }
 
 .sideCard p {
@@ -323,6 +352,20 @@ html {
   font-size: 12px;
   opacity: 0.75;
   line-height: 1.35;
+}
+
+.pix {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+ width: 22px;
+  height: 22px;
+}
+
+.securebuy{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ===== DESCRIÇÃO ===== */
@@ -342,40 +385,217 @@ html {
 .similarSection {
   display: grid;
   gap: 12px;
+  justify-content: center;
 }
 
 .similarGrid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.similarGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.similarCard {
+  background: #5a5a5a2a; /* Fundo branco como na imagem */
+  border-radius: 12px;
+  text-decoration: none;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  transition: 0.3s;
+  border: 1px solid rgba(0, 0, 0, 0.452);
+  overflow: hidden;
+  height: 100%;
+}
+
+.similarCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+
+.similarImgWrapper {
+  width: 100%;
+  aspect-ratio: 1/1; /* Mantém a imagem quadrada */
+  background: #f0f0f0;
+  overflow: hidden;
+}
+
+.similarTitle{
+  display: flex;
+  justify-content: start;
+  margin-left: -245px;
 }
 
 .similarThumb {
   width: 100%;
-  height: 140px;
+  height: 100%;
   object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
+}
+
+.similarInfo {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
 }
 
 .similarName {
-  margin: 0;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-left: 23%;
+  align-items: center;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .similarPrice {
-  margin: 0;
-  color: var(--primary);
+  color: var(--primary); /* Verde para combinar com seu preço principal */
+  font-weight: 800;
+  font-size: 16px;
+  margin-left: 30%;
+  margin-bottom: 15px;
 }
 
+.buyButton2 {
+  width: 200px;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  background: rgba(18, 18, 20, 0.92);
+  color: rgba(255, 255, 255, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.45s ease,
+    box-shadow 0.2s ease;
+}
+
+
+.buyButton2:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  box-shadow: 0 0 0 3px var(--secondary);
+  transform: scale(1.001);
+}
+
+.buyButton:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  box-shadow: 0 0 0 3px var(--secondary);
+  transform: scale(1.001);
+}
+
+.buyButton:active {
+  transform: translateY(0px);
+}
+
+.seebtn {
+  background: #000; /* Botão preto para contraste */
+  color: #fff;
+  text-align: center;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  margin-top: auto; /* Empurra o botão para o final do card */
+}
 /* ===== FOOTER ===== */
 .footer {
-  margin-top: 15%;
+  margin-top: auto;
   padding: 0;
   text-align: center;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.mainImageContainer {
+  position: relative;
+  width: 100%;
+}
+
+.zoomBtn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  padding: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: 0.2s;
+}
+
+.zoomBtn:hover {
+  background: var(--primary);
+  transform: scale(1.1);
+}
+
+/* Modal Fullscreen */
+.zoomOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  cursor: zoom-out;
+}
+
+.zoomOverlay img {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  cursor: default;
+}
+
+.closeZoom {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.closeZoom:hover { opacity: 1; }
+
+/* Ajuste das miniaturas */
+.thumbActive .thumbImg {
+  border-color: var(--primary) !important;
+  outline: 2px solid var(--primary);
+}
+
+.oldPrice {
+  text-decoration: line-through;
+  font-size: 14px;
+  opacity: 0.5;
+  margin-left: 10px;
+  font-weight: 400;
 }
 
 /* ===== RESPONSIVO ===== */
@@ -397,6 +617,7 @@ html {
   .productPage {
     padding: 14px 10px 40px;
     gap: 14px;
+    margin-left: -10px;
   }
 
   .sideBar {
@@ -415,6 +636,10 @@ html {
   .productPrice {
     font-size: 20px;
   }
+  .similarSection h2{
+    margin: auto;
+  }
+
 
   .couponRow {
     grid-template-columns: 1fr;

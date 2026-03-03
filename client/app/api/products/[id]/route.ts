@@ -6,36 +6,42 @@ import { slugify } from "@/lib/utils/slugify";
 
 type Params = { params: Promise<{ id: string }> };
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function GET(_: Request, { params }: Params) {
   try {
     const { id } = await params;
     const db = getDB();
     const isNumeric = /^\d+$/.test(id);
 
-    const result = isNumeric
-      ? await db.query(
-        `SELECT p.*, c.name as category_name, c.slug as category_slug
-           FROM products p
-           LEFT JOIN categories c ON c.id = p.category_id
-           WHERE p.slug = $1`,
-        [Number(id)]
-      )
-      : await db.query(
-        `SELECT p.*, c.name as category_name, c.slug as category_slug
-           FROM products p
-           LEFT JOIN categories c ON c.id = p.category_id
-           WHERE p.slug = $1`,
-        [id]
-      );
+    // Busca o produto (corrigido WHERE para aceitar ID numérico ou Slug)
+    const result = await db.query(
+      `SELECT p.*, c.name as category_name, c.slug as category_slug
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE ${isNumeric ? "p.id = $1" : "p.slug = $1"}`,
+      [isNumeric ? Number(id) : id]
+    );
 
     if (result.rows.length === 0) return fail("NOT_FOUND", 404);
 
+    const product = result.rows[0];
     const images = await db.query(
       `SELECT id, url, position FROM product_images WHERE product_id = $1 ORDER BY position ASC`,
-      [result.rows[0].id]
+      [product.id]
     );
 
-    return ok({ ...result.rows[0], images: images.rows });
+    const variations = await db.query(
+      `SELECT id, name, price FROM product_variations WHERE product_id = $1 ORDER BY id ASC`,
+      [product.id]
+    );
+
+    return ok({
+      ...product,
+      images: images.rows,
+      variations: variations.rows // Retornando as variações aqui
+    });
+
   } catch (error) {
     console.error(error);
     return fail("INTERNAL_ERROR", 500);

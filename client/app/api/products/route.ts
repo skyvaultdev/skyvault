@@ -34,6 +34,19 @@ export async function GET(req: Request) {
   try {
     const db = await ensureProductSchema();
     const { searchParams } = new URL(req.url);
+
+    const withoutCategories = searchParams.get("withoutCategory");
+    if (withoutCategories === "1") {
+      const result = await db.query(`
+        SELECT id, name, slug
+        FROM products
+        WHERE category_id IS NULL
+        ORDER BY name ASC
+      `);
+
+      return ok(result.rows);
+    }
+
     const name = searchParams.get("name")?.trim();
     const category = searchParams.get("category")?.trim();
 
@@ -59,12 +72,18 @@ export async function GET(req: Request) {
       `
       SELECT p.id, p.name, p.slug, p.description, p.price, p.active, p.position,
              p.category_id, c.name AS category_name, c.slug AS category_slug,
-             (
-               SELECT pi.url FROM product_images pi
-               WHERE pi.product_id = p.id
-               ORDER BY pi.position ASC, pi.created_at ASC
-               LIMIT 1
-             ) AS image_url
+            (
+              SELECT pi.url
+              FROM product_images pi
+              WHERE pi.product_id = p.id
+              ORDER BY pi.position ASC
+              LIMIT 1
+            ) AS image_url,
+            (
+              SELECT COALESCE(json_agg(json_build_object('id', pv.id, 'name', pv.name, 'price', pv.price)), '[]')
+              FROM product_variations pv
+              WHERE pv.product_id = p.id
+            ) AS variations
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
       ${whereClause}

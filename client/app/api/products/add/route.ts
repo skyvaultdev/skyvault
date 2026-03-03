@@ -36,131 +36,72 @@ async function ensureProductSchema() {
 
 export async function POST(req: Request) {
   try {
-    const db = await ensureProductSchema();
-    const contentType = req.headers.get("content-type") ?? "";
-    if (contentType.includes("multipart/form-data")) {
-      const formData = await req.formData();
+    const db = getDB();
+    const formData = await req.formData();
 
-      const name = String(formData.get("name") ?? "").trim();
-      const rawSlug = String(formData.get("slug") ?? "").trim();
-      const description = String(formData.get("description") ?? "").trim();
-      const price = Number(formData.get("price") ?? 0);
-      const categoryIdRaw = formData.get("category_id");
-      const active = String(formData.get("active") ?? "true") !== "false";
-      const categoryId = categoryIdRaw ? Number(categoryIdRaw) : null;
+    const name = String(formData.get("name") ?? "").trim();
+    const rawSlug = String(formData.get("slug") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+    
+    const price = parseFloat(String(formData.get("price") ?? "0"));
+    const categoryId = formData.get("category_id") ? Number(formData.get("category_id")) : null;
+    const active = formData.get("active") === "true";
 
-      const variationsRaw = formData.get("variations");
-      let variations: Variation[] = [];
-
-      if (variationsRaw) {
-        try {
-          variations = JSON.parse(String(variationsRaw));
-        } catch {
-          variations = [];
-        }
-      }
-
-      if (!name || !Number.isFinite(price) || price <= 0) {
-        return fail("MISSING_FIELDS", 400);
-      }
-
-      const slug = slugify(rawSlug || name);
-      const productResult = await db.query(
-        `INSERT INTO products (name, slug, description, price, category_id, active)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id`,
-        [name, slug, description || null, price, categoryId, active]
-      );
-
-      const productId: number = productResult.rows[0].id;
-      if (Array.isArray(variations) && variations.length > 0) {
-        for (const variation of variations) {
-          const variationName = variation.name?.trim();
-          const variationPrice = Number(variation.price);
-
-          if (!variationName || !Number.isFinite(variationPrice) || variationPrice <= 0) {
-            continue;
-          }
-
-          await db.query(
-            `INSERT INTO product_variations (product_id, name, price)
-             VALUES ($1, $2, $3)`,
-            [productId, variationName, variationPrice]
-          );
-        }
-      }
-
-      const images = formData.getAll("images").filter((item) => item instanceof File) as File[];
-      if (images.length > 0) {
-        const uploadDir = path.join(process.cwd(), "public/uploads");
-        await mkdir(uploadDir, { recursive: true });
-
-        for (let index = 0; index < images.length; index++) {
-          const image = images[index];
-          if (!image.type.startsWith("image/")) continue;
-
-          const ext = path.extname(image.name || ".jpg");
-          const fileName = `${crypto.randomUUID()}${ext}`;
-          const filePath = path.join(uploadDir, fileName);
-
-          const bytes = Buffer.from(await image.arrayBuffer());
-          await writeFile(filePath, bytes);
-
-          await db.query(
-            `INSERT INTO product_images (product_id, url, position)
-             VALUES ($1, $2, $3)`,
-            [productId, `/uploads/${fileName}`, index]
-          );
-        }
-      }
-
-      return ok({ id: productId }, 201);
+    if (!name || isNaN(price) || price <= 0) {
+      return fail("DADOS_INVALIDOS", 400);
     }
 
-    const body = (await req.json()) as ProductBody;
-    const name = body.name?.trim();
-    const price = Number(body.price);
-
-    if (!name || !Number.isFinite(price) || price <= 0) {
-      return fail("MISSING_FIELDS", 400);
-    }
-
-    const slug = slugify(body.slug || name);
-    const result = await db.query(
+    const slug = slugify(rawSlug || name);
+    const productResult = await db.query(
       `INSERT INTO products (name, slug, description, price, category_id, active)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [
-        name,
-        slug,
-        body.description?.trim() || null,
-        price,
-        body.categoryId ?? null,
-        body.active ?? true,
-      ]
+      [name, slug, description || null, price, categoryId, active]
     );
 
-    const productId = result.rows[0].id;
-    if (Array.isArray(body.variations)) {
-      for (const variation of body.variations) {
-        const variationName = variation.name?.trim();
-        const variationPrice = Number(variation.price);
-
-        if (!variationName || !Number.isFinite(variationPrice) || variationPrice <= 0) {
-          continue;
+    const productId = productResult.rows[0].id;
+    const variationsRaw = formData.get("variations");
+    if (variationsRaw) {
+      const variations = JSON.parse(String(variationsRaw));
+      for (const v of variations) {
+        const vPrice = parseFloat(String(v.price ?? "0"));
+        if (v.name && !isNaN(vPrice)) {
+          await db.query(
+            `INSERT INTO product_variations (product_id, name, price)
+             VALUES ($1, $2, $3)`,
+            [productId, v.name, vPrice]
+          );
         }
+      }
+    }
+
+    const images = formData.getAll("images") as File[];
+    if (images.length > 0) {
+      const uploadDir = path.join(process.cwd(), "public/uploads/products");
+      await mkdir(uploadDir, { recursive: true });
+
+      for (let i = 0; i < images.length; i++) {
+        const file = images[i];
+        if (!file.type.startsWith("image/")) continue;
+
+        const ext = path.extname(file.name) || ".jpg";
+        const fileName = `${crypto.randomUUID()}${ext}`;
+        const filePath = path.join(uploadDir, fileName);
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+        await writeFile(filePath, buffer);
 
         await db.query(
-          `INSERT INTO product_variations (product_id, name, price)
+          `INSERT INTO product_images (product_id, url, position)
            VALUES ($1, $2, $3)`,
-          [productId, variationName, variationPrice]
+          [productId, `/uploads/products/${fileName}`, i]
         );
       }
     }
 
     return ok({ id: productId }, 201);
   } catch (error) {
-    console.error(error);
-    return fail("INTERNAL_ERROR", 500);
+    console.error("Erro ao adicionar produto:", error);
+    return fail("ERRO_INTERNO", 500);
   }
 }

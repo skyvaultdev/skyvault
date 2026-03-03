@@ -2,6 +2,7 @@
 
 import "./login.css";
 import "./modal.css";
+import { useRouter } from "next/navigation";
 import { FaDiscord } from "react-icons/fa";
 import { useState, useEffect } from "react";
 
@@ -16,6 +17,7 @@ export default function Login() {
   const [isVerifying, setIsVerifying] = useState(false);
 
   const [cooldown, setCooldown] = useState(0);
+  const router = useRouter();
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -40,7 +42,11 @@ export default function Login() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await res.json();
+      let data = null;
+
+      try {
+        data = await res.json();
+      } catch { }
 
       if (res.ok) {
         setMsg("Código enviado para seu email");
@@ -92,6 +98,7 @@ export default function Login() {
   }
 
   async function handleVerifyCode() {
+    
     if (!code.trim()) {
       setMsg("Digite o código.");
       return;
@@ -100,6 +107,7 @@ export default function Login() {
     setIsVerifying(true);
     setMsg("Verificando código...");
 
+    
     try {
       const res = await fetch("/api/auth/email/callback", {
         method: "POST",
@@ -112,7 +120,9 @@ export default function Login() {
       if (res.ok) {
         setMsg("Código verificado! Login autorizado.");
         setIsModalOpen(false);
+
         window.location.href = "/";
+
       } else {
         setMsg(data.error || "Código inválido.");
       }
@@ -202,13 +212,15 @@ export default function Login() {
 
               <button
                 type="button"
-                onClick={handleVerifyCode}
+                onClick={handleVerifyCode }
                 disabled={isVerifying}
                 className="modalConfirm"
               >
                 {isVerifying ? "Verificando..." : "Verificar"}
               </button>
             </div>
+
+            
           </div>
         </div>
       )}

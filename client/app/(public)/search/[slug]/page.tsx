@@ -9,7 +9,7 @@ type Product = {
     name: string;
     slug: string;
     price: number;
-    image?: string | null;
+    image_url?: string | null;
 };
 
 export default function SearchPage() {
@@ -33,7 +33,7 @@ export default function SearchPage() {
                 setLoading(true);
 
                 try {
-                    const res = await fetch(`/api/products?name=${encodeURIComponent(q)}`, { method: "GET" });
+                    const res = await fetch(`/api/products?name=${q}`, { method: "GET" });
                     const json = await res.json();
                     const data = (json?.data ?? json?.product ?? []) as Product[];
                     setProducts(Array.isArray(data) ? data : []);
@@ -63,7 +63,7 @@ export default function SearchPage() {
                     {products.map((product) => (
                         <div key={product.id} className="productCard">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={product.image || "/download.jpg"} alt={product.name} />
+                            <img src={product.image_url || "/file.svg"} alt={product.name} />
                             <h3>{product.name}</h3>
                             <p>R$ {Number(product.price).toFixed(2)}</p>
                             <a href={`/product/${product.slug}`} className="viewButton">

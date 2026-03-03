@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getDB } from "@/lib/database/db";
-import CategoryAutoSelect from "./(components)/CategoryAutoSelect"; 
+import CategoryAutoSelect from "./(components)/CategoryAutoSelect";
 import "./home.css";
+import HighlightsCarousel from "./(private)/dashboard/components/HighlightsCarousel";
 
 type Category = { id: number; name: string; slug: string };
 type Banner = { id: number; title: string; subtitle: string | null; image_url: string; link: string | null };
@@ -51,21 +52,31 @@ async function getHomeData() {
 
 export default async function Home() {
   const { banners, categories, products } = await getHomeData();
-
   const highlights = products.slice(0, 3);
+  const uncategorizedItems: Product[] = [];
 
- 
   const map = new Map<string, { category: Category; items: Product[] }>();
   for (const c of categories) map.set(c.slug, { category: c, items: [] });
 
   for (const p of products) {
-    const key = p.category_slug ?? "";
-    if (!key) continue;
+    const key = p.category_slug;
+    
+    if (!key) {
+      uncategorizedItems.push(p);
+      continue;
+    }
+
     const bucket = map.get(key);
     if (bucket) bucket.items.push(p);
   }
 
   const sections = [...map.values()].filter((b) => b.items.length > 0);
+  if (uncategorizedItems.length > 0) {
+    sections.push({
+      category: { id: 0, name: "Outros", slug: "outros" },
+      items: uncategorizedItems,
+    });
+  }
 
   return (
     <main className="homePage">
@@ -85,7 +96,6 @@ export default async function Home() {
         </section>
       ) : null}
 
-  
       <aside className="categoryFilterWrap">
         <div className="categoryFilterBar">
           <CategoryAutoSelect categories={categories.map((c) => ({ name: c.name, slug: c.slug }))} />
@@ -93,7 +103,6 @@ export default async function Home() {
         </div>
       </aside>
 
-      
       {highlights.length > 0 ? (
         <section className="highlights">
           <div className="highlightsTop">
@@ -111,37 +120,19 @@ export default async function Home() {
           </div>
 
           <div className="highlightsRow">
-            {highlights.map((product) => (
-              <article key={product.id} className="highlightCard">
-            
-                <img
-                  src={product.image_url || "/download.jpg"}
-                  alt={product.name}
-                  className="highlightImage"
-                />
-                <div className="highlightOverlay">
-                  <div className="highlightMeta">
-                    <span className="productCategory">{product.category_name ?? "Sem categoria"}</span>
-                    <h3 className="productTitle">{product.name}</h3>
-                    <p className="productPrice">R$ {Number(product.price).toFixed(2)}</p>
-                  </div>
-
-                  <Link href={`/product/${product.slug}`} className="buyButton">
-                    Comprar agora
-                  </Link>
-                </div>
-              </article>
-            ))}
+            <HighlightsCarousel highlights={highlights} />
           </div>
         </section>
       ) : null}
 
-  
       {sections.map(({ category, items }) => (
         <section key={category.slug} className="categorySection">
           <div className="categoryHeaderRow">
             <h2 className="categoryTitle">{category.name}</h2>
-            <Link className="pillLink" href={`/catalog?category=${encodeURIComponent(category.slug)}`}>
+            <Link 
+                className="pillLink" 
+                href={category.id === 0 ? "/catalog" : `/catalog?category=${encodeURIComponent(category.slug)}`}
+            >
               Ver mais <span aria-hidden="true">›</span>
             </Link>
           </div>
@@ -149,18 +140,14 @@ export default async function Home() {
           <div className="productsGrid">
             {items.slice(0, 6).map((product) => (
               <article key={product.id} className="productCard">
-              
                 <img
-                  src={product.image_url || "/download.jpg"}
+                  src={product.image_url || "/file.svg"}
                   alt={product.name}
                   className="productThumb"
                 />
-
-                <span className="productCategory">{product.category_name ?? "Sem categoria"}</span>
-
+                <span className="productCategory">{product.category_name ?? "Outros"}</span>
                 <h3 className="productTitle">{product.name}</h3>
                 <p className="productPrice">R$ {Number(product.price).toFixed(2)}</p>
-
                 <Link href={`/product/${product.slug}`} className="buyButton">
                   Comprar agora
                 </Link>
@@ -169,6 +156,8 @@ export default async function Home() {
           </div>
         </section>
       ))}
+
+      
     </main>
   );
 }

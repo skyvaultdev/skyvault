@@ -24,15 +24,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Sky Vault | Our Pre-Alpha",
   description: "Where all your dreams come true",
-  icons: {
-    icon: "/download.jpg",
-  }
 };
 
 export default async function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
-
+}: {
+  children: React.ReactNode;
+}) {
   await initApp();
 
   const db = getDB();
@@ -66,12 +64,19 @@ export default async function RootLayout({
           backgroundSize: backgroundImg ? "cover" : undefined,
           backgroundPosition: backgroundImg ? "center" : undefined,
         }}
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable}`}
       >
-        <Header />
-        {children}
-        <div className="background" />
-        <Footer />
+        {/* Overlay visual apenas */}
+        <div className="transparency-box" />
+
+        {/* Layout estrutural correto */}
+        <div className="page-wrapper">
+          <Header />
+          <main className="main-content">
+            {children}
+          </main>
+          <Footer />
+        </div>
 
         {backgroundCss && (
           <style id="store-custom-background">

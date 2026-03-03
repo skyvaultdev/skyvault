@@ -9,17 +9,17 @@ const discord = config.discord;
 type Role = keyof typeof ROLES
 
 async function sendWebhookLog(content: any) {
-  try {
-    await fetch(discord.webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(content),
-    });
-  } catch (err) {
-    console.error("Erro ao enviar webhook:", err);
-  }
+    try {
+        await fetch(discord.webhookUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(content),
+        });
+    } catch (err) {
+        console.error("Erro ao enviar webhook:", err);
+    }
 }
 
 
@@ -108,43 +108,34 @@ export async function GET(req: Request) {
     });
 
     const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
+    let role: Role | "regular_citizen" = "regular_citizen";
+    let permissions;
+
     if (adminRow.rows.length > 0) {
-        const role: Role = adminRow.rows[0].role
-        const token = await signJWT({
-            email: email,
-            role: Object.keys(ROLES[role]) || "regular_citzen",
-            permissions: ROLES[role] || []
-        });
-
-        const res = NextResponse.redirect(config.WEBSITE_URL);
-        res.cookies.set("auth_token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            path: "/",
-            maxAge: 60 * 60 * 24 * 7
-        })
-
-        return res
-    } else {
-        const token = await signJWT({
-            email: email,
-            role: "regular_citzen",
-            permissions: []
-        });
-
-        console.log(token)
-
-        const res = NextResponse.redirect(config.WEBSITE_URL);
-        res.cookies.set("auth_token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            path: "/",
-            maxAge: 60 * 60 * 24 * 7
-        })
-
-        return res
+        const roleFromDb = adminRow.rows[0].role as string;
+        if (roleFromDb in ROLES) {
+            role = roleFromDb as Role;
+            permissions = ROLES[role];
+        } else {permissions = [];}
     }
 
+    const token = await signJWT({
+        email,
+        role,
+        permissions,
+    });
+
+    const res = NextResponse.redirect(config.WEBSITE_URL);
+
+    res.cookies.set("auth_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return res;
 }
+
+

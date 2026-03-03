@@ -15,6 +15,8 @@
   align-items: center;
 }
 
+h1{color: white;}
+
 .logincontainer {
   width: 400px;
   padding: 40px 20px;
@@ -48,7 +50,7 @@
      height: 40px;
      border-radius: 20px;
      border: none;
-     background-color: #7040c9;
+     background-color: var(--primary);
      color: white;
      font-family: 'Poppins', sans-serif;
      font-size: 16px;
@@ -63,7 +65,7 @@
  }
 
  .butao button:hover {
-     background-color: #8053e6;
+     background-color: var(--secondary);
      transform: scale(1.02);
  }
 
@@ -71,7 +73,7 @@
      width: 250px;
      height: 35px;
      border-radius: 5px;
-     border: solid 2px #5a1eb9;
+     border: solid 2px var(--primary);
      padding: 0 10px;
      font-size: 16px;
      font-family: 'Poppins', sans-serif;
@@ -86,15 +88,15 @@
  }
 
  .loginitems input:hover {
-     border-color: #d166ff;
+     border-color: var(--secondary);
 
 
  }
 
  .loginitems input:focus {
      outline: none;
-     border-color: #d166ff;
-     box-shadow: 0 0 8px #d166ff;
+     border-color: var(--secondary);
+     box-shadow: 0 0 8px var(--secondary);
 
  }
 
@@ -147,6 +149,7 @@
  p{
     position: relative;
     top: 5px;
+    color: white;
  }
  
  @media (max-width: 780px) {

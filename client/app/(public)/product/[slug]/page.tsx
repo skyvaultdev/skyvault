@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import "./product.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FiLock, FiX, FiMaximize2 } from "react-icons/fi";
 
+// --- TIPOS ---
 type ProductImage = { id: number; url: string; position: number };
 
 type Product = {
@@ -28,10 +31,6 @@ type Coupon = {
   code: string;
   active: boolean;
   percent_off: number;
-  usage_limit: number;
-  used_count: number;
-  min_order_value?: number | null;
-  expires_at?: string | null;
 };
 
 type Similar = {
@@ -40,25 +39,27 @@ type Similar = {
   name: string;
   price: number;
   image_url: string | null;
-  score: number;
 };
 
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
+  const router = useRouter();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<Variations[]>([]);
   const [selectedVariationPos, setSelectedVariationPos] = useState<number | null>(null);
+  const [similar, setSimilar] = useState<Similar[]>([]);
 
   const [notFound, setNotFound] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   const [couponCode, setCouponCode] = useState("");
   const [couponMessage, setCouponMessage] = useState("");
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
 
-  const [similar, setSimilar] = useState<Similar[]>([]);
-  const similarLoadedRef = useRef(false);
+  // ✅ loading só do botão "Adicionar ao carrinho"
+  const [loadingAdd, setLoadingAdd] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,214 +69,209 @@ export default function ProductPage() {
       if (!slug) return;
 
       try {
-        const res = await fetch(`/api/products/${encodeURIComponent(slug)}`, { method: "GET" });
-
+        const res = await fetch(`/api/products/${encodeURIComponent(slug)}`);
         if (!res.ok) {
-          if (!cancelled) {
-            setProduct(null);
-            if (res.status === 404) setNotFound(true);
-          }
+          if (!cancelled && res.status === 404) setNotFound(true);
           return;
         }
 
-        const json = (await res.json()) as { ok?: boolean; data?: unknown };
+        const json = await res.json();
         if (!json.ok || !json.data || cancelled) return;
 
         const data = json.data as Product;
-        const safeImages = Array.isArray(data.images) ? data.images : [];
-        const normalized: Product = { ...data, images: safeImages };
 
-        if (!cancelled) {
-          setProduct(normalized);
-          setSelectedImage(0);
-          setCouponMessage("");
-          setFinalPrice(null);
-          setVariations([]);
-          setSelectedVariationPos(null);
+        // reseta estados ao trocar de produto
+        setProduct(null);
+        setVariations([]);
+        setSimilar([]);
+        setFinalPrice(null);
+        setCouponCode("");
+        setCouponMessage("");
+        setSelectedImage(0);
+        setSelectedVariationPos(null);
 
-          similarLoadedRef.current = false;
-          setSimilar([]);
-          setNotFound(false);
-        }
+        setProduct({
+          ...data,
+          price: Number(data.price),
+          images: Array.isArray(data.images) ? data.images : [],
+        });
+
+        setNotFound(false);
       } catch {
-        // ignore
+        setNotFound(true);
       }
     }
 
-    void loadProduct();
-
+    loadProduct();
     return () => {
       cancelled = true;
     };
   }, [params.slug]);
 
   useEffect(() => {
+    if (!product?.id) return;
     let cancelled = false;
 
-    async function loadVariations() {
-      if (!product?.id) return;
+    async function loadExtraData() {
+      if (!product) return;
 
       try {
-        const res = await fetch(`/api/products/variations/${encodeURIComponent(String(product.id))}`, {
-          method: "GET",
-        });
+        const vRes = await fetch(`/api/products/variations/${product.id}`);
+        const vJson = await vRes.json();
 
-        if (!res.ok) {
-          if (!cancelled) setVariations([]);
-          return;
-        }
+        if (vJson.ok && !cancelled) {
+          const list = Array.isArray(vJson.data) ? vJson.data : Object.values(vJson.data || {});
+          const cleaned = (list as Variations[])
+            .map((v) => ({ ...v, price: Number(v.price) }))
+            .sort((a, b) => a.position - b.position);
 
-        const json = (await res.json()) as { ok?: boolean; data?: unknown };
-        if (!json.ok || cancelled) return;
-
-        const raw = json.data;
-        const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.values(raw) : [];
-
-        const cleaned = (list as Variations[])
-          .map((v) => ({
-            product_id: Number(v.product_id),
-            name: String(v.name),
-            price: Number(v.price),
-            position: Number(v.position),
-          }))
-          .sort((a, b) => a.position - b.position);
-
-        if (!cancelled) {
           setVariations(cleaned);
+
           if (cleaned.length > 0) setSelectedVariationPos(cleaned[0].position);
         }
-      } catch {
-        if (!cancelled) setVariations([]);
-      }
-    }
 
-    void loadVariations();
+        const allRes = await fetch(`/api/products`);
+        const allJson = await allRes.json();
+        if (!allJson.ok || cancelled) return;
 
-    return () => {
-      cancelled = true;
-    };
-  }, [product?.id]);
+        const pool: any[] = allJson.data;
+        const currentWords = product.name.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
 
-  const currentImage = useMemo(() => {
-    if (!product) return "/download.jpg";
-    const img = product.images?.[selectedImage]?.url;
-    return img || "/download.jpg";
-  }, [product, selectedImage]);
+        const listSameCategory: any[] = [];
+        const listSimilarWords: any[] = [];
+        const listNoCategory: any[] = [];
 
-  const selectedVariation = useMemo(() => {
-    if (selectedVariationPos === null) return null;
-    return variations.find((v) => v.position === selectedVariationPos) ?? null;
-  }, [variations, selectedVariationPos]);
+        pool.forEach((item) => {
+          if (item.id === product.id) return;
 
-  const basePrice = Number(selectedVariation?.price ?? product?.price ?? 0);
-  const displayedPrice = Number(finalPrice ?? basePrice);
+          if (product.category_id && item.category_id === product.category_id) {
+            listSameCategory.push(item);
+            return;
+          }
 
-  useEffect(() => {
-    if (!product) return;
-    if (!product.category_id) return;
+          const itemWords = item.name.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+          const common = currentWords.filter((w) => itemWords.includes(w));
+          const similarity = common.length / Math.max(currentWords.length, 1);
 
-    let cancelled = false;
+          if (similarity >= 0.5) {
+            listSimilarWords.push(item);
+            return;
+          }
 
-    async function loadSimilar() {
-      if (similarLoadedRef.current || !product) return;
-      similarLoadedRef.current = true;
-
-      try {
-        const res = await fetch(`/api/products?category=${encodeURIComponent(String(product.category_id))}`, {
-          method: "GET",
+          if (!item.category_id) {
+            listNoCategory.push(item);
+          }
         });
 
-        if (!res.ok || cancelled) return;
+        const finalResults = [...listSameCategory, ...listSimilarWords, ...listNoCategory]
+          .filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i)
+          .slice(0, 4)
+          .map((item) => ({
+            id: Number(item.id),
+            slug: String(item.slug),
+            name: String(item.name),
+            price: Number(item.price),
+            image_url: item.image_url || null,
+          }));
 
-        const json = (await res.json()) as { ok?: boolean; data?: unknown };
-        if (!json.ok || cancelled) return;
-
-        const arr = Array.isArray(json.data) ? (json.data as any[]) : [];
-        const cleaned = arr
-          .filter((item) => item && item.id !== product.id)
-          .map((item) => {
-            const itemPrice = Number(item.price);
-            const acceptable = itemPrice <= basePrice * 1.2;
-            const score = acceptable ? 2 : 1;
-
-            return {
-              id: Number(item.id),
-              slug: String(item.slug),
-              name: String(item.name),
-              price: itemPrice,
-              image_url: item.image_url ? String(item.image_url) : null,
-              score,
-            } satisfies Similar;
-          })
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 10);
-
-        setSimilar(cleaned);
-      } catch {
-        // ignore
+        if (!cancelled) setSimilar(finalResults);
+      } catch (err) {
+        console.error(err);
       }
     }
 
-    function onScroll() {
-      if (window.scrollY > 300) void loadSimilar();
-    }
-
-    window.addEventListener("scroll", onScroll);
+    loadExtraData();
     return () => {
       cancelled = true;
-      window.removeEventListener("scroll", onScroll);
     };
-  }, [product?.id, product?.category_id, basePrice]);
+  }, [product?.id, product?.category_id, product?.name]);
+
+  const selectedVariation = useMemo(() => {
+    return variations.find((v) => v.position === selectedVariationPos) || null;
+  }, [variations, selectedVariationPos]);
+
+  const basePrice = useMemo(() => {
+    if (!product) return 0;
+    return Number(selectedVariation?.price ?? product.price ?? 0);
+  }, [selectedVariation, product]);
+
+  const displayedPrice = useMemo(() => {
+    return finalPrice !== null ? Number(finalPrice) : basePrice;
+  }, [finalPrice, basePrice]);
+
+  const currentImage = useMemo(() => {
+    if (!product || !product.images.length) return "/file.svg";
+    return product.images[selectedImage]?.url || "/file.svg";
+  }, [product, selectedImage]);
 
   async function applyCoupon() {
     if (!product) return;
 
-    setCouponMessage("");
-    setFinalPrice(null);
-
     const code = couponCode.trim().toUpperCase();
-    if (!code) {
-      setCouponMessage("Digite um cupom");
-      return;
-    }
+    if (!code) return;
 
     try {
-      const res = await fetch("/api/coupons", { method: "GET" });
-      if (!res.ok) {
-        setCouponMessage("Falha ao validar cupom");
-        return;
+      const res = await fetch("/api/coupons");
+      const json = await res.json();
+
+      const coupon = (json.data as Coupon[]).find((c) => c.code === code && c.active);
+
+      if (coupon) {
+        setFinalPrice(basePrice * (1 - Number(coupon.percent_off) / 100));
+        setCouponMessage(`-${coupon.percent_off}% aplicado!`);
+      } else {
+        setCouponMessage("Inválido");
       }
-
-      const json = (await res.json()) as { ok?: boolean; data?: unknown };
-      const list = Array.isArray(json.data) ? (json.data as Coupon[]) : [];
-      const coupon = list.find((c) => c.code === code && c.active);
-
-      if (!coupon) {
-        setCouponMessage("Cupom inválido");
-        return;
-      }
-
-      if (coupon.expires_at && new Date(coupon.expires_at) <= new Date()) {
-        setCouponMessage("Cupom expirado");
-        return;
-      }
-
-      if (coupon.usage_limit > 0 && coupon.used_count >= coupon.usage_limit) {
-        setCouponMessage("Cupom sem usos restantes");
-        return;
-      }
-
-      const minValue = Number(coupon.min_order_value ?? 0);
-      if (minValue > 0 && basePrice < minValue) {
-        setCouponMessage("Valor mínimo para cupom não atingido");
-        return;
-      }
-
-      const discounted = basePrice * (1 - Number(coupon.percent_off) / 100);
-      setFinalPrice(discounted);
-      setCouponMessage(`Cupom aplicado: -${coupon.percent_off}%`);
     } catch {
-      setCouponMessage("Erro de rede ao validar cupom");
+      setCouponMessage("Erro");
+    }
+  }
+
+  // ✅ ADICIONAR AO CARRINHO (AJUSTADO PARA O SEU COMPONENTE)
+  async function handleAddToCart() {
+    // 1) liga loading do botão
+    setLoadingAdd(true);
+
+    try {
+      // 2) se tiver variação, manda ela; se não tiver, manda null
+      //    (se sua API exigir variação, você pode bloquear quando for null)
+      const variation_id = selectedVariation ? selectedVariation.position : null;
+
+      // 3) chama sua API para adicionar item
+      const response = await fetch("/api/cart", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product?.id,
+          variation_id,
+          quantity: 1,
+        }),
+      });
+
+      // 4) converte a resposta em json (pra ler message)
+      const data = await response.json();
+
+      // 5) se deu certo
+      if (response.ok) {
+        // 5.1) força o Next atualizar a árvore e o Header buscar o carrinho de novo
+        router.refresh();
+
+        // 5.2) evento opcional (só funciona se o Header estiver escutando)
+        window.dispatchEvent(new Event("abrirCarrinho"));
+      } else {
+        // 6) se deu erro e for token inválido, manda pro login
+        if (data?.message === "UNAUTHORIZED_TOKEN") {
+          router.push("/login");
+        } else {
+          alert("Erro ao adicionar: " + (data?.message ?? "Erro desconhecido"));
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar ao carrinho:", error);
+      alert("Erro inesperado ao adicionar ao carrinho.");
+    } finally {
+      // 7) desliga loading
+      setLoadingAdd(false);
     }
   }
 
@@ -284,125 +280,136 @@ export default function ProductPage() {
 
   return (
     <main className="productPage">
+      {isZoomed && (
+        <div className="zoomOverlay" onClick={() => setIsZoomed(false)}>
+          <button className="closeZoom">
+            <FiX size={30} />
+          </button>
+          <img src={currentImage} alt="Zoom" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
       <section className="productLayout">
-        {/* LEFT */}
         <div className="card galleryCard">
-          <img src={currentImage} alt={product.name} className="mainImage" />
+          <div className="mainImageContainer">
+            <img src={currentImage} alt={product.name} className="mainImage" />
+            <button className="zoomBtn" onClick={() => setIsZoomed(true)}>
+              <FiMaximize2 size={20} />
+            </button>
+          </div>
 
           <div className="thumbRow">
-            {(Array.isArray(product.images) ? product.images : []).map((image, index) => (
+            {product.images.map((image, index) => (
               <button
                 key={image.id}
-                type="button"
                 onClick={() => setSelectedImage(index)}
-                aria-label={`Selecionar imagem ${index + 1}`}
-                className="thumbBtn"
+                className={`thumbBtn ${index === selectedImage ? "thumbActive" : ""}`}
               >
-                <img
-                  src={image.url}
-                  alt={`${product.name} ${index + 1}`}
-                  className={`thumbImg ${index === selectedImage ? "thumbImgActive" : ""}`}
-                />
+                <img src={image.url} alt="thumb" className="thumbImg" />
               </button>
             ))}
           </div>
         </div>
 
-        {/* CENTER */}
-        {/* CENTER */}
-<div className="card infoCard">
-  <h1 className="productTitle">{product.name}</h1>
+        <div className="card infoCard">
+          <h1 className="productTitle">{product.name}</h1>
 
-  <p className="productPrice">
-    <strong>R$ {displayedPrice.toFixed(2)}</strong>
-  </p>
+          <p className="productPrice">
+            <strong>R$ {displayedPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+            {finalPrice !== null && <span className="oldPrice"> R$ {basePrice.toFixed(2).replace(".", ",")}</span>}
+          </p>
 
-  <p className="productDesc">{product.description || ""}</p>
+          <div className="productDesc">
+            {product.description?.split("\n").map((line, i) => (
+              <p key={i}>{line}</p>
+            ))}
+          </div>
 
-  {variations.length > 0 ? (
-    <div className="variationBlock">
-      <span className="variationLabel">Variações disponíveis:</span>
+          {variations.length > 0 && (
+            <div className="variationBlock">
+              <span className="variationLabel">Selecione uma opção:</span>
 
-      <div className="variationList">
-        {variations.map((v, index) => (
-          <button
-            key={`${v.product_id}-${v.position}-${index}`}
-            type="button"
-            className={`variationItem ${selectedVariationPos === v.position ? "variationItemActive" : ""}`}
-            onClick={() => {
-              setSelectedVariationPos(v.position);
-              setFinalPrice(null);
-              setCouponMessage("");
-            }}
-          >
-            <div className="variationInfo">
-              <p className="variationName">{v.name}</p>
-              <p className="variationStock">+Estoque ilimitado</p>
+              <div className="variationList">
+                {variations.map((v) => (
+                  <button
+                    key={v.position}
+                    className={`variationItem ${selectedVariationPos === v.position ? "variationItemActive" : ""}`}
+                    onClick={() => setSelectedVariationPos(v.position)}
+                  >
+                    <div className="variationInfo">
+                      <p className="variationName">{v.name}</p>
+                      <p className="variationStock">Em estoque</p>
+                    </div>
+                    <span className="variationPrice">R$ {v.price.toFixed(2).replace(".", ",")}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <span className="variationPrice">R$ {Number(v.price).toFixed(2)}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  ) : null}
+          )}
 
-  <div className="actions">
-    <button type="button" className="btnPrimary">
-      Comprar agora
-    </button>
+          <div className="actions">
+            <button className="btnPrimary">Comprar agora</button>
 
-    <button type="button" className="btnSecondary">
-      Adicionar ao carrinho
-    </button>
-  </div>
+            {/* ✅ BOTÃO AJUSTADO */}
+            <button className="btnSecondary" onClick={handleAddToCart} disabled={loadingAdd}>
+              {loadingAdd ? "Adicionando..." : "Adicionar ao carrinho"}
+            </button>
+          </div>
 
-  <div className="couponBox">
-    <div className="couponRow">
-      <input
-        className="couponInput"
-        value={couponCode}
-        onChange={(event) => setCouponCode(event.target.value)}
-        placeholder="Cupom"
-      />
+          <div className="couponBox">
+            <div className="couponRow">
+              <input
+                className="couponInput"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="CUPOM"
+              />
+              <button className="couponBtn" onClick={applyCoupon}>
+                Aplicar
+              </button>
+            </div>
+            {couponMessage && <p className="couponMsg">{couponMessage}</p>}
+          </div>
+        </div>
 
-      <button type="button" className="couponBtn" onClick={() => void applyCoupon()}>
-        Aplicar
-      </button>
-    </div>
-
-    {couponMessage ? <p className="couponMsg">{couponMessage}</p> : null}
-    {finalPrice !== null ? <p className="couponMsg">Preço final: R$ {finalPrice.toFixed(2)}</p> : null}
-  </div>
-</div>
-
-        {/* RIGHT */}
         <aside className="sideBar">
           <article className="sideCard">
-            <h3>Compra segura</h3>
-            <p>Sua compra é protegida por criptografia SSL</p>
+            <h3 className="securebuy">
+              Compra segura <FiLock size={18} />
+            </h3>
+            <p>Seus dados estão protegidos.</p>
           </article>
 
-          <article className="sideCard">
-            <h3>Métodos de pagamentos</h3>
-            <p>Pix, cartão e boleto</p>
-          </article>
+          <aside className="sideBar">
+            <article className="sideCard">
+              <h3>Método de pagamento</h3>
+              <p className="pix">
+                Pix <img src="/pix.jpg" className="pix" />
+              </p>
+            </article>
+          </aside>
         </aside>
       </section>
 
       {similar.length > 0 && (
         <section className="similarSection">
-          <h2>Produtos similares</h2>
+          <h2 className="similarTitle">Recomendados para você</h2>
 
           <div className="similarGrid">
             {similar.map((item) => (
-              <article key={item.id} className="similarCard">
-                <img src={item.image_url || "/download.jpg"} alt={item.name} className="similarThumb" />
+              <div key={item.id} className="similarCard" onClick={() => router.push(`/product/${item.slug}`)}>
+                <div className="similarImgWrapper">
+                  <img src={item.image_url || "/file.svg"} alt={item.name} className="similarThumb" />
+                </div>
 
-                <h4 className="similarName">{item.name}</h4>
-                <p className="similarPrice">R$ {Number(item.price).toFixed(2)}</p>
-
-                <Link href={`/product/${item.slug}`}>Ver</Link>
-              </article>
+                <div className="similarInfo">
+                  <h4 className="similarName">{item.name}</h4>
+                  <p className="similarPrice">
+                    R$ {Number(item.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                  <button className="buyButton2">Comprar</button>
+                </div>
+              </div>
             ))}
           </div>
         </section>

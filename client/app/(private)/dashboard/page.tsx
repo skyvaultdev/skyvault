@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar, { type DashboardTab } from "./components/Sidebar";
 import DashboardTabs from "./components/DashboardTabs";
+import ProductPreview from "./components/ProductPreview";
 
 type TypeKey = "products" | "categories" | "coupon";
 
@@ -14,6 +15,15 @@ type Item = {
   name: string;
   slug?: string;
   position?: number | null;
+};
+
+type ProductItem = {
+  id: number;
+  name: string;
+  slug?: string;
+  position?: number | null;
+  stock_type?: 'key' | 'file' | 'infinite';
+  stock_count?: number;
 };
 
 type Stats = {
@@ -33,10 +43,40 @@ type StoreSettings = {
 type Admin = {
   id: number;
   email: string;
+  role?: string;
 };
+
+const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
+  owner: [
+    "Acesso total",
+    "Gerenciar equipe",
+    "Editar loja",
+    "Remover admins",
+  ],
+  admin: [
+    "Gerenciar produtos",
+    "Ver analytics",
+    "Editar loja",
+  ],
+  editor: [
+    "Editar produtos",
+    "Organizar catálogo",
+  ],
+};
+
+type AdminRole = "owner" | "admin" | "editor";
 
 export default function Dashboard() {
   const router = useRouter();
+
+
+  const [isStockOpen, setIsStockOpen] = useState(false);
+  const [productToManage, setProductToManage] = useState<Item | null>(null);
+  const [stockContent, setStockContent] = useState("");
+  const [stockType, setStockType] = useState<'key' | 'file' | 'infinite'>('key');
+  const [isSavingStock, setIsSavingStock] = useState(false);
+  const [variations, setVariations] = useState<any[]>([]);
+  const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState<TypeKey>("products");
@@ -61,6 +101,9 @@ export default function Dashboard() {
     backgroundImageUrl: "",
     backgroundCss: "",
   });
+
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+
   const [colorTarget, setColorTarget] = useState<"primary" | "secondary">("primary");
   const [selectedColor, setSelectedColor] = useState("#b700ff");
   const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
@@ -68,6 +111,252 @@ export default function Dashboard() {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [orderedProducts, setOrderedProducts] = useState<Item[]>([]);
   const [draggedProductId, setDraggedProductId] = useState<number | null>(null);
+
+  const [addEmail, setAddEmail] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addRole, setAddRole] = useState<AdminRole>("editor");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addBusy, setAddBusy] = useState(false);
+  const [isRemoveOpen, setIsRemoveOpen] = useState(false);
+
+  const [removeId, setRemoveId] = useState<number | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+
+  function openAdd() {
+    setAddEmail("")
+    setAddRole("editor")
+    setAddError(null)
+    setAddBusy(false)
+    setIsAddOpen(true)
+  }
+
+  function closeAdd() {
+    setIsAddOpen(false)
+  }
+
+  function openRemove() {
+    const first = admins[0]?.id ?? null;
+    setRemoveId(first)
+    setRemoveError(null)
+    setRemoveBusy(false)
+    setIsRemoveOpen(true)
+  }
+
+  function closeRemove() {
+    setIsRemoveOpen(false)
+  }
+
+  async function handleLoadStock(id: number | string, target: "product" | "variation") {
+    if (!id) return;
+    setSelectedVariationId(target === "variation" ? Number(id) : null);
+
+    try {
+      const res = await fetch(`/api/stock/info/${target}/${id}`);
+      if (!res.ok) return;
+
+      const json = await res.json();
+      if (json.ok) {
+        setStockContent(json.data.content || "");
+        setStockType(json.data.type || 'key');
+      }
+    } catch (e) {
+      console.error("Erro ao carregar info de estoque:", e);
+    }
+  }
+
+  async function openStockModal(product: Item) {
+    setProductToManage(product);
+    setIsStockOpen(true);
+    setSelectedVariationId(null);
+    setStockContent("");
+    setVariations([]);
+
+    try {
+      const res = await fetch(`/api/products/variations/`);
+      const json = await res.json();
+
+      if (json.ok && json.data) {
+        const variationsArray = Array.isArray(json.data) ? json.data : Object.values(json.data);
+
+        if (variationsArray.length === 0) {
+          handleLoadStock(product.id, "product");
+        } else {
+          setVariations(variationsArray);
+          if (variationsArray.length === 1) {
+            handleLoadStock(variationsArray[0].id, "variation");
+          }
+        }
+      }
+    } catch (e) { }
+  }
+
+  async function handleLoadVariationStock(variationId: any) {
+    if (!variationId) return;
+    setSelectedVariationId(variationId);
+
+    try {
+      const res = await fetch(`/api/stock/info/variation/${variationId}`);
+      if (!res.ok) throw new Error(`Erro do servidor: ${res.status}`);
+
+      const json = await res.json();
+      if (json.ok) {
+        setStockContent(json.data.content || "");
+        setStockType(json.data.type || 'key');
+      }
+    } catch (e) { }
+  }
+
+  function handleImportTxt(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (el) => {
+        const content = el.target?.result as string;
+        setStockContent(prev => (prev ? prev + '\n' + content : content));
+      };
+      reader.readAsText(file);
+    }
+  }
+
+  function clearStock() {
+    if (confirm("Deseja realmente apagar todo o conteúdo deste campo?")) {
+      setStockContent("");
+    }
+  }
+
+  async function handleSaveStock() {
+    // Se não tem variação selecionada E não tem produto carregado, não faz nada
+    if (!productToManage && !selectedVariationId) {
+      alert("Nenhum item selecionado para salvar.");
+      return;
+    }
+
+    setIsSavingStock(true);
+    try {
+      const formData = new FormData();
+      formData.append("type", stockType);
+      formData.append("content", stockContent);
+
+      if (stockType === 'file') {
+        const fileInput = document.getElementById('stock-file-input') as HTMLInputElement;
+        if (fileInput?.files?.[0]) {
+          formData.append("file", fileInput.files[0]);
+        }
+      }
+
+      const endpoint = selectedVariationId ? `/api/stock/update/variation/${selectedVariationId}`
+        : `/api/stock/update/product/${productToManage?.id}`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: formData,
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (!res.ok || !contentType?.includes("application/json")) {
+        const errorText = await res.text();
+        console.error("Resposta do servidor não é JSON:", errorText);
+        throw new Error("Erro no servidor ao salvar. Verifique a rota.");
+      }
+
+      const json = await res.json();
+
+      if (json.ok) {
+        setIsStockOpen(false);
+        void loadItems();
+        alert("Estoque atualizado com sucesso!");
+      } else {
+        alert(json.message || "Erro ao salvar estoque.");
+      }
+    } catch (error: any) {
+      console.error("Erro no handleSaveStock:", error);
+      alert(error.message || "Erro de conexão.");
+    } finally {
+      setIsSavingStock(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isStockOpen && productToManage) {
+      const fetchStockInfo = async () => {
+        try {
+          const res = await fetch(`/api/stock/info/product/${productToManage.id}`);
+          const json = await res.json();
+
+          if (json.ok) {
+            setStockType(json.data.stock_type || 'key');
+            setStockContent("");
+          }
+        } catch (err) {
+          console.error("Erro ao carregar estoque", err);
+        }
+      };
+      fetchStockInfo();
+    }
+  }, [isStockOpen, productToManage]);
+
+
+  function validateEmail(email: string) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) return "Digite um email.";
+    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) return "Digite um email válido.";
+    return null;
+  }
+
+  async function handleAddConfirm() {
+    const error = validateEmail(addEmail);
+    if (error) return setAddError(error);
+
+    setAddBusy(true);
+    setAddError(null);
+
+    try {
+      const res = await fetch("/api/admins/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: addEmail,
+          role: addRole,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        setAddError(json.error || "Erro ao adicionar.");
+        return;
+      }
+
+      await loadAdmins();
+      closeAdd();
+    } finally {
+      setAddBusy(false);
+    }
+  }
+
+  async function handleRemoveConfirm() {
+    if (!removeId) return;
+
+    setRemoveBusy(true);
+    setRemoveError(null);
+
+    try {
+      const res = await fetch(`/api/admins/remove/${removeId}`, {
+        method: "DELETE",
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        setRemoveError(json.error || "Erro ao remover");
+        return;
+      }
+
+      await loadAdmins();
+      closeRemove();
+    } finally {
+      setRemoveBusy(false);
+    }
+  }
 
   async function loadStats() {
     try {
@@ -270,6 +559,304 @@ export default function Dashboard() {
   const deleteLabel = type === "products" ? "produto" : type === "categories" ? "categoria" : "cupom";
   const previewProducts = useMemo(() => orderedProducts.length > 0 ? orderedProducts : items, [items, orderedProducts]);
 
+  const renderTabContent = () => {
+    if (selectedTab === "inicio" && previewSlug) {
+      return <ProductPreview slug={previewSlug} onBack={() => setPreviewSlug(null)} />;
+    }
+
+    if (selectedTab === "estoque") {
+      return (
+        <DashboardTabs
+          selectedTab="estoque"
+          orderedProducts={orderedProducts}
+          onOpenStock={openStockModal}
+          previewProducts={previewProducts}
+          colorTarget={colorTarget}
+          selectedColor={selectedColor}
+          onChangeColorTarget={setColorTarget}
+          onChangeSelectedColor={setSelectedColor}
+          onSaveColors={saveColors}
+          storeSettings={storeSettings}
+          onBackgroundTypeChange={(type) => setStoreSettings(p => ({ ...p, backgroundType: type }))}
+          onBackgroundCssChange={(css) => setStoreSettings(p => ({ ...p, backgroundCss: css }))}
+          onBackgroundImageChange={setBackgroundImageFile}
+          onSaveBackground={saveBackground}
+          onDragStart={setDraggedProductId}
+          onDrop={moveDraggedProduct}
+          onSavePositions={savePositions}
+          admins={admins}
+        />
+      );
+    }
+
+    if (selectedTab === "inicio") {
+      return (
+        <section className="settingsPanel">
+          <h3>Prévia da Home</h3>
+          <div className="previewBanner">Banner principal da loja</div>
+          <div className="previewGrid">
+            {previewProducts.map((product) => (
+              <article key={product.id} className="previewCard">
+                <strong>{product.name}</strong>
+                <span>ID: {product.id}</span>
+              </article>
+            ))}
+            {previewProducts.length === 0 && <p>Nenhum produto disponível para prévia.</p>}
+          </div>
+        </section>
+      );
+    }
+
+    if (selectedTab === "cores") {
+      return (
+        <section className="settingsPanel">
+          <h3>Cores da loja</h3>
+
+          <label className="fieldLabel" htmlFor="color-target">
+            Grupo de cor
+          </label>
+          <select
+            id="color-target"
+            value={colorTarget ?? "primary"}
+            onChange={(event) => setColorTarget(event.target.value as "primary" | "secondary")}
+            className="settingsInput"
+          >
+            <option value="primary">Primária</option>
+            <option value="secondary">Secundária</option>
+          </select>
+
+          <label className="fieldLabel" htmlFor="color-picker">
+            Selecionar cor
+          </label>
+          <input
+            id="color-picker"
+            type="color"
+            value={selectedColor ?? "#b700ff"}
+            onChange={(event) => setSelectedColor(event.target.value)}
+            className="colorPicker"
+            aria-label="Selecionar cor da loja"
+          />
+
+          <button className="btn" type="button" onClick={() => void saveColors()} aria-label="Salvar cores da loja">
+            Salvar cores
+          </button>
+
+          <p className="helperText">
+            Primária: {storeSettings.primaryColor ?? "#b700ff"} | Secundária:{" "}
+            {storeSettings.secondaryColor ?? "#6400ff"}
+          </p>
+        </section>
+      );
+    }
+
+    if (selectedTab === "background") {
+      return (
+        <section className="settingsPanel">
+          <h3>Background</h3>
+
+          <label className="radioRow">
+            <input
+              type="radio"
+              checked={(storeSettings.backgroundType ?? "lines") === "lines"}
+              onChange={() => setStoreSettings((prev) => ({ ...prev, backgroundType: "lines" }))}
+            />
+            Linhas
+          </label>
+
+          <label className="radioRow">
+            <input
+              type="radio"
+              checked={(storeSettings.backgroundType ?? "lines") === "dots"}
+              onChange={() => setStoreSettings((prev) => ({ ...prev, backgroundType: "dots" }))}
+            />
+            Pontos
+          </label>
+
+          <label className="fieldLabel" htmlFor="background-image">
+            Upload de imagem
+          </label>
+          <input
+            id="background-image"
+            type="file"
+            accept="image/*"
+            onChange={(event) => setBackgroundImageFile(event.target.files?.[0] ?? null)}
+            className="settingsInput"
+          />
+
+          <label className="fieldLabel" htmlFor="background-css">
+            CSS customizado
+          </label>
+          <textarea
+            id="background-css"
+            value={storeSettings.backgroundCss ?? ""}
+            onChange={(event) => setStoreSettings((prev) => ({ ...prev, backgroundCss: event.target.value }))}
+            className="settingsTextarea"
+            rows={4}
+          />
+
+          <button className="btn" type="button" onClick={() => void saveBackground()} aria-label="Salvar background da loja">
+            Salvar background
+          </button>
+        </section>
+      );
+    }
+
+    if (selectedTab === "posicao") {
+      return (
+        <section className="settingsPanel">
+          <h3>Posição dos produtos</h3>
+          <div className="sortableList">
+            {orderedProducts.map((product) => (
+              <div
+                key={product.id}
+                draggable
+                onDragStart={() => setDraggedProductId(product.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => moveDraggedProduct(product.id)}
+                className="sortableItem"
+              >
+                {product.name}
+              </div>
+            ))}
+          </div>
+          <button className="btn" type="button" onClick={() => void savePositions()} aria-label="Salvar ordem dos produtos">
+            Salvar ordem
+          </button>
+        </section>
+      );
+    }
+
+
+    return (
+      <section className="settingsPanel">
+        <h3>Equipe</h3>
+
+        <div>
+          <button type="button" className="addbtn" onClick={openAdd}>
+            Adicionar Equipe
+          </button>
+
+          <button type="button" className="removebtn" onClick={openRemove} disabled={admins.length === 0}>
+            Remover Equipe
+          </button>
+        </div>
+
+        <table className="teamTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {admins.map((admin) => (
+              <tr key={admin.id}>
+                <td>{admin.id}</td>
+                <td>{admin.email}</td>
+                <td>{admin.role ?? "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {admins.length === 0 && <p>Nenhum admin encontrado.</p>}
+
+        {isAddOpen && (
+          <div className="modalOverlay" role="dialog" aria-modal="true" aria-label="Adicionar equipe">
+            <div className="modalContent">
+              <h4>Adicionar equipe</h4>
+
+              <label className="fieldLabel">
+                Email
+              </label>
+              <input
+                id="add-email"
+                type="text"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                className="settingsInput"
+                placeholder="email@dominio.com"
+                autoFocus
+              />
+
+              <label className="fieldLabel" htmlFor="add-role">
+                Role
+              </label>
+              <select
+                id="add-role"
+                value={addRole}
+                onChange={(e) => setAddRole(e.target.value as AdminRole)}
+                className="settingsInput"
+              >
+                <option value="owner">Owner</option>
+                <option value="admin">Admin</option>
+                <option value="editor">Editor</option>
+              </select>
+
+              <div className="rolePreview">
+                <strong>Permissões atribuídas:</strong>
+
+                <ul>
+                  {ROLE_PERMISSIONS[addRole].map((perm) => (
+                    <li key={perm}>{perm}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {addError && <p className="helperText">{addError}</p>}
+
+              <div>
+                <button type="button" className="btnSecondary" onClick={closeAdd} disabled={addBusy}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn" onClick={() => void handleAddConfirm()} disabled={addBusy}>
+                  {addBusy ? "Salvando..." : "Adicionar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isRemoveOpen && (
+          <div className="modalOverlay" role="dialog" aria-modal="true" aria-label="Remover equipe">
+            <div className="modalContent">
+              <h4>Remover da equipe</h4>
+
+              <label className="fieldLabel" htmlFor="remove-select">
+                Selecionar usuário
+              </label>
+
+              <select
+                id="remove-select"
+                value={removeId !== null ? String(removeId) : ""}
+                onChange={(e) => setRemoveId(Number(e.target.value))}
+                className="settingsInput"
+              >
+                {admins.map((a) => (
+                  <option key={a.id} value={String(a.id)}>
+                    {a.email} {a.role ? `(${a.role})` : ""}
+                  </option>
+                ))}
+              </select>
+
+              {removeError && <p className="helperText">{removeError}</p>}
+
+              <div>
+                <button type="button" className="btnSecondary" onClick={closeRemove} disabled={removeBusy}>
+                  Cancelar
+                </button>
+                <button type="button" className="removebtn" onClick={() => void handleRemoveConfirm()} disabled={removeBusy}>
+                  {removeBusy ? "Removendo..." : "Remover"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -286,47 +873,16 @@ export default function Dashboard() {
         <section className="mainArea">
           <div className="dashboardBuilder">
             <Sidebar selectedTab={selectedTab} onSelect={setSelectedTab} />
-            <DashboardTabs
-              selectedTab={selectedTab}
-              previewProducts={previewProducts}
-              colorTarget={colorTarget}
-              selectedColor={selectedColor}
-              onChangeColorTarget={setColorTarget}
-              onChangeSelectedColor={setSelectedColor}
-              onSaveColors={saveColors}
-              storeSettings={storeSettings}
-              onBackgroundTypeChange={(backgroundType) => setStoreSettings((prev) => ({ ...prev, backgroundType }))}
-              onBackgroundCssChange={(backgroundCss) => setStoreSettings((prev) => ({ ...prev, backgroundCss }))}
-              onBackgroundImageChange={setBackgroundImageFile}
-              onSaveBackground={saveBackground}
-              orderedProducts={orderedProducts}
-              onDragStart={setDraggedProductId}
-              onDrop={moveDraggedProduct}
-              onSavePositions={savePositions}
-              admins={admins}
-            />
+            <div className="tabContentContainer">
+              {renderTabContent()}
+            </div>
           </div>
         </section>
 
         <aside className="sidebar">
           <div className="searchRow">
-            <button
-              className="iconBtn iconAdd"
-              type="button"
-              aria-label="Adicionar produto"
-              onClick={() => router.push(`/dashboard/${type}/add`)}
-            >
-              +
-            </button>
-
-            <input
-              className="searchInput"
-              type="text"
-              placeholder="Pesquisar..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-
+            <button className="iconBtn iconAdd" onClick={() => router.push(`/dashboard/${type}/add`)}>+</button>
+            <input className="searchInput" placeholder="Pesquisar..." value={search} onChange={(e) => setSearch(e.target.value)} />
             <select className="searchSelect" value={type} onChange={(e) => setType(e.target.value as TypeKey)}>
               <option value="products">Produtos</option>
               <option value="categories">Categorias</option>
@@ -336,22 +892,164 @@ export default function Dashboard() {
 
           <div className="productList">
             {loadingItems && <div>Carregando...</div>}
-            {itemsError && <div>{itemsError}</div>}
-            {!loadingItems && items.length === 0 && <div>Nenhum resultado encontrado</div>}
+            {!loadingItems && items.map((item) => (
+              <div className="productItem" key={item.id}>
+                <a
+                  onClick={() => {
+                    if (type === "products" && item.slug) {
+                      setPreviewSlug(item.slug);
+                      setSelectedTab("inicio");
+                    }
+                  }}
 
-            {!loadingItems &&
-              items.map((item) => (
-                <div className="productItem" key={item.id}>
-                  <a className="productName">{item.name}</a>
-                  <div className="productActions">
-                    <button className="iconBtn iconEdit" type="button" onClick={() => handleEdit(item.slug ?? item.id)} aria-label={`Editar ${item.name}`}>✎</button>
-                    <button className="iconBtn iconRemove" type="button" onClick={() => openDeleteModal(item.id)} aria-label={`Remover ${item.name}`}>✕</button>
-                  </div>
+                >
+                  {item.name}
+                </a>
+                <div className="productActions">
+                  <button className="iconBtn iconEdit" onClick={() => handleEdit(item.slug ?? item.id)}>✎</button>
+                  <button className="iconBtn iconRemove" onClick={() => openDeleteModal(item.id)}>✕</button>
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
         </aside>
       </main>
+
+      {isStockOpen && productToManage && (
+        <div className="modalOverlay" onClick={() => setIsStockOpen(false)}>
+          <div className="modalContent stockModal" onClick={(e) => e.stopPropagation()}>
+            <div className="modalHeader">
+              <h4 style={{ color: "var(--primary)" }}>📦 Estoque: {productToManage.name}</h4>
+              <button className="closeBtn" onClick={() => setIsStockOpen(false)}>&times;</button>
+            </div>
+
+            <div className="modalBody">
+              <div className="variationField" style={{ marginBottom: '20px' }}>
+                <label className="fieldLabel">Selecione a Variação:</label>
+                <select
+                  className="settingsInput"
+                  value={selectedVariationId || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    console.log("Agora capturando o valor correto:", val);
+                    if (val) handleLoadVariationStock(val); // Remova o Number() se for usar o nome
+                  }}
+                >
+                  <option value="" disabled>-- Escolha qual variação editar --</option>
+                  {variations.map((v, index) => (
+                    <option
+                      key={index}
+                      value={v.product_id}
+                    >
+                      {v.name} (R$ {v.price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedVariationId ? (
+                <>
+                  <div className="stockStatusInfo">
+                    <span>Estoque Atual: <strong>{stockType === 'infinite' ? '∞' : (stockContent.split('\n').filter(k => k.trim()).length)}</strong> itens</span>
+                    <button className="textBtn danger" onClick={() => setStockContent("")}>Zerar Campos</button>
+                  </div>
+
+                  <label className="fieldLabel">Tipo de Entrega</label>
+                  <div className="stockTypeGrid">
+                    <button className={`typeBtn ${stockType === 'key' ? 'active' : ''}`} onClick={() => setStockType('key')}>🔑 Keys</button>
+                    <button className={`typeBtn ${stockType === 'file' ? 'active' : ''}`} onClick={() => setStockType('file')}>📁 Arquivo</button>
+                    <button className={`typeBtn ${stockType === 'infinite' ? 'active' : ''}`} onClick={() => setStockType('infinite')}>∞ Infinito / Fantasma</button>
+                  </div>
+
+                  <div className="stockConfigArea" style={{ marginTop: '20px' }}>
+                    {stockType === 'key' && (
+                      <>
+                        <div className="labelRow">
+                          <label className="fieldLabel">Chaves (uma por linha)</label>
+                          <input
+                            type="file"
+                            id="import-txt"
+                            accept=".txt"
+                            hidden
+                            onChange={handleImportTxt}
+                          />
+                          <button className="miniBtn" onClick={() => document.getElementById('import-txt')?.click()}>📂 Importar .txt</button>
+                        </div>
+                        <textarea
+                          className="settingsTextarea stockArea"
+                          placeholder="Cole suas chaves aqui...&#10;Ex:&#10;CHAVE-001&#10;CHAVE-002"
+                          value={stockContent}
+                          onChange={(e) => setStockContent(e.target.value)}
+                          rows={12}
+                        />
+                      </>
+                    )}
+
+                    {stockType === 'file' && (
+                      <div className="fileUploadZone">
+                        <label className="fieldLabel">Upload do Produto Digital</label>
+                        <input
+                          type="file"
+                          id="stock-file-input"
+                          className="settingsInput"
+                          onChange={(e) => setStockContent(e.target.files?.[0]?.name || "")}
+                        />
+                        <p className="helperText">O cliente receberá este arquivo após a compra.</p>
+                      </div>
+                    )}
+
+                    {stockType === 'infinite' && (
+                      <div className="ghostStockArea">
+                        <p className="helperText">O estoque infinito não diminui após as vendas.</p>
+                        <label className="fieldLabel">Conteúdo a ser entregue:</label>
+                        <textarea
+                          className="settingsTextarea"
+                          placeholder="Link ou mensagem que o cliente receberá sempre..."
+                          value={stockContent}
+                          onChange={(e) => setStockContent(e.target.value)}
+                          rows={4}
+                        />
+                        <div className="ghostOption">
+                          <label className="fieldLabel">Exibir Estoque Fantasma (Visual)</label>
+                          <input
+                            type="number"
+                            className="settingsInput"
+                            placeholder="Ex: 999 (Apenas visual para o cliente)"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="field">
+                  <p>Selecione uma variação acima para gerenciar o estoque.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="modalActions">
+              <button className="btnSecondary" onClick={() => setIsStockOpen(false)}>Cancelar</button>
+              <div className="rightActions">
+                <button
+                  className="btnDanger"
+                  onClick={() => { if (confirm("Apagar todo o estoque desta variação?")) { setStockContent(""); } }}
+                  disabled={!selectedVariationId}
+                >
+                  Excluir Tudo
+                </button>
+                <button
+                  className="btnConfirm2"
+                  onClick={() => void handleSaveStock()}
+                  disabled={isSavingStock || !selectedVariationId}
+                >
+                  {isSavingStock ? "Salvando..." : "Salvar Configurações"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isDeleteOpen && (
         <div className="modalOverlay" onClick={closeDeleteModal}>

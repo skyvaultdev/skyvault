@@ -11,11 +11,14 @@ export async function GET(_: Request, { params }: Params) {
     const { id } = await params;
     const db = getDB();
 
-    const category = await db.query("SELECT id, name, slug, image_url FROM categories WHERE id = $1", [Number(id)]);
+    const isNumeric = /^\d+$/.test(id);
+    const insertId = isNumeric ? Number(id) : id;
+    const category = await db.query("SELECT id, name, slug, image_url FROM categories WHERE slug = $1", 
+      [insertId]
+    );
     if (category.rows.length === 0) return fail("NOT_FOUND", 404);
 
-    const products = await db.query("SELECT id, name FROM products WHERE category_id = $1 ORDER BY name", [Number(id)]);
-    return ok({ ...category.rows[0], products: products.rows });
+    return ok({ ...category.rows[0]});
   } catch (error) {
     console.error(error);
     return fail("INTERNAL_ERROR", 500);

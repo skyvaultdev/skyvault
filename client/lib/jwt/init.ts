@@ -35,3 +35,17 @@ export async function hasPermission(token: string, permission: string) {
     return false;
   }
 }
+
+export async function hasRole(token: string, role: string) {
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    if(!payload) return false
+    
+    const setRole = (payload.roles as string[]) || [];
+    if (!setRole.includes(role)) {
+      return false;
+    } else return true;
+  } catch {
+    return false;
+  }
+}

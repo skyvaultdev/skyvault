@@ -173,7 +173,7 @@ export default function Dashboard() {
     setVariations([]);
 
     try {
-      const res = await fetch(`/api/products/variations/`);
+      const res = await fetch(`/api/products/variations/${product.id}`);
       const json = await res.json();
 
       if (json.ok && json.data) {

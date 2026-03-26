@@ -71,7 +71,7 @@ export async function GET(req: Request) {
     const result = await db.query(
       `
       SELECT p.id, p.name, p.slug, p.description, p.price, p.active, p.position,
-             p.category_id, p.stock_count,p.is_unlimited, c.name AS category_name, c.slug AS category_slug,
+             p.category_id, p.stock_count,p.is_unlimited,p.stock_type,c.name AS category_name, c.slug AS category_slug,
             (
               SELECT pi.url
               FROM product_images pi
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
               LIMIT 1
             ) AS image_url,
             (
-              SELECT COALESCE(json_agg(json_build_object('id', pv.id, 'name', pv.name, 'price', pv.price,'stock_count', pv.stock_count,'is_unlimited',pv.is_unlimited)), '[]')
+              SELECT COALESCE(json_agg(json_build_object('id', pv.id, 'name', pv.name, 'price', pv.price,'stock_count', pv.stock_count,'is_unlimited',pv.is_unlimited, 'stock_type',pv.stock_type)), '[]')
               FROM product_variations pv
               WHERE pv.product_id = p.id
             ) AS variations

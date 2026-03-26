@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userEmail = decoded.email;
-    const db = await getDB();
+    const db = getDB();
 
     const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest) {
 
     const userEmail = decoded.email;
 
-    const db = await getDB();
+    const db = getDB();
     const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
 
@@ -84,10 +84,10 @@ export async function PUT(req: NextRequest) {
     const quantityToAdd = Number(body.quantity ?? 1);
 
     if (!product_id || quantityToAdd <= 0) return fail("INVALID_DATA", 400);
-    const stockCheckQuery = variation_id 
+    const stockCheckQuery = variation_id
       ? `SELECT stock_count, is_unlimited FROM product_variations WHERE id = $1 AND product_id = $2`
       : `SELECT stock_count, is_unlimited FROM products WHERE id = $1`;
-    
+
     const stockParams = variation_id ? [variation_id, product_id] : [product_id];
     const { rows: stockData } = await db.query(stockCheckQuery, stockParams);
 
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
     const userEmail = decoded.email;
-    const db = await getDB();
+    const db = getDB();
     const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
 
@@ -149,7 +149,27 @@ export async function POST(req: NextRequest) {
 
     if (quantity <= 0) {
       await db.query("DELETE FROM cart_items WHERE id = $1 AND user_id = $2", [cart_item_id, userId]);
-      return ok({ message: "Item removed from cart" });
+      return ok({ message: "Item removed" });
+    }
+
+    const validateStock = await db.query(`
+      SELECT p.stock_count as p_stock, p.is_unlimited as p_unlim, 
+             v.stock_count as v_stock, v.is_unlimited as v_unlim,
+             c.variation_id
+      FROM cart_items c
+      JOIN products p ON c.product_id = p.id
+      LEFT JOIN product_variations v ON c.variation_id = v.id
+      WHERE c.id = $1 AND c.user_id = $2
+    `, [cart_item_id, userId]);
+
+    if (validateStock.rowCount === 0) return fail("ITEM_NOT_FOUND", 404);
+
+    const info = validateStock.rows[0];
+    const isUnlimited = info.variation_id ? info.v_unlim : info.p_unlim;
+    const stockCount = info.variation_id ? info.v_stock : info.p_stock;
+
+    if (!isUnlimited && stockCount < quantity) {
+      return fail("INSUFFICIENT_STOCK", 400);
     }
 
     const result = await db.query(
@@ -157,7 +177,6 @@ export async function POST(req: NextRequest) {
       [quantity, cart_item_id, userId]
     );
 
-    if (result.rowCount === 0) return fail("ITEM_NOT_FOUND", 404);
     return ok(result.rows[0]);
   } catch (error) {
     console.error("Erro no POST Cart Update:", error);

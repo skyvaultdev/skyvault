@@ -31,7 +31,7 @@ export async function GET(_: Request, { params }: Params) {
     );
 
     const variations = await db.query(
-      `SELECT id, name, price, stock_count, is_unlimited FROM product_variations WHERE product_id = $1 ORDER BY id ASC`,
+      `SELECT id, name, price, stock_count,is_unlimited,stock_type FROM product_variations WHERE product_id = $1 ORDER BY id ASC`,
       [product.id]
     );
 

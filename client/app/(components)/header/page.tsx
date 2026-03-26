@@ -15,6 +15,8 @@ type CartItem = {
   unit_price: number;
   quantity: number;
   image_url: string;
+  stock_count: number;
+  is_unlimited: boolean;
 };
 
 export default function Header() {
@@ -72,6 +74,9 @@ export default function Header() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cart_item_id: id, quantity: newQty }),
       });
+
+      const data = await res.json();
+
       if (res.ok) {
         if (newQty <= 0) {
           setCartItems((prev) => prev.filter((item) => item.cart_item_id !== id));
@@ -79,6 +84,12 @@ export default function Header() {
           setCartItems((prev) =>
             prev.map((item) => (item.cart_item_id === id ? { ...item, quantity: newQty } : item))
           );
+        }
+      } else {
+        if (data.message === "INSUFFICIENT_STOCK") {
+          alert("Quantidade máxima em estoque atingida.");
+        } else {
+          console.error("Erro ao atualizar carrinho:", data.message);
         }
       }
     } catch (err) {
@@ -100,31 +111,49 @@ export default function Header() {
         {cartItems.length === 0 ? (
           <p className="emptyMsg">Seu carrinho está vazio.</p>
         ) : (
-          cartItems.map((item) => (
-            <div key={item.cart_item_id} className="cartItemContainer">
-              <div className="cartItemMain">
-                <img src={item.image_url || "/file.svg"} alt={item.product_name} className="cartItemImg" />
-                <div className="cartItemTitle"><h4>{item.product_name}</h4></div>
-              </div>
-              <div className="cartItemSub">
-                <div className="subDetails">
-                  <span className="arrow">↳</span>
-                  <div>
-                    <p className="varName">{item.variation_name}</p>
-                    <p className="itemPrice">R$ {Number(item.unit_price).toFixed(2).replace(".", ",")}</p>
+          cartItems.map((item) => {
+            const canIncrease = item.is_unlimited || item.quantity < item.stock_count;
+
+            return (
+              <div key={item.cart_item_id} className="cartItemContainer">
+                <div className="cartItemMain">
+                  <img src={item.image_url || "/file.svg"} alt={item.product_name} className="cartItemImg" />
+                  <div className="cartItemTitle"><h4>{item.product_name}</h4></div>
+                </div>
+                <div className="cartItemSub">
+                  <div className="subDetails">
+                    <span className="arrow">↳</span>
+                    <div>
+                      <p className="varName">{item.variation_name}</p>
+                      <p className="itemPrice">R$ {Number(item.unit_price).toFixed(2).replace(".", ",")}</p>
+                    </div>
+                  </div>
+                  <div className="cartActions">
+                    <div className="qtyBox">
+                      <button
+                        className="qtyBtn"
+                        onClick={() => updateQuantity(item.cart_item_id, item.quantity - 1)}
+                      >
+                        <FaMinus size={10} />
+                      </button>
+
+                      <span className="qtyValue">{item.quantity}</span>
+
+                      <button
+                        className={`qtyBtn ${!canIncrease ? "disabledQty" : ""}`}
+                        onClick={() => canIncrease && updateQuantity(item.cart_item_id, item.quantity + 1)}
+                        disabled={!canIncrease}
+                        title={!canIncrease ? "Limite de estoque atingido" : ""}
+                      >
+                        <FaPlus size={10} />
+                      </button>
+                    </div>
+                    <button className="deleteBtn" onClick={() => updateQuantity(item.cart_item_id, 0)}><FaTrash size={14} /></button>
                   </div>
                 </div>
-                <div className="cartActions">
-                  <div className="qtyBox">
-                    <button className="qtyBtn" onClick={() => updateQuantity(item.cart_item_id, item.quantity - 1)}><FaMinus size={10} /></button>
-                    <span className="qtyValue">{item.quantity}</span>
-                    <button className="qtyBtn" onClick={() => updateQuantity(item.cart_item_id, item.quantity + 1)}><FaPlus size={10} /></button>
-                  </div>
-                  <button className="deleteBtn" onClick={() => updateQuantity(item.cart_item_id, 0)}><FaTrash size={14} /></button>
-                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       <div className="cartFooter">

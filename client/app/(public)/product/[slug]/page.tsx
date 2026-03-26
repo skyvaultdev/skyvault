@@ -119,7 +119,6 @@ export default function ProductPage() {
           .sort((a, b) => a.position - b.position);
 
         setVariations(cleaned);
-        console.log(cleaned)
         if (cleaned.length > 0) {
           const firstAvailable = cleaned.find(v => v.is_unlimited || v.stock_count > 0);
           setSelectedVariationPos(firstAvailable ? firstAvailable.id : cleaned[0].id);

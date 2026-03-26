@@ -207,7 +207,7 @@ export default function StockEditPage() {
             </button>
 
             <button onClick={() => setStockType("infinite")} className={`typeBtn ${stockType === "infinite" ? "active" : ""}`}>
-              Infinito
+              Fantasma
             </button>
           </div>
 

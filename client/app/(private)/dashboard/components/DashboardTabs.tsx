@@ -15,6 +15,7 @@ type ProductItem = {
   position?: number | null;
   stock_type?: 'key' | 'file' | 'infinite';
   stock_count?: number;
+  image_url?: string;
 };
 
 type AdminItem = {
@@ -74,9 +75,12 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     admins,
   } = props;
 
+
   const previewCards = useMemo(() => previewProducts.slice(0, 4), [previewProducts]);
 
- if (selectedTab === "estoque") {
+
+  if (selectedTab === "estoque") {
+    console.log(orderedProducts);
     return (
       <section className="settingsPanel">
         <div className="tabHeader">
@@ -84,34 +88,45 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           <p className="helperText">Configure a entrega de keys, arquivos ou estoque infinito para cada produto.</p>
         </div>
 
-        
         <div className="inventoryGrid">
           {orderedProducts.map((product) => (
             <div key={product.id} className="inventoryCard">
-              <div className="productInfoCell">
-                <strong>{product.name}</strong>
-                <span>ID: {product.id}</span>
+              <div className="productImagePreview">
+                <img
+                  src={product.image_url || "/file.svg"}
+                  alt={product.name}
+                  className="stockProductImg"
+                />
               </div>
-              
-              <div className="stockStatus">
-                <span className={`stockBadge ${product.stock_type || 'none'}`}>
-                  {product.stock_type === 'key' ? `Keys (${product.stock_count || 0})` :
-                    product.stock_type === 'file' ? 'Arquivo' :
-                    product.stock_type === 'infinite' ? 'Infinito' : 'Não configurado'}
-                </span>
+              <div className="productInfoCell">
+                <strong>
+                  {product.name}
+                </strong>
+                <strong className="stockQtyInline">
+                 Stock = ({product.stock_type === 'infinite' ? '∞' : (product.stock_count ?? 0)})
+                </strong>
+              </div>
+
+              <div className="infoProd">
+                <div className="slug">• {product.slug}</div>
+                <div className="tipo">• {product.stock_type === 'key' ? `Keys` :
+                  product.stock_type === 'file' ? 'Arquivo' :
+                    product.stock_type === 'infinite' ? 'Infinito' :
+                       'Sem estoque configurado'}
+                </div>
               </div>
 
               <div className="cardActions">
-                <Link href={`/dashboard/stock/manage/${product.id}`} style={{ width: '100%' }}>
-                  <button className="btnEditSmall" style={{ width: '100%' }}>
-                    Configurar
+                <Link href={`/dashboard/stock/manage/${product.id}`}>
+                  <button className="btnEditSmall">
+                   ⚙️ Configurar
                   </button>
                 </Link>
               </div>
             </div>
           ))}
         </div>
-        
+
         {orderedProducts.length === 0 && (
           <p className="emptyMsg">Nenhum produto encontrado.</p>
         )}

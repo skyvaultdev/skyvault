@@ -14,7 +14,6 @@ export async function GET(_: Request, { params }: Params) {
     const db = getDB();
     const isNumeric = /^\d+$/.test(id);
 
-    // Busca o produto (corrigido WHERE para aceitar ID numérico ou Slug)
     const result = await db.query(
       `SELECT p.*, c.name as category_name, c.slug as category_slug
        FROM products p
@@ -32,14 +31,14 @@ export async function GET(_: Request, { params }: Params) {
     );
 
     const variations = await db.query(
-      `SELECT id, name, price FROM product_variations WHERE product_id = $1 ORDER BY id ASC`,
+      `SELECT id, name, price, stock_count, is_unlimited FROM product_variations WHERE product_id = $1 ORDER BY id ASC`,
       [product.id]
     );
 
     return ok({
       ...product,
       images: images.rows,
-      variations: variations.rows // Retornando as variações aqui
+      variations: variations.rows
     });
 
   } catch (error) {

@@ -6,7 +6,6 @@
   --transition-smooth: all 0.3s ease;
 }
 
-/* ===== BOTÕES DE AÇÃO DO PAINEL ===== */
 .addbtn, .removebtn {
     color: white;
     border: none;
@@ -403,40 +402,7 @@
   align-items: center;
   gap: 8px;
 }
-
-.stockBadge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.stockBadge.key { background: rgba(255, 191, 0, 0.1); color: #ffbf00; }
-.stockBadge.file { background: rgba(0, 140, 255, 0.1); color: #008cff; }
-.stockBadge.infinite { background: rgba(162, 0, 255, 0.1); color: #a200ff; }
-
-.btnEditSmall {
-  background: var(--primary);
-  border: none;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: opacity 0.2s;
-}
-
-.btnEditSmall:hover {
-  opacity: 0.8;
-}
-
-.inventoryGrid {
-  margin-top: 20px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  padding: 10px;
-}
+ 
 
 @media (max-width: 1024px) {
   .previewContainer .productLayout {

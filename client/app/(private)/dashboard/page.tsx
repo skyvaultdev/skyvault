@@ -69,15 +69,6 @@ type AdminRole = "owner" | "admin" | "editor";
 export default function Dashboard() {
   const router = useRouter();
 
-
-  const [isStockOpen, setIsStockOpen] = useState(false);
-  const [productToManage, setProductToManage] = useState<Item | null>(null);
-  const [stockContent, setStockContent] = useState("");
-  const [stockType, setStockType] = useState<'key' | 'file' | 'infinite'>('key');
-  const [isSavingStock, setIsSavingStock] = useState(false);
-  const [variations, setVariations] = useState<any[]>([]);
-  const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
-
   const [search, setSearch] = useState("");
   const [type, setType] = useState<TypeKey>("products");
   const [selectedTab, setSelectedTab] = useState<DashboardTab>("inicio");
@@ -101,6 +92,7 @@ export default function Dashboard() {
     backgroundImageUrl: "",
     backgroundCss: "",
   });
+
 
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
 
@@ -146,156 +138,6 @@ export default function Dashboard() {
   function closeRemove() {
     setIsRemoveOpen(false)
   }
-
-  async function handleLoadStock(id: number | string, target: "product" | "variation") {
-    if (!id) return;
-    setSelectedVariationId(target === "variation" ? Number(id) : null);
-
-    try {
-      const res = await fetch(`/api/stock/info/${target}/${id}`);
-      if (!res.ok) return;
-
-      const json = await res.json();
-      if (json.ok) {
-        setStockContent(json.data.content || "");
-        setStockType(json.data.type || 'key');
-      }
-    } catch (e) {
-      console.error("Erro ao carregar info de estoque:", e);
-    }
-  }
-
-  async function openStockModal(product: Item) {
-    setProductToManage(product);
-    setIsStockOpen(true);
-    setSelectedVariationId(null);
-    setStockContent("");
-    setVariations([]);
-
-    try {
-      const res = await fetch(`/api/products/variations/${product.id}`);
-      const json = await res.json();
-
-      if (json.ok && json.data) {
-        const variationsArray = Array.isArray(json.data) ? json.data : Object.values(json.data);
-
-        if (variationsArray.length === 0) {
-          handleLoadStock(product.id, "product");
-        } else {
-          setVariations(variationsArray);
-          if (variationsArray.length === 1) {
-            handleLoadStock(variationsArray[0].id, "variation");
-          }
-        }
-      }
-    } catch (e) { }
-  }
-
-  async function handleLoadVariationStock(variationId: any) {
-    if (!variationId) return;
-    setSelectedVariationId(variationId);
-
-    try {
-      const res = await fetch(`/api/stock/info/variation/${variationId}`);
-      if (!res.ok) throw new Error(`Erro do servidor: ${res.status}`);
-
-      const json = await res.json();
-      if (json.ok) {
-        setStockContent(json.data.content || "");
-        setStockType(json.data.type || 'key');
-      }
-    } catch (e) { }
-  }
-
-  function handleImportTxt(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (el) => {
-        const content = el.target?.result as string;
-        setStockContent(prev => (prev ? prev + '\n' + content : content));
-      };
-      reader.readAsText(file);
-    }
-  }
-
-  function clearStock() {
-    if (confirm("Deseja realmente apagar todo o conteúdo deste campo?")) {
-      setStockContent("");
-    }
-  }
-
-  async function handleSaveStock() {
-    // Se não tem variação selecionada E não tem produto carregado, não faz nada
-    if (!productToManage && !selectedVariationId) {
-      alert("Nenhum item selecionado para salvar.");
-      return;
-    }
-
-    setIsSavingStock(true);
-    try {
-      const formData = new FormData();
-      formData.append("type", stockType);
-      formData.append("content", stockContent);
-
-      if (stockType === 'file') {
-        const fileInput = document.getElementById('stock-file-input') as HTMLInputElement;
-        if (fileInput?.files?.[0]) {
-          formData.append("file", fileInput.files[0]);
-        }
-      }
-
-      const endpoint = selectedVariationId ? `/api/stock/update/variation/${selectedVariationId}`
-        : `/api/stock/update/product/${productToManage?.id}`;
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        body: formData,
-      });
-
-      const contentType = res.headers.get("content-type");
-      if (!res.ok || !contentType?.includes("application/json")) {
-        const errorText = await res.text();
-        console.error("Resposta do servidor não é JSON:", errorText);
-        throw new Error("Erro no servidor ao salvar. Verifique a rota.");
-      }
-
-      const json = await res.json();
-
-      if (json.ok) {
-        setIsStockOpen(false);
-        void loadItems();
-        alert("Estoque atualizado com sucesso!");
-      } else {
-        alert(json.message || "Erro ao salvar estoque.");
-      }
-    } catch (error: any) {
-      console.error("Erro no handleSaveStock:", error);
-      alert(error.message || "Erro de conexão.");
-    } finally {
-      setIsSavingStock(false);
-    }
-  }
-
-  useEffect(() => {
-    if (isStockOpen && productToManage) {
-      const fetchStockInfo = async () => {
-        try {
-          const res = await fetch(`/api/stock/info/product/${productToManage.id}`);
-          const json = await res.json();
-
-          if (json.ok) {
-            setStockType(json.data.stock_type || 'key');
-            setStockContent("");
-          }
-        } catch (err) {
-          console.error("Erro ao carregar estoque", err);
-        }
-      };
-      fetchStockInfo();
-    }
-  }, [isStockOpen, productToManage]);
-
 
   function validateEmail(email: string) {
     const trimmedEmail = email.trim();
@@ -464,6 +306,8 @@ export default function Dashboard() {
     router.push(`/dashboard/${type}/edit/${slugOrId}`);
   }
 
+
+
   function openDeleteModal(id: number) {
     setItemToDelete(id);
     setIsDeleteOpen(true);
@@ -569,7 +413,6 @@ export default function Dashboard() {
         <DashboardTabs
           selectedTab="estoque"
           orderedProducts={orderedProducts}
-          onOpenStock={openStockModal}
           previewProducts={previewProducts}
           colorTarget={colorTarget}
           selectedColor={selectedColor}
@@ -631,7 +474,7 @@ export default function Dashboard() {
           <input
             id="color-picker"
             type="color"
-            value={selectedColor ?? "#b700ff"}
+            value={String(selectedColor || "#b700ff")}
             onChange={(event) => setSelectedColor(event.target.value)}
             className="colorPicker"
             aria-label="Selecionar cor da loja"
@@ -648,6 +491,7 @@ export default function Dashboard() {
         </section>
       );
     }
+
 
     if (selectedTab === "background") {
       return (
@@ -914,142 +758,6 @@ export default function Dashboard() {
           </div>
         </aside>
       </main>
-
-      {isStockOpen && productToManage && (
-        <div className="modalOverlay" onClick={() => setIsStockOpen(false)}>
-          <div className="modalContent stockModal" onClick={(e) => e.stopPropagation()}>
-            <div className="modalHeader">
-              <h4 style={{ color: "var(--primary)" }}>📦 Estoque: {productToManage.name}</h4>
-              <button className="closeBtn" onClick={() => setIsStockOpen(false)}>&times;</button>
-            </div>
-
-            <div className="modalBody">
-              <div className="variationField" style={{ marginBottom: '20px' }}>
-                <label className="fieldLabel">Selecione a Variação:</label>
-                <select
-                  className="settingsInput"
-                  value={selectedVariationId || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    console.log("Agora capturando o valor correto:", val);
-                    if (val) handleLoadVariationStock(val); // Remova o Number() se for usar o nome
-                  }}
-                >
-                  <option value="" disabled>-- Escolha qual variação editar --</option>
-                  {variations.map((v, index) => (
-                    <option
-                      key={index}
-                      value={v.product_id}
-                    >
-                      {v.name} (R$ {v.price})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedVariationId ? (
-                <>
-                  <div className="stockStatusInfo">
-                    <span>Estoque Atual: <strong>{stockType === 'infinite' ? '∞' : (stockContent.split('\n').filter(k => k.trim()).length)}</strong> itens</span>
-                    <button className="textBtn danger" onClick={() => setStockContent("")}>Zerar Campos</button>
-                  </div>
-
-                  <label className="fieldLabel">Tipo de Entrega</label>
-                  <div className="stockTypeGrid">
-                    <button className={`typeBtn ${stockType === 'key' ? 'active' : ''}`} onClick={() => setStockType('key')}>🔑 Keys</button>
-                    <button className={`typeBtn ${stockType === 'file' ? 'active' : ''}`} onClick={() => setStockType('file')}>📁 Arquivo</button>
-                    <button className={`typeBtn ${stockType === 'infinite' ? 'active' : ''}`} onClick={() => setStockType('infinite')}>∞ Infinito / Fantasma</button>
-                  </div>
-
-                  <div className="stockConfigArea" style={{ marginTop: '20px' }}>
-                    {stockType === 'key' && (
-                      <>
-                        <div className="labelRow">
-                          <label className="fieldLabel">Chaves (uma por linha)</label>
-                          <input
-                            type="file"
-                            id="import-txt"
-                            accept=".txt"
-                            hidden
-                            onChange={handleImportTxt}
-                          />
-                          <button className="miniBtn" onClick={() => document.getElementById('import-txt')?.click()}>📂 Importar .txt</button>
-                        </div>
-                        <textarea
-                          className="settingsTextarea stockArea"
-                          placeholder="Cole suas chaves aqui...&#10;Ex:&#10;CHAVE-001&#10;CHAVE-002"
-                          value={stockContent}
-                          onChange={(e) => setStockContent(e.target.value)}
-                          rows={12}
-                        />
-                      </>
-                    )}
-
-                    {stockType === 'file' && (
-                      <div className="fileUploadZone">
-                        <label className="fieldLabel">Upload do Produto Digital</label>
-                        <input
-                          type="file"
-                          id="stock-file-input"
-                          className="settingsInput"
-                          onChange={(e) => setStockContent(e.target.files?.[0]?.name || "")}
-                        />
-                        <p className="helperText">O cliente receberá este arquivo após a compra.</p>
-                      </div>
-                    )}
-
-                    {stockType === 'infinite' && (
-                      <div className="ghostStockArea">
-                        <p className="helperText">O estoque infinito não diminui após as vendas.</p>
-                        <label className="fieldLabel">Conteúdo a ser entregue:</label>
-                        <textarea
-                          className="settingsTextarea"
-                          placeholder="Link ou mensagem que o cliente receberá sempre..."
-                          value={stockContent}
-                          onChange={(e) => setStockContent(e.target.value)}
-                          rows={4}
-                        />
-                        <div className="ghostOption">
-                          <label className="fieldLabel">Exibir Estoque Fantasma (Visual)</label>
-                          <input
-                            type="number"
-                            className="settingsInput"
-                            placeholder="Ex: 999 (Apenas visual para o cliente)"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="field">
-                  <p>Selecione uma variação acima para gerenciar o estoque.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="modalActions">
-              <button className="btnSecondary" onClick={() => setIsStockOpen(false)}>Cancelar</button>
-              <div className="rightActions">
-                <button
-                  className="btnDanger"
-                  onClick={() => { if (confirm("Apagar todo o estoque desta variação?")) { setStockContent(""); } }}
-                  disabled={!selectedVariationId}
-                >
-                  Excluir Tudo
-                </button>
-                <button
-                  className="btnConfirm2"
-                  onClick={() => void handleSaveStock()}
-                  disabled={isSavingStock || !selectedVariationId}
-                >
-                  {isSavingStock ? "Salvando..." : "Salvar Configurações"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isDeleteOpen && (
         <div className="modalOverlay" onClick={closeDeleteModal}>

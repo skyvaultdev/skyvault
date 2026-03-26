@@ -92,7 +92,7 @@ export default function Header() {
     <div className="cartDropdown">
       <div className="cartHeader">
         <h3>Carrinho</h3>
-        <button onClick={() => setCartAberto(false)} className="closeBtn">
+        <button onClick={() => setCartAberto(false)} className="closeBtncart">
           <FiX size={20} />
         </button>
       </div>

@@ -1,0 +1,10 @@
+.inventoryGrid{
+    display: grid;
+    gap: 15px;
+    padding: 10px;
+}
+
+.inventoryCard{
+    border: solid var(--primary) 1px;
+    padding: 5 10;
+}

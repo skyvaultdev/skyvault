@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import LoadingHandler from "./(components)/loader/LoadingHandler";
+import { Suspense } from "react";
+
 import "./(components)/header/header.css";
 import Header from "./(components)/header/page";
 import "./(components)/footer/footer.css";
@@ -66,12 +69,13 @@ export default async function RootLayout({
         }}
         className={`${geistSans.variable} ${geistMono.variable}`}
       >
-        {/* Overlay visual apenas */}
-        <div className="transparency-box" />
 
-        {/* Layout estrutural correto */}
+        <div className="transparency-box" />
         <div className="page-wrapper">
           <Header />
+          <Suspense fallback={null}>
+            <LoadingHandler />
+          </Suspense>
           <main className="main-content">
             {children}
           </main>

@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiLock, FiX, FiMaximize2 } from "react-icons/fi";
 
-// --- TIPOS ---
 type ProductImage = { id: number; url: string; position: number };
 
 type Product = {
@@ -18,13 +17,18 @@ type Product = {
   price: number;
   category_id: number | null;
   images: ProductImage[];
+  stock_count: number;
+  is_unlimited: boolean;
 };
 
 type Variations = {
+  id: number;
   product_id: number;
   name: string;
   price: number;
   position: number;
+  stock_count: number;
+  is_unlimited: boolean;
 };
 
 type Coupon = {
@@ -40,6 +44,14 @@ type Similar = {
   price: number;
   image_url: string | null;
 };
+
+function getSimilarity(a: string, b: string) {
+  const wordsA = a.toLowerCase().split(/\s+/);
+  const wordsB = b.toLowerCase().split(/\s+/);
+
+  const matches = wordsA.filter((w) => wordsB.includes(w));
+  return matches.length / Math.max(wordsA.length, 1);
+}
 
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
@@ -58,7 +70,6 @@ export default function ProductPage() {
   const [couponMessage, setCouponMessage] = useState("");
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
 
-  // ✅ loading só do botão "Adicionar ao carrinho"
   const [loadingAdd, setLoadingAdd] = useState(false);
 
   useEffect(() => {
@@ -79,8 +90,6 @@ export default function ProductPage() {
         if (!json.ok || !json.data || cancelled) return;
 
         const data = json.data as Product;
-
-        // reseta estados ao trocar de produto
         setProduct(null);
         setVariations([]);
         setSimilar([]);
@@ -95,6 +104,26 @@ export default function ProductPage() {
           price: Number(data.price),
           images: Array.isArray(data.images) ? data.images : [],
         });
+
+        const vData: Variations[] = Array.isArray(json.data.variations)
+          ? json.data.variations
+          : [];
+
+        const cleaned = vData
+          .map((v) => ({
+            ...v,
+            price: Number(v.price),
+            stock_count: v.stock_count,
+            is_unlimited: Boolean(v.is_unlimited)
+          }))
+          .sort((a, b) => a.position - b.position);
+
+        setVariations(cleaned);
+        console.log(cleaned)
+        if (cleaned.length > 0) {
+          const firstAvailable = cleaned.find(v => v.is_unlimited || v.stock_count > 0);
+          setSelectedVariationPos(firstAvailable ? firstAvailable.id : cleaned[0].id);
+        }
 
         setNotFound(false);
       } catch {
@@ -116,55 +145,41 @@ export default function ProductPage() {
       if (!product) return;
 
       try {
-        const vRes = await fetch(`/api/products/variations/${product.id}`);
-        const vJson = await vRes.json();
-
-        if (vJson.ok && !cancelled) {
-          const list = Array.isArray(vJson.data) ? vJson.data : Object.values(vJson.data || {});
-          const cleaned = (list as Variations[])
-            .map((v) => ({ ...v, price: Number(v.price) }))
-            .sort((a, b) => a.position - b.position);
-
-          setVariations(cleaned);
-
-          if (cleaned.length > 0) setSelectedVariationPos(cleaned[0].position);
-        }
-
         const allRes = await fetch(`/api/products`);
         const allJson = await allRes.json();
-        if (!allJson.ok || cancelled) return;
 
         const pool: any[] = allJson.data;
-        const currentWords = product.name.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
 
-        const listSameCategory: any[] = [];
-        const listSimilarWords: any[] = [];
-        const listNoCategory: any[] = [];
+        const sameCategory: any[] = [];
+        const similarWords: { item: any; score: number }[] = [];
+        const noCategory: any[] = [];
 
         pool.forEach((item) => {
           if (item.id === product.id) return;
 
           if (product.category_id && item.category_id === product.category_id) {
-            listSameCategory.push(item);
+            sameCategory.push(item);
             return;
           }
 
-          const itemWords = item.name.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
-          const common = currentWords.filter((w) => itemWords.includes(w));
-          const similarity = common.length / Math.max(currentWords.length, 1);
-
-          if (similarity >= 0.5) {
-            listSimilarWords.push(item);
+          const score = getSimilarity(product.name, item.name);
+          if (score >= 0.4) {
+            similarWords.push({ item, score });
             return;
           }
 
           if (!item.category_id) {
-            listNoCategory.push(item);
+            noCategory.push(item);
           }
         });
 
-        const finalResults = [...listSameCategory, ...listSimilarWords, ...listNoCategory]
-          .filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i)
+        similarWords.sort((a, b) => b.score - a.score);
+        const finalResults = [
+          ...sameCategory,
+          ...similarWords.map((s) => s.item),
+          ...noCategory,
+        ]
+          .filter((v, i, arr) => arr.findIndex((t) => t.id === v.id) === i)
           .slice(0, 4)
           .map((item) => ({
             id: Number(item.id),
@@ -174,20 +189,17 @@ export default function ProductPage() {
             image_url: item.image_url || null,
           }));
 
-        if (!cancelled) setSimilar(finalResults);
+        setSimilar(finalResults);
       } catch (err) {
         console.error(err);
       }
     }
 
     loadExtraData();
-    return () => {
-      cancelled = true;
-    };
   }, [product?.id, product?.category_id, product?.name]);
 
   const selectedVariation = useMemo(() => {
-    return variations.find((v) => v.position === selectedVariationPos) || null;
+    return variations.find((v) => v.id === selectedVariationPos) || null;
   }, [variations, selectedVariationPos]);
 
   const basePrice = useMemo(() => {
@@ -203,6 +215,14 @@ export default function ProductPage() {
     if (!product || !product.images.length) return "/file.svg";
     return product.images[selectedImage]?.url || "/file.svg";
   }, [product, selectedImage]);
+
+  const isAvailable = useMemo(() => {
+    if (!product) return false;
+    const target = selectedVariation ?? product;
+    if (!target) return false;
+
+    return target.is_unlimited || target.stock_count > 0;
+  }, [product, selectedVariation]);
 
   async function applyCoupon() {
     if (!product) return;
@@ -227,17 +247,11 @@ export default function ProductPage() {
     }
   }
 
-  // ✅ ADICIONAR AO CARRINHO (AJUSTADO PARA O SEU COMPONENTE)
   async function handleAddToCart() {
-    // 1) liga loading do botão
     setLoadingAdd(true);
 
     try {
-      // 2) se tiver variação, manda ela; se não tiver, manda null
-      //    (se sua API exigir variação, você pode bloquear quando for null)
-      const variation_id = selectedVariation ? selectedVariation.position : null;
-
-      // 3) chama sua API para adicionar item
+      const variation_id = selectedVariation ? selectedVariation.id : null;
       const response = await fetch("/api/cart", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -248,19 +262,12 @@ export default function ProductPage() {
         }),
       });
 
-      // 4) converte a resposta em json (pra ler message)
       const data = await response.json();
-
-      // 5) se deu certo
       if (response.ok) {
-        // 5.1) força o Next atualizar a árvore e o Header buscar o carrinho de novo
         router.refresh();
-
-        // 5.2) evento opcional (só funciona se o Header estiver escutando)
         window.dispatchEvent(new Event("abrirCarrinho"));
       } else {
-        // 6) se deu erro e for token inválido, manda pro login
-        if (data?.message === "UNAUTHORIZED_TOKEN") {
+        if (data?.error === "UNAUTHORIZED_TOKEN") {
           router.push("/login");
         } else {
           alert("Erro ao adicionar: " + (data?.message ?? "Erro desconhecido"));
@@ -270,7 +277,6 @@ export default function ProductPage() {
       console.error("Erro ao adicionar ao carrinho:", error);
       alert("Erro inesperado ao adicionar ao carrinho.");
     } finally {
-      // 7) desliga loading
       setLoadingAdd(false);
     }
   }
@@ -330,29 +336,43 @@ export default function ProductPage() {
               <span className="variationLabel">Selecione uma opção:</span>
 
               <div className="variationList">
-                {variations.map((v) => (
-                  <button
-                    key={v.position}
-                    className={`variationItem ${selectedVariationPos === v.position ? "variationItemActive" : ""}`}
-                    onClick={() => setSelectedVariationPos(v.position)}
-                  >
-                    <div className="variationInfo">
-                      <p className="variationName">{v.name}</p>
-                      <p className="variationStock">Em estoque</p>
-                    </div>
-                    <span className="variationPrice">R$ {v.price.toFixed(2).replace(".", ",")}</span>
-                  </button>
-                ))}
+                {variations.map((v) => {
+                  const outOfStock = !v.is_unlimited && v.stock_count < 1;
+                  return (
+                    <button
+                      key={v.id}
+                      disabled={outOfStock}
+                      className={`variationItem ${selectedVariationPos === v.id ? "variationItemActive" : ""} ${outOfStock ? "outOfStock" : ""}`}
+                      onClick={() => setSelectedVariationPos(v.id)}
+                    >
+                      <div className="variationInfo">
+                        <p className="variationName">{v.name}</p>
+                        <p className="variationStock">
+                          {v.is_unlimited ? "Disponível" : outOfStock ? "Esgotado" : `${v.stock_count} em estoque`}
+                        </p>
+                      </div>
+                      <span className="variationPrice">R$ {v.price.toFixed(2).replace(".", ",")}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
           <div className="actions">
-            <button className="btnPrimary">Comprar agora</button>
+            <button
+              className="btnPrimary"
+              disabled={!isAvailable || loadingAdd}
+            >
+              {isAvailable ? "Comprar agora" : "Produto Esgotado"}
+            </button>
 
-            {/* ✅ BOTÃO AJUSTADO */}
-            <button className="btnSecondary" onClick={handleAddToCart} disabled={loadingAdd}>
-              {loadingAdd ? "Adicionando..." : "Adicionar ao carrinho"}
+            <button
+              className="btnSecondary"
+              onClick={handleAddToCart}
+              disabled={!isAvailable || loadingAdd}
+            >
+              {loadingAdd ? "Adicionando..." : isAvailable ? "Adicionar ao carrinho" : "Esgotado"}
             </button>
           </div>
 

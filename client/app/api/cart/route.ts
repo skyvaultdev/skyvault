@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/api/response";
 import { verifyJWT } from "@/lib/jwt/init";
 import { cookies } from "next/headers";
 
+
 export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -28,8 +29,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = discUser.length > 0 ? discUser[0].id : regularUser[0].id;
-    const result = await db.query(
-      `
+    const result = await db.query(`
       SELECT 
           c.id AS cart_item_id,
           p.name AS product_name,
@@ -37,21 +37,19 @@ export async function GET(req: NextRequest) {
           COALESCE(v.name, 'Padrão') AS variation_name,
           COALESCE(v.price, p.price) AS unit_price,
           c.quantity,
+          COALESCE(v.stock_count, p.stock_count) AS stock_count,
+          COALESCE(v.is_unlimited, p.is_unlimited) AS is_unlimited,
           (
-            SELECT url 
-            FROM product_images 
+            SELECT url FROM product_images 
             WHERE product_id = p.id 
-            ORDER BY position ASC 
-            LIMIT 1
+            ORDER BY position ASC LIMIT 1
           ) AS image_url
       FROM cart_items c
       JOIN products p ON c.product_id = p.id
       LEFT JOIN product_variations v ON c.variation_id = v.id
       WHERE c.user_id = $1
       ORDER BY c.added_at DESC;
-    `,
-      [userId]
-    );
+    `, [userId]);
 
     return ok(result.rows);
   } catch (error) {
@@ -82,48 +80,47 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json();
     const product_id = Number(body.product_id);
-    const quantity = Number(body.quantity ?? 1);
+    const variation_id = body.variation_id ? Number(body.variation_id) : null;
+    const quantityToAdd = Number(body.quantity ?? 1);
 
-    const variation_id =
-      body.variation_id === undefined || body.variation_id === "" || body.variation_id === null
-        ? null
-        : Number(body.variation_id);
+    if (!product_id || quantityToAdd <= 0) return fail("INVALID_DATA", 400);
+    const stockCheckQuery = variation_id 
+      ? `SELECT stock_count, is_unlimited FROM product_variations WHERE id = $1 AND product_id = $2`
+      : `SELECT stock_count, is_unlimited FROM products WHERE id = $1`;
+    
+    const stockParams = variation_id ? [variation_id, product_id] : [product_id];
+    const { rows: stockData } = await db.query(stockCheckQuery, stockParams);
 
-    if (!product_id || Number.isNaN(product_id)) return fail("MISSING_PRODUCT_ID", 400);
-    if (!quantity || Number.isNaN(quantity) || quantity <= 0) return fail("BAD_QUANTITY", 400);
+    if (stockData.length === 0) return fail("PRODUCT_NOT_FOUND", 404);
+
+    const item = stockData[0];
+    if (!item.is_unlimited && item.stock_count < quantityToAdd) {
+      return fail("OUT_OF_STOCK", 400);
+    }
+
 
     let result;
     if (variation_id === null) {
-      const upsertNoVariation = `
+      const upsertNoVar = `
         INSERT INTO cart_items (user_id, product_id, variation_id, quantity)
         VALUES ($1, $2, NULL, $3)
-        ON CONFLICT (user_id, product_id)
-        WHERE variation_id IS NULL
-        DO UPDATE SET 
-            quantity = cart_items.quantity + EXCLUDED.quantity,
-            updated_at = CURRENT_TIMESTAMP
-        RETURNING *;
-      `;
-
-      result = await db.query(upsertNoVariation, [userId, product_id, quantity]);
+        ON CONFLICT (user_id, product_id) WHERE variation_id IS NULL
+        DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity
+        RETURNING *;`;
+      result = await db.query(upsertNoVar, [userId, product_id, quantityToAdd]);
     } else {
-      const upsertWithVariation = `
+      const upsertWithVar = `
         INSERT INTO cart_items (user_id, product_id, variation_id, quantity)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (user_id, product_id, variation_id)
-        WHERE variation_id IS NOT NULL
-        DO UPDATE SET 
-            quantity = cart_items.quantity + EXCLUDED.quantity,
-            updated_at = CURRENT_TIMESTAMP
-        RETURNING *;
-      `;
-
-      result = await db.query(upsertWithVariation, [userId, product_id, variation_id, quantity]);
+        ON CONFLICT (user_id, product_id, variation_id) WHERE variation_id IS NOT NULL
+        DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity
+        RETURNING *;`;
+      result = await db.query(upsertWithVar, [userId, product_id, variation_id, quantityToAdd]);
     }
 
     return ok(result.rows[0]);
   } catch (error) {
-    console.error("Erro no PUT Cart (Add):", error);
+    console.error("Erro no PUT Cart:", error);
     return fail("INTERNAL_SERVER_ERROR", 500);
   }
 }

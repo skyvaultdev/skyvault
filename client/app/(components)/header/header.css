@@ -62,11 +62,11 @@
         display: flex;
         justify-content: center;
 
-    
+
     }
 
-    .loginbtn{
-         display: flex;
+    .loginbtn {
+        display: flex;
         align-items: center;
         justify-content: center;
         transform-origin: center;
@@ -86,11 +86,11 @@
             box-shadow 0.2s ease;
     }
 
-.loginbtn:hover{
-     background-color: var(--secondary);
+    .loginbtn:hover {
+        background-color: var(--secondary);
         border-color: var(--secondary);
         transform: scale(1.1);
-}
+    }
 
     .navright {
         display: flex;
@@ -316,6 +316,7 @@
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         border-radius: 5px;
         padding: 12px;
+        cursor: pointer;
         transition:
             background-color 0.3s ease,
             border-color 0.3s ease,
@@ -355,21 +356,25 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        position: relative;
     }
+
 
     .cartHeader h3 {
         font-size: 1.2rem;
         font-weight: 600;
     }
 
-    
-    .closeBtn {
-        margin-top: 55px;
-        background: none;
-        border: none;
-        color: #666;
-        cursor: pointer;
-    }
+
+ .closeBtncart {
+    position: absolute;
+    top: 25px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+}
 
 
     .cartItemContainer {
@@ -683,7 +688,7 @@
         }
 
         .navleft,
-        .navcenter{
+        .navcenter {
             width: 100%;
             justify-content: center;
         }
@@ -698,7 +703,7 @@
             margin-top: 15px;
         }
 
-        
+
 
         .userBtn {
             margin-top: -45px;

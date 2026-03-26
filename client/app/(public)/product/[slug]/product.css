@@ -255,12 +255,11 @@ html {
 .btnSecondary {
   width: 100%;
   height: 44px;
-  position-anchor: calc();
+ margin: 0;
   border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 0px;
   cursor: pointer;
   transition: transform 140ms ease;
 }
@@ -288,6 +287,29 @@ html {
   transform: translateY(-1px);
   border-color: blue;
   background-color: blue;
+}
+
+.variationItem.outOfStock {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #bdbdbd;
+  border-color: #747474;
+  pointer-events: none; 
+}
+
+.variationItem.outOfStock .variationName,
+.variationItem.outOfStock .variationPrice {
+  color: #505050;
+}
+
+.btnPrimary:disabled, 
+.btnSecondary:disabled {
+  background-color: #383838 !important;
+  border-color: #7c7b7b !important;
+  color: #464646 !important;
+  cursor: not-allowed;
+  transform: none !important; 
+  box-shadow: none !important;
 }
 
 /* ===== CUPOM ===== */

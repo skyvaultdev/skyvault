@@ -221,23 +221,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     );
   }
 
-  if (selectedTab === "inicio") {
-    return (
-      <section className="settingsPanel">
-        <h3>Prévia da Home</h3>
-        <div className="previewBanner">Banner principal da loja</div>
-        <div className="previewGrid">
-          {previewCards.map((product) => (
-            <article key={product.id} className="previewCard">
-              <strong>{product.name}</strong>
-              <span>ID: {product.id}</span>
-            </article>
-          ))}
-          {previewCards.length === 0 && <p>Nenhum produto disponível para prévia.</p>}
-        </div>
-      </section>
-    );
-  }
 
   if (selectedTab === "cores") {
     return (

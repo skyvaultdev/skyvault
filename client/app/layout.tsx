@@ -29,6 +29,42 @@ export const metadata: Metadata = {
   description: "Where all your dreams come true",
 };
 
+function getBackgroundStyle(type: string) {
+  switch (type) {
+    case "dots":
+      return {
+        backgroundImage: `
+          radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)
+        `,
+        backgroundSize: "20px 20px",
+      };
+
+    case "lines":
+      return {
+        backgroundImage: `
+          linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
+        `,
+        backgroundSize: "40px 40px",
+      };
+
+    case "grid":
+      return {
+        backgroundImage: `
+          linear-gradient(#ffffff10 1px, transparent 1px),
+          linear-gradient(90deg, #ffffff10 1px, transparent 1px)
+        `,
+        backgroundSize: "25px 25px",
+      };
+
+    case "none":
+      return {};
+
+    default:
+      return {};
+  }
+}
+
 export default async function RootLayout({
   children,
 }: {
@@ -51,10 +87,14 @@ export default async function RootLayout({
   const backgroundType = theme.background_style ?? "lines";
   const backgroundImg = theme.background_img_url ?? null;
   const backgroundCss = theme.background_css ?? null;
+  const bgStyle = getBackgroundStyle(backgroundType);
+
+  const patternImage = bgStyle.backgroundImage;
+  const patternSize = bgStyle.backgroundSize;
 
   return (
     <html
-      lang="en"
+      lang="pt-BR"
       style={{
         ["--primary" as any]: primary,
         ["--secondary" as any]: secondary,
@@ -63,9 +103,17 @@ export default async function RootLayout({
       <body
         data-store-background={backgroundType}
         style={{
-          backgroundImage: backgroundImg ? `url(${backgroundImg})` : undefined,
-          backgroundSize: backgroundImg ? "cover" : undefined,
-          backgroundPosition: backgroundImg ? "center" : undefined,
+          backgroundImage: backgroundImg
+            ? `${patternImage}, url(${backgroundImg})`
+            : patternImage,
+
+          backgroundSize: backgroundImg
+            ? `${patternSize}, cover`
+            : patternSize,
+
+          backgroundPosition: backgroundImg
+            ? `top left, center`
+            : undefined,
         }}
         className={`${geistSans.variable} ${geistMono.variable}`}
       >
@@ -81,12 +129,6 @@ export default async function RootLayout({
           </main>
           <Footer />
         </div>
-
-        {backgroundCss && (
-          <style id="store-custom-background">
-            {`body { ${backgroundCss} }`}
-          </style>
-        )}
       </body>
     </html>
   );

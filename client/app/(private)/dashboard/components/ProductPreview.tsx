@@ -39,10 +39,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  /* =========================
-     CARREGAMENTO
-  ========================= */
-
   useEffect(() => {
     let cancelled = false;
 
@@ -50,7 +46,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
       setLoading(true);
 
       try {
-        // 1️⃣ Busca produto pelo slug
         const res = await fetch(`/api/products/${encodeURIComponent(slug)}`);
         const json = await res.json();
 
@@ -67,8 +62,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
 
         if (cancelled) return;
         setProduct(productData);
-
-        // 2️⃣ Busca variações
         const vRes = await fetch(`/api/products/variations/${productData.id}`);
         const vJson = await vRes.json();
 
@@ -112,18 +105,12 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
     };
   }, [slug]);
 
-  /* =========================
-     IMAGEM ATUAL
-  ========================= */
 
   const currentImage = useMemo(() => {
     if (!product?.images?.length) return "/file.svg";
     return product.images[selectedImage]?.url || "/file.svg";
   }, [product, selectedImage]);
 
-  /* =========================
-     PREÇO ATUAL
-  ========================= */
 
   const displayedPrice = useMemo(() => {
     const variation = variations.find(
@@ -134,9 +121,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
     return Number(price);
   }, [variations, selectedVariationPos, product]);
 
-  /* =========================
-     ESTADOS DE RENDER
-  ========================= */
 
   if (loading)
     return (
@@ -152,9 +136,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
       </div>
     );
 
-  /* =========================
-     RENDER PRINCIPAL
-  ========================= */
 
   return (
     <div className="previewContainer">
@@ -196,7 +177,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
             </div>
           </div>
 
-          {/* INFO */}
           <div className="card infoCard">
             <h1 className="productTitle">{product.name}</h1>
 
@@ -262,8 +242,7 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
               </button>
             </div>
           </div>
-
-          {/* SIDEBAR */}
+          
           <aside className="sideBar">
             <article className="sideCard">
               <h3 className="securebuy">

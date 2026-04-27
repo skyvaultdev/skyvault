@@ -72,6 +72,17 @@ export default function ProductPage() {
 
   const [loadingAdd, setLoadingAdd] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+  const totalPages = Math.ceil(similar.length / itemsPerPage);
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return similar.slice(startIndex, startIndex + itemsPerPage);
+  }, [similar, currentPage]);
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -367,7 +378,7 @@ export default function ProductPage() {
             </button>
 
             <button
-              className="btnSecondary"
+              className="btncartadd"
               onClick={handleAddToCart}
               disabled={!isAvailable || loadingAdd}
             >
@@ -375,7 +386,7 @@ export default function ProductPage() {
             </button>
           </div>
 
-          <div className="couponBox">
+          {/*  <div className="couponBox">
             <div className="couponRow">
               <input
                 className="couponInput"
@@ -385,10 +396,10 @@ export default function ProductPage() {
               />
               <button className="couponBtn" onClick={applyCoupon}>
                 Aplicar
-              </button>
+              </button> 
             </div>
             {couponMessage && <p className="couponMsg">{couponMessage}</p>}
-          </div>
+          </div>-*/}
         </div>
 
         <aside className="sideBar">
@@ -415,7 +426,7 @@ export default function ProductPage() {
           <h2 className="similarTitle">Recomendados para você</h2>
 
           <div className="similarGrid">
-            {similar.map((item) => (
+            {paginatedProducts.map((item) => (
               <div key={item.id} className="similarCard" onClick={() => router.push(`/product/${item.slug}`)}>
                 <div className="similarImgWrapper">
                   <img src={item.image_url || "/file.svg"} alt={item.name} className="similarThumb" />
@@ -432,6 +443,38 @@ export default function ProductPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="btnPagination"
+          >
+            &larr;
+          </button>
+          {pageNumbers.map((num) => (
+            <button
+              key={num}
+              onClick={() => setCurrentPage(num)}
+              className={`pageNumber ${currentPage === num ? "active" : ""} btnPagination`}
+            > {num}
+            </button>
+          ))}
+          <button
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="btnPagination"
+          >
+            &rarr;
+          </button>
+
+        </div>
+      )}
+
+      {similar.length === 0 && (
+        <p className="emptyMsg">Nenhum produto encontrado.</p>
       )}
     </main>
   );

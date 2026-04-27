@@ -1,0 +1,107 @@
+:root {
+  --primary-color: #b700ff;
+  --secondary-color: #6400ff;
+  --bg-card: #ffffff;
+  --text-main: #333;
+  --coupon-border: #e0e0e0;
+  --success: #2ecc71;
+}
+
+/* Container do Cupom com efeito de 'Ticket' */
+.coupon-card {
+  background: var(--bg-card);
+  border: 2px dashed var(--coupon-border);
+  border-radius: 15px;
+  padding: 20px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  max-width: 500px;
+  margin: 10px auto;
+}
+
+/* Detalhe lateral de 'recorte' do ticket */
+.coupon-card::before,
+.coupon-card::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: #f4f4f9; /* Cor do fundo da página */
+  border-radius: 50%;
+  left: -12px;
+}
+
+.coupon-card::before { top: 20%; }
+.coupon-card::after { bottom: 20%; }
+
+.coupon-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(183, 0, 255, 0.15);
+  border-color: var(--primary-color);
+}
+
+/* Seção de Informações */
+.coupon-info {
+  flex: 1;
+}
+
+.coupon-code {
+  font-family: 'Monospace', courier;
+  background: #f8f0ff;
+  color: var(--primary-color);
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-weight: bold;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.coupon-discount {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+/* Botão de Adicionar/Copiar */
+.coupon-btn {
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coupon-btn:hover {
+  filter: brightness(1.1);
+}
+
+.coupon-btn:active {
+  transform: scale(0.95);
+}
+
+/* Badge de "Novo" ou "Expira em breve" */
+.coupon-badge {
+  position: absolute;
+  top: 10px;
+  right: -30px;
+  background: var(--success);
+  color: white;
+  padding: 5px 35px;
+  font-size: 0.7rem;
+  transform: rotate(45deg);
+  font-weight: bold;
+  text-transform: uppercase;
+}

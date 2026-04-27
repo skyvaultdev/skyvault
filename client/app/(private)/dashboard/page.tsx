@@ -14,6 +14,7 @@ type Item = {
   id: number;
   name: string;
   slug?: string;
+  variations: [];
   position?: number | null;
 };
 
@@ -22,6 +23,7 @@ type ProductItem = {
   name: string;
   slug?: string;
   position?: number | null;
+  variations: [];
   stock_type?: 'key' | 'file' | 'infinite';
   stock_count?: number;
 };

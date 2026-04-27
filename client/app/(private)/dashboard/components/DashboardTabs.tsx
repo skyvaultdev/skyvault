@@ -1,18 +1,27 @@
 "use client";
 
-import { useMemo } from "react";
-import type { DashboardTab } from "./Sidebar";
 import "./components.css";
 import "./stocktabs.css";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { DashboardTab } from "./Sidebar";
 import Link from "next/link";
 
-
+type Variation = {
+  id: number;
+  name: string;
+  price: number;
+  stock_count: number;
+  stock_type: 'key' | 'file' | 'infinite';
+  is_unlimited: boolean;
+}
 
 type ProductItem = {
   id: number;
   name: string;
   slug?: string;
   position?: number | null;
+  variations: Variation[];
   stock_type?: 'key' | 'file' | 'infinite';
   stock_count?: number;
   image_url?: string;
@@ -30,7 +39,6 @@ type StoreSettings = {
   backgroundCss: string;
   backgroundImageUrl: string;
 };
-
 
 type DashboardTabsProps = {
   selectedTab: DashboardTab;
@@ -75,12 +83,35 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     admins,
   } = props;
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [openVariationId, setOpenVariationId] = useState<number | null>(null);
+  
+  const itemsPerPage = 12;
+  const router = useRouter();
 
+  const filteredProducts = useMemo(() => {
+    return orderedProducts.filter((product) =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.slug?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [orderedProducts, searchTerm]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredProducts, currentPage]);
+
+  const manageStock = (productId: any) => {
+    router.push(`/dashboard/stock/manage/${productId}`);
+  };
+
+  const pageNumbers = Array.from({ length: totalPages}, (_, i) => i + 1);
   const previewCards = useMemo(() => previewProducts.slice(0, 4), [previewProducts]);
 
-
   if (selectedTab === "estoque") {
-    console.log(orderedProducts);
     return (
       <section className="settingsPanel">
         <div className="tabHeader">
@@ -88,46 +119,102 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           <p className="helperText">Configure a entrega de keys, arquivos ou estoque infinito para cada produto.</p>
         </div>
 
-        <div className="inventoryGrid">
-          {orderedProducts.map((product) => (
-            <div key={product.id} className="inventoryCard">
-              <div className="productImagePreview">
-                <img
-                  src={product.image_url || "/file.svg"}
-                  alt={product.name}
-                  className="stockProductImg"
-                />
-              </div>
-              <div className="productInfoCell">
-                <strong>
-                  {product.name}
-                </strong>
-                <strong className="stockQtyInline">
-                 Stock = ({product.stock_type === 'infinite' ? '∞' : (product.stock_count ?? 0)})
-                </strong>
-              </div>
-
-              <div className="infoProd">
-                <div className="slug">• {product.slug}</div>
-                <div className="tipo">• {product.stock_type === 'key' ? `Keys` :
-                  product.stock_type === 'file' ? 'Arquivo' :
-                    product.stock_type === 'infinite' ? 'Infinito' :
-                       'Sem estoque configurado'}
-                </div>
-              </div>
-
-              <div className="cardActions">
-                <Link href={`/dashboard/stock/manage/${product.id}`}>
-                  <button className="btnEditSmall">
-                   ⚙️ Configurar
-                  </button>
-                </Link>
-              </div>
-            </div>
-          ))}
+        <div className="searchContainer">
+          <input
+            type="text"
+            placeholder="Buscar por nome ou slug..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="searchInput"
+          />
         </div>
 
-        {orderedProducts.length === 0 && (
+        <div className="inventoryGrid">
+          {paginatedProducts.map((product) => {
+            const isMenuOpen = openVariationId === product.id;
+
+            return (
+              <div key={product.id} className="inventoryCard">
+                <div className="productImagePreview">
+                  <Link href={`/product/${product.slug}`}>
+                    <img
+                      src={product.image_url || "/file.svg"}
+                      alt={product.name}
+                      className="stockProductImg"
+                    />
+                  </Link>
+                </div>
+                <div className="productInfoCell">
+                  <strong>{product.name}</strong>
+                  <span className="stockQtyInline">
+                    ({product.stock_type === 'infinite' ? '∞' : (product.stock_count ?? 0)})
+                  </span>
+                </div>
+
+                <div className="infoProd">
+                  <div className="slug">• {product.slug}</div>
+                  <div className="tipo">• {
+                    product.stock_type === 'key' ? `Keys` :
+                    product.stock_type === 'file' ? 'Arquivo' :
+                    product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
+                  }</div>
+                  
+                  {product.variations.length > 0 && (
+                    <button
+                      type="button"
+                      className="variationhead"
+                      onClick={() => setOpenVariationId(isMenuOpen ? null : product.id)}
+                    >
+                      Variações {isMenuOpen ? '▲' : '▼'}
+                    </button>
+                  )}
+
+                  {isMenuOpen && (
+                    <div className="variações">
+                      {product.variations.map((v) => (
+                        <div className="variação" key={v.id}>
+                          {v.name} ({v.is_unlimited ? '∞' : v.stock_count})
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="cardActions">
+                  <button className="btnEditSmall" onClick={() => manageStock(product.slug)}>
+                    ⚙️ Configurar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button 
+              disabled={currentPage === 1} 
+              onClick={() => setCurrentPage(prev => prev - 1)}
+              className="btnPagination"
+            >
+              &larr;
+            </button>
+           {pageNumbers.map((num) => (
+            <button
+              key={num}
+              onClick={() => setCurrentPage(num)}
+              className={`pageNumber ${currentPage === num ? "active" : ""} btnPagination`}
+              > {num} 
+            </button>
+           ))}
+
+          </div>
+        )}
+
+        {filteredProducts.length === 0 && (
           <p className="emptyMsg">Nenhum produto encontrado.</p>
         )}
       </section>
@@ -156,7 +243,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     return (
       <section className="settingsPanel">
         <h3>Cores da loja</h3>
-
         <label className="fieldLabel" htmlFor="color-target">Grupo de cor</label>
         <select
           id="color-target"
@@ -167,7 +253,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           <option value="primary">Primária</option>
           <option value="secondary">Secundária</option>
         </select>
-
         <label className="fieldLabel" htmlFor="color-picker">Selecionar cor</label>
         <input
           id="color-picker"
@@ -175,16 +260,10 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           value={selectedColor ?? "#b700ff"}
           onChange={(event) => onChangeSelectedColor(event.target.value)}
           className="colorPicker"
-          aria-label="Selecionar cor da loja"
         />
-
-        <button className="btn" type="button" onClick={() => void onSaveColors()} aria-label="Salvar cores da loja">
+        <button className="btn" type="button" onClick={() => void onSaveColors()}>
           Salvar cores
         </button>
-
-        <p className="helperText">
-          Primária: {storeSettings.primaryColor ?? "#b700ff"} | Secundária: {storeSettings.secondaryColor ?? "#6400ff"}
-        </p>
       </section>
     );
   }
@@ -193,7 +272,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     return (
       <section className="settingsPanel">
         <h3>Background</h3>
-
         <label className="radioRow">
           <input
             type="radio"
@@ -202,7 +280,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           />
           Linhas
         </label>
-
         <label className="radioRow">
           <input
             type="radio"
@@ -211,7 +288,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           />
           Pontos
         </label>
-
         <label className="fieldLabel" htmlFor="background-image">Upload de imagem</label>
         <input
           id="background-image"
@@ -220,7 +296,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           onChange={(event) => onBackgroundImageChange(event.target.files?.[0] ?? null)}
           className="settingsInput"
         />
-
         <label className="fieldLabel" htmlFor="background-css">CSS customizado</label>
         <textarea
           id="background-css"
@@ -229,8 +304,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           className="settingsTextarea"
           rows={4}
         />
-
-        <button className="btn" type="button" onClick={() => void onSaveBackground()} aria-label="Salvar background da loja">
+        <button className="btn" type="button" onClick={() => void onSaveBackground()}>
           Salvar background
         </button>
       </section>
@@ -255,7 +329,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
             </div>
           ))}
         </div>
-        <button className="btn" type="button" onClick={() => void onSavePositions()} aria-label="Salvar ordem dos produtos">
+        <button className="btn" type="button" onClick={() => void onSavePositions()}>
           Salvar ordem
         </button>
       </section>
@@ -265,8 +339,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
   return (
     <section className="settingsPanel">
       <h3>Equipe</h3>
-      <button type="button" className="addbtn">Adicionar Equipe</button>
-      <button type="button" className="removebtn">Remover Equipe</button>
       <table className="teamTable">
         <thead>
           <tr>

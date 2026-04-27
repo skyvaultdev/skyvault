@@ -89,7 +89,16 @@
     .loginbtn:hover {
         background-color: var(--secondary);
         border-color: var(--secondary);
-        transform: scale(1.1);
+        transform: scale(1.05);
+    }
+
+    .entradaico {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 22px;
+        height: 22px; 
+        margin-right: 5px;
     }
 
     .navright {
@@ -366,15 +375,15 @@
     }
 
 
- .closeBtncart {
-    position: absolute;
-    top: 25px;
-    right: 20px;
-    background: none;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-}
+    .closeBtncart {
+        position: absolute;
+        top: 25px;
+        right: 20px;
+        background: none;
+        border: none;
+        color: #aaa;
+        cursor: pointer;
+    }
 
 
     .cartItemContainer {

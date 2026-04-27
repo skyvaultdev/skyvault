@@ -266,7 +266,6 @@ export default function Header() {
 
                       <hr className="dropdownDivider" />
 
-                      {/* LOGOUT */}
                       <button
                         className="userDropdownItem"
                         onClick={async () => {
@@ -296,7 +295,9 @@ export default function Header() {
                 )}
               </div>
             ) : (
-              <Link href="/login" className="loginbtn">Login</Link>
+              <>
+                <Link href="/login" className="loginbtn">Login</Link>
+              </>
             )}
           </li>
         </ul>

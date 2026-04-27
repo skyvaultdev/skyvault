@@ -252,7 +252,7 @@ html {
   transition: transform 140ms ease;
 }
 
-.btnSecondary {
+.btncartadd {
   width: 100%;
   height: 44px;
  margin: 0;
@@ -277,13 +277,13 @@ html {
   filter: brightness(1.05);
 }
 
-.btnSecondary {
+.btncartadd {
   border: 1px solid var(--border-active);
   background: var(--bg-card);
   color: var(--text-primary);
 }
 
-.btnSecondary:hover {
+.btncartadd:hover {
   transform: translateY(-1px);
   border-color: blue;
   background-color: blue;
@@ -303,7 +303,7 @@ html {
 }
 
 .btnPrimary:disabled, 
-.btnSecondary:disabled {
+.btncartadd:disabled {
   background-color: #383838 !important;
   border-color: #7c7b7b !important;
   color: #464646 !important;
@@ -312,39 +312,9 @@ html {
   box-shadow: none !important;
 }
 
-/* ===== CUPOM ===== */
-.couponBox {
-  display: grid;
-  gap: 8px;
-  margin-top: 6px;
-}
 
-.couponRow {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-}
 
-.couponInput,
-.couponBtn {
-  height: 42px;
-  border-radius: var(--radius-xs);
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
 
-.couponBtn {
-  padding: 0 14px;
-  cursor: pointer;
-}
-
-.couponMsg {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
 
 /* ===== SIDEBAR ===== */
 .sideBar {
@@ -460,6 +430,8 @@ html {
 .similarThumb {
   width: 100%;
   height: 100%;
+  border: solid 1px rgb(51, 51, 51);
+
   object-fit: cover;
 }
 
@@ -662,8 +634,4 @@ html {
     margin: auto;
   }
 
-
-  .couponRow {
-    grid-template-columns: 1fr;
-  }
 }

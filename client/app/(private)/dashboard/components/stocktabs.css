@@ -1,8 +1,11 @@
+
+
 .inventoryGrid {
   display: grid;
   padding: 10px;
   gap: 15px;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  align-items: start;
 }
 
 .inventoryCard {
@@ -12,51 +15,147 @@
   background: rgba(12, 12, 14, 0.72);
   backdrop-filter: blur(10px);
   box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 14px;
-  transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+  height: auto;
+  transition: transform 170ms ease, border-color 170ms ease;
 }
 
 .inventoryCard:hover {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.05);
   border-color: var(--primary);
+}
+
+.searchContainer{
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
 }
 
 .productImagePreview {
   width: 100%;
-  height: 180px; 
+  height: 180px;
   border-radius: 12px;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .stockProductImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
-  border-radius: 12px;
+}
+
+.productInfoCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.stockQtyInline {
+  margin-left: 5px;
+  color: var(--secondary);
+}
+
+.infoProd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slug, .tipo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(54, 54, 54, 0.8);
+  border-radius: 10px;
+  padding: 6px;
+  font-size: 0.85rem;
+  word-break: break-all;
+  text-align: center;
+}
+
+.variationhead {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--secondary);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 5px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.variationhead:hover {
+  opacity: 0.9;
+  transform: scale(1.01);
+}
+
+.variações {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border: 1px dashed var(--secondary);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  margin-top: 5px;
+}
+
+.variação {
+  width: 100%;
+  text-align: center;
+  padding: 6px;
   background: rgba(255, 255, 255, 0.05);
-  transition: transform 220ms ease, filter 220ms ease;
+  border-radius: 6px;
+  font-size: 0.85rem;
 }
 
-.inventoryCard:hover .stockProductImg {
-  transform: scale(1.05);
-  filter: brightness(1.1);
+.cardActions {
+  margin-top: auto;
+  padding-top: 10px;
 }
 
-.btnEditSmall{
-    border: solid var(--primary);
-    background-color: var(--primary);
-    border-radius: 15px;
-    padding: 5 10;
-    width: 100%;
-     box-shadow: 0 4px 4px var(--primary);
-     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+.btnEditSmall {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1a1a1a;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.btnEditSmall:hover {
+  background: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.emptyMsg {
+  text-align: center;
+  grid-column: 1 / -1;
+  padding: 40px;
+  opacity: 0.5;
+}
+
+.btnPagination {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1a1a1a;
+  color: white;
+  margin-left: 10px;
+  cursor: pointer;
+ box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
      transition:
          background-color 0.3s ease,
          border-color 0.3s ease,
@@ -64,41 +163,34 @@
          box-shadow 0.2s ease;
 }
 
-.btnEditSmall:hover{
-    border-color: var(--secondary);
-    background-color: var(--secondary);
-    box-shadow: 0 4px 4px var(--secondary);
-    transform: translateY(-2px);
+.btnPagination:hover {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  transform: scale(1.1);
 }
 
-.productInfoCell{
-    display: flex;
-    align-items: center;
-    justify-content: center ;
+@media (max-width: 768px) {
+  .inventoryGrid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    padding: 5px;
+  }
+  
+  .productImagePreview {
+    height: 150px;
+  }
+  
+  .inventoryCard {
+    padding: 10px;
+  }
 }
 
-.stockQtyInline{
-    margin-left: 5px;
-    color: var(--secondary);
-}
-
-.slug{
-  display: flex;
-    border: 2px solid rgb(54, 54, 54);
-    background-color: rgb(54, 54, 54);
-    border-radius: 15px;
-    padding: 5 5;
-    align-items: center;
-    justify-content: center;
-}
-
-.tipo{
-  display: flex;
-    border: 2px solid rgb(54, 54, 54);
-    background-color: rgb(54, 54, 54);
-    border-radius: 15px;
-    padding: 5 5;
-    align-items: center;
-    justify-content: center;
-    margin-top: 10px;
+@media (max-width: 480px) {
+  .inventoryGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .productImagePreview {
+    height: 200px;
+  }
 }

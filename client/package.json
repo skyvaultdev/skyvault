@@ -17,7 +17,8 @@
     "pg": "^8.17.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "swapy": "^1.0.5"
   },
   "devDependencies": {
     "@fullhuman/postcss-purgecss": "^8.0.0",

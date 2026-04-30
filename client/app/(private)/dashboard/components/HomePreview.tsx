@@ -41,6 +41,7 @@ export default function HomePreview({
   sections,
   isPreview = false,
 }: HomePreviewProps) {
+  
   const [localSections, setLocalSections] = useState<SectionType[]>(sections);
   const [isSaving, setIsSaving] = useState(false);
   const [draggedItem, setDraggedItem] = useState<{ slug: string; fromIndex: number } | null>(null);
@@ -101,7 +102,7 @@ export default function HomePreview({
       });
 
       if (response.ok) {
-        alert(`✅ Ordem salva! ${payload.length} produtos atualizados.`);
+        alert(`✅ Ordem salva! produtos atualizados.`);
       } else {
         alert("❌ Erro ao salvar.");
       }

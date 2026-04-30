@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       return ok(result.rows[0]);
     }
 
-    const result = await db.query("SELECT id, name, slug, image_url FROM categories ORDER BY name ASC");
+    const result = await db.query("SELECT id, name, slug, image_url FROM categories ORDER BY position ASC");
     return ok(result.rows);
   } catch (error) {
     console.error(error);

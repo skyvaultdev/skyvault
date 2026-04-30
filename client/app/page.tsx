@@ -22,7 +22,7 @@ async function getHomeData() {
 
   const [bannersRes, categoriesRes, productsRes] = await Promise.all([
     db.query<Banner>("SELECT id,title,subtitle,image_url,link FROM home_banners WHERE active = true ORDER BY position ASC"),
-    db.query<Category>("SELECT id, name, slug FROM categories ORDER BY name ASC"),
+    db.query<Category>("SELECT id, name, slug FROM categories ORDER BY position ASC"),
     db.query<Product>(`
       SELECT
         p.id, p.name, p.slug, p.price,
@@ -52,7 +52,7 @@ async function getHomeData() {
 
 export default async function Home() {
   const { banners, categories, products } = await getHomeData();
-  const highlights = products.slice(0, 3);
+  const highlights = products.slice(0, 5);
   const uncategorizedItems: Product[] = [];
 
   const map = new Map<string, { category: Category; items: Product[] }>();

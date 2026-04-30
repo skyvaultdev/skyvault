@@ -17,7 +17,7 @@ export async function GET() {
         db.query(`
           SELECT id,name,slug
           FROM categories
-          ORDER BY name ASC
+          ORDER BY position ASC
         `),
 
         db.query(`
@@ -57,7 +57,6 @@ export async function GET() {
     const products = productsRes.rows;
 
     const highlights = products.slice(0, 3);
-
     const uncategorized: any[] = [];
 
     const map = new Map();
@@ -106,7 +105,7 @@ export async function GET() {
     });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: "erro interno" },
+      { success: false, error: "INTERNAL_ERROR" },
       { status: 500 }
     );
   }

@@ -81,7 +81,7 @@ export default function EditProductPage() {
           if (p.images) {
             setImages(p.images.sort((a: any, b: any) => a.position - b.position));
           }
-        }
+        } else { router.push("/dashboard") }
       } catch (e) {
         setFeedback("Erro ao carregar produto.");
       } finally {

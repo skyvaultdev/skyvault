@@ -7,6 +7,7 @@ import Sidebar, { type DashboardTab } from "./components/Sidebar";
 import DashboardTabs from "./components/DashboardTabs";
 import ProductPreview from "./components/ProductPreview";
 import HomePreview from "./components/HomePreview";
+import CategoryPreview from "./components/CategoryPreview";
 import "@/app/home.css";
 import "./dashboard.css";
 import "./modal.css";
@@ -97,6 +98,11 @@ export default function Dashboard() {
     highlights: [],
   });
 
+  const [categoryData, setCategoryData] = useState({
+    categories: [],
+    sections: [],
+  });
+
   const [loadingHomeData, setLoadingHomeData] = useState(false);
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
   const [colorTarget, setColorTarget] = useState<"primary" | "secondary">("primary");
@@ -165,6 +171,24 @@ export default function Dashboard() {
         categories: json.data?.categories || [],
         sections: json.data?.sections || [],
         highlights: json.data?.highlights || [],
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingHomeData(false);
+    }
+  }, []);
+
+  const loadCategoryData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/categories/data");
+      if (!res.ok) return;
+      const json = await res.json();
+      const formatedSections = []
+
+      setCategoryData({
+        categories: json.data?.categories || [],
+        sections: json.data?.sections || [],
       });
     } catch (error) {
       console.error(error);
@@ -318,6 +342,7 @@ export default function Dashboard() {
     void loadStoreSettings();
     void loadAdmins();
     void loadHomeData();
+    void loadCategoryData();
   }, [loadItems, loadStoreSettings, loadHomeData]);
 
   useEffect(() => {
@@ -534,24 +559,13 @@ export default function Dashboard() {
 
     if (selectedTab === "posicao") {
       return (
-        <section className="settingsPanel">
-          <h3>Posição dos produtos</h3>
-          <div className="sortableList">
-            {orderedProducts.map((product) => (
-              <div
-                key={product.id}
-                draggable
-                onDragStart={() => setDraggedProductId(product.id)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => moveDraggedProduct(product.id)}
-                className="sortableItem"
-              >
-                {product.name}
-              </div>
-            ))}
-          </div>
-          <button className="btn" onClick={() => void savePositions()}>Salvar ordem</button>
-        </section>
+        <div className="previewRealSize">
+          <CategoryPreview
+            categories={categoryData.categories}
+            sections={categoryData.sections}
+            isPreview={true}
+          />
+        </div>
       );
     }
 

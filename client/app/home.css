@@ -188,8 +188,8 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(183, 0, 255, 0.15);
-  border: 1px solid rgba(183, 0, 255, 0.25);
+  background: transparent;
+  border: 1px solid var(--primary);
   color: var(--primary);
   font-size: 14px;
 }

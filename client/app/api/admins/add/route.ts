@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     const { rows: discordUsers } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [email])
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [email])
-    if(regularUser?.length < 1 || discordUsers?.length < 1) return fail("USER_NOT_FOUND", 400)
+    if(regularUser?.length < 1 && discordUsers?.length < 1) return fail("USER_NOT_FOUND", 400)
 
     await db.query( `INSERT INTO admin (email,role) VALUES($1,$2)`,
         [email, role]

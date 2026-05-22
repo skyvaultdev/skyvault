@@ -162,9 +162,41 @@
 }
 .btn:hover { border-color: var(--primary); color: var(--primary); }
 
-
 .removebtn, .addbtn{
   width: 100%;
+}
+.settingsMenuItem.disabled {
+  opacity: 0.45;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.4);
+  cursor: not-allowed;
+  border: 1px solid rgba(255,255,255,0.04);
+  filter: grayscale(1);
+}
+
+.settingsMenuItem.disabled:hover {
+  transform: none;
+  background: rgba(255,255,255,0.04);
+}
+
+.editBtn {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.editBtn:hover {
+  background-color: #45a049;
+}
+.disabledAction {
+  color: #ccc;
+}
+.error {
+  color: #f44336;
+  margin: 8px 0 0;
 }
 
 .productList { border-top: 1px solid #1f1f1f; padding-top: 10px; }
@@ -199,9 +231,34 @@ textarea:focus-visible {
 }
 
 @media (max-width: 980px) {
-  .content { grid-template-columns: 1fr; }
-  .dashboardBuilder { grid-template-columns: 1fr; }
-  .settingsSidebar { position: static; }
+
+  .content {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .dashboardBuilder {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .settingsSidebar {
+    position: static;
+    width: 100%;
+  }
+
+  .settingsMenuItem {
+    width: 100%;
+  }
+
+  .settingsPanel,
+  .mainArea,
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+  }
+
 }
 
 
@@ -278,7 +335,6 @@ textarea:focus-visible {
   border: none;
 }
 
-/* bloqueia clique */
 .previewOverlay {
   position: absolute;
   inset: 0;
@@ -297,20 +353,16 @@ textarea:focus-visible {
   }
 }
 
-/* 3) Mobile: vira “cards” (cada linha vira um bloco) */
 @media (max-width: 560px) {
-  /* não força min-width gigante no mobile */
   .teamTable {
     min-width: 0;
     width: 100%;
   }
 
-  /* some com o cabeçalho */
   .teamTable thead {
     display: none;
   }
 
-  /* cada linha vira um “card” */
   .teamTable,
   .teamTable tbody,
   .teamTable tr {
@@ -326,7 +378,6 @@ textarea:focus-visible {
     margin-bottom: 10px;
   }
 
-  /* cada célula vira linha label:valor */
   .teamTable td {
     display: flex;
     justify-content: space-between;
@@ -335,7 +386,7 @@ textarea:focus-visible {
 
     border-bottom: 1px solid #1f1f1f;
     padding: 8px 0;
-    white-space: normal; /* agora pode quebrar */
+    white-space: normal; 
   }
 
   .teamTable td:last-child {
@@ -343,7 +394,6 @@ textarea:focus-visible {
     padding-bottom: 0;
   }
 
-  /* rótulo (vem do data-label no HTML) */
   .teamTable td::before {
     content: attr(data-label);
     font-size: 12px;
@@ -351,4 +401,22 @@ textarea:focus-visible {
     font-weight: 700;
     flex: 0 0 auto;
   }
+}
+
+@media (max-width: 480px) {
+
+  .settingsSidebar {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .categorySidebar {
+    width: 100%;
+  }
+
+  .categorySidebar .settingsMenuItem {
+    width: 100%;
+  }
+
 }

@@ -1,6 +1,7 @@
 export const ROLES = {
   owner: [
     "dashboard.access",
+    "store.customize",
     "products.read",
     "products.write",
     "orders.read",
@@ -10,6 +11,7 @@ export const ROLES = {
   ],
   admin: [
     "dashboard.access",
+    "store.customize",
     "products.read",
     "products.write",
     "orders.read"

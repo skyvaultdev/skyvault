@@ -1,4 +1,4 @@
-/* ===== VARIÁVEIS ===== */
+
 :root {
   --primary: #b700ff;
   --bg-glass: rgba(12, 12, 14, 0.7);
@@ -18,12 +18,10 @@
   --text-body: rgba(255, 255, 255, 0.86);
 }
 
-/* ===== RESET ===== */
 html {
   overflow-y: scroll;
 }
 
-/* ===== LAYOUT PRINCIPAL ===== */
 .productPage {
   width: 100%;
   max-width: 1240px;
@@ -50,7 +48,6 @@ html {
   align-items: start;
 }
 
-/* ===== BASE DOS CARDS ===== */
 .card,
 .galleryCard,
 .infoCard,
@@ -76,7 +73,6 @@ html {
   box-shadow: var(--shadow-hover);
 }
 
-/* ===== GALERIA ===== */
 .mainImage {
   width: 100%;
   height: 330px;
@@ -119,7 +115,6 @@ html {
   outline: 2px solid rgba(255, 255, 255, 0.28);
 }
 
-/* ===== INFORMAÇÕES DO PRODUTO ===== */
 .productTitle {
   margin: 0;
   font-size: 16px;
@@ -143,7 +138,6 @@ html {
   white-space: pre-wrap;
 }
 
-/* ===== VARIAÇÕES ===== */
 .variationBlock {
   display: grid;
   gap: 8px;
@@ -234,7 +228,6 @@ html {
   font-size: 18px;
 }
 
-/* ===== BOTÕES ===== */
 .actions {
   display: grid;
   gap: 10px;
@@ -312,11 +305,6 @@ html {
   box-shadow: none !important;
 }
 
-
-
-
-
-/* ===== SIDEBAR ===== */
 .sideBar {
   display: grid;
   gap: 16px;
@@ -360,7 +348,6 @@ html {
   gap: 8px;
 }
 
-/* ===== DESCRIÇÃO ===== */
 .descriptionCard h2 {
   margin: 0;
   font-size: 14px;
@@ -373,7 +360,6 @@ html {
   line-height: 1.45;
 }
 
-/* ===== SIMILARES ===== */
 .similarSection {
   display: grid;
   gap: 12px;
@@ -395,7 +381,7 @@ html {
 }
 
 .similarCard {
-  background: #5a5a5a2a; /* Fundo branco como na imagem */
+  background: #5a5a5a2a;
   border-radius: 12px;
   text-decoration: none;
   color: #333;
@@ -416,7 +402,7 @@ html {
 
 .similarImgWrapper {
   width: 100%;
-  aspect-ratio: 1/1; /* Mantém a imagem quadrada */
+  aspect-ratio: 1/1;
   background: #f0f0f0;
   overflow: hidden;
 }
@@ -455,7 +441,7 @@ html {
 }
 
 .similarPrice {
-  color: var(--primary); /* Verde para combinar com seu preço principal */
+  color: var(--primary); 
   font-weight: 800;
   font-size: 16px;
   margin-left: 30%;
@@ -501,16 +487,15 @@ html {
 }
 
 .seebtn {
-  background: #000; /* Botão preto para contraste */
+  background: #000; 
   color: #fff;
   text-align: center;
   padding: 10px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: bold;
-  margin-top: auto; /* Empurra o botão para o final do card */
+  margin-top: auto; 
 }
-/* ===== FOOTER ===== */
 .footer {
   margin-top: auto;
   padding: 0;
@@ -543,7 +528,6 @@ html {
   transform: scale(1.1);
 }
 
-/* Modal Fullscreen */
 .zoomOverlay {
   position: fixed;
   inset: 0;
@@ -578,7 +562,6 @@ html {
 
 .closeZoom:hover { opacity: 1; }
 
-/* Ajuste das miniaturas */
 .thumbActive .thumbImg {
   border-color: var(--primary) !important;
   outline: 2px solid var(--primary);
@@ -592,26 +575,16 @@ html {
   font-weight: 400;
 }
 
-/* ===== RESPONSIVO ===== */
-@media (max-width: 1024px) {
-  .productLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .sideBar {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .mainImage {
-    height: 300px;
-  }
-}
-
 @media (max-width: 640px) {
   .productPage {
     padding: 14px 10px 40px;
     gap: 14px;
-    margin-left: -10px;
+    margin-left: 0;
+  }
+
+  .productLayout {
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .sideBar {
@@ -622,6 +595,10 @@ html {
     height: 220px;
   }
 
+  .thumbRow {
+    justify-content: center;
+  }
+
   .thumbImg {
     width: 56px;
     height: 56px;
@@ -630,8 +607,86 @@ html {
   .productPrice {
     font-size: 20px;
   }
-  .similarSection h2{
+
+  .variationList {
+    width: 100%;
+  }
+
+  .variationItem {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .variationName {
+    font-size: 14px;
+  }
+
+  .variationPrice {
+    font-size: 16px;
+  }
+
+  .btnPrimary,
+  .btncartadd,
+  .buyButton2 {
+    width: 100%;
+  }
+
+  .similarSection h2 {
     margin: auto;
   }
 
+  .similarGrid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 10px 0;
+  }
+
+  .similarCard {
+    width: 100%;
+  }
+
+  .similarTitle {
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .similarInfo {
+    width: 100%;
+    padding: 14px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .similarName {
+    margin-left: 0;
+    margin-bottom: 8px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .similarPrice {
+    margin-left: 0;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .buyButton2 {
+    height: 44px;
+  }
+
+
+  .zoomBtn {
+    top: 10px;
+    right: 10px;
+    padding: 6px;
+  }
+
+  .zoomOverlay {
+    padding: 12px;
+  }
+
+  .closeZoom {
+    top: 14px;
+    right: 14px;
+  }
 }

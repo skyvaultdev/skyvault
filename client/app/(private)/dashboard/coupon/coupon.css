@@ -7,7 +7,6 @@
   --success: #2ecc71;
 }
 
-/* Container do Cupom com efeito de 'Ticket' */
 .coupon-card {
   background: var(--bg-card);
   border: 2px dashed var(--coupon-border);
@@ -23,14 +22,13 @@
   margin: 10px auto;
 }
 
-/* Detalhe lateral de 'recorte' do ticket */
 .coupon-card::before,
 .coupon-card::after {
   content: "";
   position: absolute;
   width: 20px;
   height: 20px;
-  background-color: #f4f4f9; /* Cor do fundo da página */
+  background-color: #f4f4f9;
   border-radius: 50%;
   left: -12px;
 }
@@ -44,7 +42,6 @@
   border-color: var(--primary-color);
 }
 
-/* Seção de Informações */
 .coupon-info {
   flex: 1;
 }
@@ -69,7 +66,6 @@
   margin: 0;
 }
 
-/* Botão de Adicionar/Copiar */
 .coupon-btn {
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   color: white;
@@ -92,7 +88,6 @@
   transform: scale(0.95);
 }
 
-/* Badge de "Novo" ou "Expira em breve" */
 .coupon-badge {
   position: absolute;
   top: 10px;

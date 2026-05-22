@@ -41,13 +41,7 @@ export default function CategoryPreview({
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    /*
-    useEffect(() => {
-        const sortedSections = [...sections].sort((a, b) => a.index - b.index);
-        setLocalSections(sortedSections);
-    }, [sections]);
-    */
-
+   
     function handleDragStart(e: React.DragEvent, index: number) {
         if (!isPreview) return;
         setDraggedIndex(index);
@@ -122,7 +116,7 @@ export default function CategoryPreview({
 
     const DisabledLink = ({ href, className, children }: any) => {
         if (isPreview) {
-            return <div className={className} style={{ cursor: 'default' }}>{children}</div>;
+            return <div className={className}>{children}</div>;
         }
         return <Link href={href} className={className}>{children}</Link>;
     };
@@ -130,7 +124,7 @@ export default function CategoryPreview({
     return (
         <main className="categoryPreview">
             {isPreview && (
-                <div className="savebtnord">
+                <div className="savebtnord2">
                     <button onClick={saveHomeOrder} disabled={isSaving}>
                         {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
                     </button>
@@ -141,7 +135,7 @@ export default function CategoryPreview({
             {localSections.map(({ category, index }, i) => (
                 <section key={category.slug} className={`categorySection ${dragOverIndex === index ? 'dragOver' : ''}`}>
                     <div
-                        className={`categorySection ${dragOverIndex === index ? 'is-dragging-over' : ''}`}
+                        className={`categorySection2 ${dragOverIndex === index ? 'is-dragging-over' : ''}`}
                         draggable={isPreview}
                         onDragStart={(e) =>
                             handleDragStart(e, i)}

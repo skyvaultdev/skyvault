@@ -3,7 +3,6 @@
   --secondary: #6400ff;
 }
 
-/* ===== RESET BÁSICO ===== */
 * {
   box-sizing: border-box;
 }
@@ -15,10 +14,9 @@ body {
   min-height: 100vh;
 }
 
-/* ===== BODY COMO FLEX CONTAINER ===== */
 body {
-  display: flex;              /* ativa flex */
-  flex-direction: column;     /* empilha vertical */
+  display: flex;            
+  flex-direction: column;     
   background:
     radial-gradient(circle at 20% 20%, rgba(183, 0, 255, 0.25), transparent 40%),
     radial-gradient(circle at 80% 10%, rgba(100, 0, 255, 0.25), transparent 40%),
@@ -28,22 +26,18 @@ body {
   font-family: var(--font-geist-sans), sans-serif;
 }
 
-/* ===== WRAPPER PRINCIPAL ===== */
 .page-wrapper {
   display: flex;
   flex-direction: column;
-  flex: 1;              /* ocupa toda altura disponível */
-  min-height: 100vh;    /* garante tela cheia */
+  flex: 1;              
+  min-height: 100vh;  
   position: relative;
   z-index: 1;
 }
 
-/* ===== MAIN EMPURRA FOOTER ===== */
 .main-content {
-  flex: 1;   /* ESSENCIAL: empurra o footer para baixo */
+  flex: 1; 
 }
-
-/* ===== OVERLAY VISUAL ===== */
 .transparency-box {
   position: fixed;
   inset: 0;
@@ -54,7 +48,6 @@ body {
   z-index: 0;
 }
 
-/* ===== BACKGROUND ANIMADO (SE USAR) ===== */
 body::before {
   content: "";
   position: fixed;

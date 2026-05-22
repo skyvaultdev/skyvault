@@ -709,14 +709,17 @@
         .navcenter input {
             width: 100%;
             max-width: 300px;
-            margin-top: 15px;
+            margin-top: 20px;
+            position: relative; top: -5px;
         }
 
 
 
         .userBtn {
-            margin-top: -45px;
+            margin-top: -50px;
             margin-right: -280px;
+            height: 40px;
+            width: 40px;
         }
 
         .userDropdown {

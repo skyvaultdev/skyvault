@@ -11,7 +11,9 @@
 .modalBox {
   width: 100%;
   max-width: 420px;
-  background: #111;
+  height: 100%;
+  max-height: 200px;
+  background:  #111; ;
   padding: 24px;
   border-radius: 16px;
   color: #fff;
@@ -37,36 +39,94 @@
 }
 
 .btnSecondary {
+  
   padding: 14px 14px;
-  background: #202020;
+  background: var(--primary);
   border: none;
   border-radius: 8px;
   color: #fff;
   cursor: pointer;
-  margin-left: -8px;
-  position: relative;
-  left: -68px;
   transition: 0.3s;
   transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
 }
 
 .btnSecondary:hover {
-  border-color: #2a2a2a;
-  background-color: #2a2a2a;
+  border-color: var(--secondary);
+  background-color: var(--secondary);
   transform: scale(1.05) translateY(-2px);
 }
 
-.btnConfirm {
-  padding: 8px 14px;
-  background: #e11d48;
+.removebutton {
+  padding: 14px 14px;
+  background-color: var(--primary);
   border: none;
   border-radius: 8px;
   color: #fff;
   cursor: pointer;
+  width: 100%;
+  margin: 5 0 0;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+} 
+
+.removebutton:hover {
+  background-color: var(--secondary);
+  transform: scale(1.02);
+
+}
+
+.btncancel{
+  padding: 14px 14px;
+  background: rgba(53, 53, 53, 0.562);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+   margin: 5 0 0;
+  width: 100%;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.btncancel:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  transform: scale(1.05) translateY(-2px);
+}
+
+
+.btnadc{
+ display: inline;
+  padding: 14px 14px;
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: 0.3s;
+  margin-left: 20px;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.btnadc:hover {
+  border-color: var(--secondary);
+  background-color: var(--secondary);
+  transform: scale(1.05) translateY(-2px);
+}
+
+
+.btnConfirm {
+  padding: 8px 14px;
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+   transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
 }
 
 .btnConfirm:hover {
-  background: #be123c;
+  background: var(--secondary);
+  transform: scale(1.05);
 }
 
 
@@ -157,8 +217,62 @@ display: flex;
   background-position: right 12px center;
   margin-left: 15px;
   background-size: 18px;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
 }
 
+.settingsInput:hover { border-color:var(--secondary); }
+.settingsInput:focus-visible {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.15);
+  transform: scale(1.005);
+}
+
+.settingsInputR{
+  display: flex;
+    height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 18, 20, 0.9);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10 16px;
+  font-size: 14px;
+  transition: all 180ms ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  margin-left: 50;
+  background-size: 18px;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.settingsInputR:hover { border-color:var(--secondary); }
+.settingsInputR:focus-visible {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(183, 0, 255, 0.15);
+  transform: scale(1.005);
+}
+
+.btnCancel{
+  padding: 12px 14px;
+  background: #e11d48;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  margin-right: 15px;
+  transition: 0.3s;
+  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+}
+
+.btnCancel:hover {
+  border-color: #be123c;
+  background-color: #be123c;
+  transform: scale(1.05);
+}
 
 @keyframes fadeIn {
   from {

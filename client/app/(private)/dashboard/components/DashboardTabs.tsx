@@ -2,7 +2,7 @@
 
 import "./components.css";
 import "./stocktabs.css";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardTab } from "./Sidebar";
 import Link from "next/link";
@@ -32,10 +32,19 @@ type AdminItem = {
   email: string;
 };
 
+type BackgroundType =
+  | "lines"
+  | "dots"
+  | "grid"
+  | "diagonal"
+  | "cyber"
+  | "hero-icons"
+  | "none";
+
 type StoreSettings = {
   primaryColor: string;
   secondaryColor: string;
-  backgroundType: "lines" | "dots";
+  backgroundType: BackgroundType;
   backgroundCss: string;
   backgroundImageUrl: string;
 };
@@ -83,10 +92,12 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     admins,
   } = props;
 
+
+
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [openVariationId, setOpenVariationId] = useState<number | null>(null);
-  
+
   const itemsPerPage = 12;
   const router = useRouter();
 
@@ -98,7 +109,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
   }, [orderedProducts, searchTerm]);
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  
+
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
@@ -108,7 +119,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     router.push(`/dashboard/stock/manage/${productId}`);
   };
 
-  const pageNumbers = Array.from({ length: totalPages}, (_, i) => i + 1);
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
   const previewCards = useMemo(() => previewProducts.slice(0, 4), [previewProducts]);
 
   if (selectedTab === "estoque") {
@@ -158,10 +169,10 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                   <div className="slug">• {product.slug}</div>
                   <div className="tipo">• {
                     product.stock_type === 'key' ? `Keys` :
-                    product.stock_type === 'file' ? 'Arquivo' :
-                    product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
+                      product.stock_type === 'file' ? 'Arquivo' :
+                        product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
                   }</div>
-                  
+
                   {product.variations.length > 0 && (
                     <button
                       type="button"
@@ -195,21 +206,21 @@ export default function DashboardTabs(props: DashboardTabsProps) {
 
         {totalPages > 1 && (
           <div className="pagination">
-            <button 
-              disabled={currentPage === 1} 
+            <button
+              disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => prev - 1)}
               className="btnPagination"
             >
               &larr;
             </button>
-           {pageNumbers.map((num) => (
-            <button
-              key={num}
-              onClick={() => setCurrentPage(num)}
-              className={`pageNumber ${currentPage === num ? "active" : ""} btnPagination`}
-              > {num} 
-            </button>
-           ))}
+            {pageNumbers.map((num) => (
+              <button
+                key={num}
+                onClick={() => setCurrentPage(num)}
+                className={`pageNumber ${currentPage === num ? "active" : ""} btnPagination`}
+              > {num}
+              </button>
+            ))}
 
           </div>
         )}
@@ -220,7 +231,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
       </section>
     );
   }
-
 
   if (selectedTab === "cores") {
     return (

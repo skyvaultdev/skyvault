@@ -35,8 +35,6 @@
   transform: scale(1.02);
   box-shadow: 0 4px 15px rgba(224, 0, 0, 0.3);
 }
-
-/* ===== CONTAINER DE PREVIEW (DENTRO DO PAINEL) ===== */
 .previewContainer {
   background: var(--bg-glass);
   padding: 24px;
@@ -236,8 +234,6 @@
   align-items: start;
 }
 
-/* ===== CARDS ===== */
-
 .previewContainer .card,
 .previewContainer .galleryCard,
 .previewContainer .infoCard,
@@ -262,8 +258,6 @@
   border-color: var(--border-hover);
   box-shadow: var(--shadow-hover);
 }
-
-/* ===== GALERIA ===== */
 
 .previewContainer .mainImage {
   width: 100%;
@@ -306,8 +300,6 @@
   outline: 2px solid var(--primary);
 }
 
-/* ===== TEXTO ===== */
-
 .previewContainer .productTitle {
   margin: 0;
   font-size: 18px;
@@ -329,7 +321,7 @@
   opacity: 0.9;
 }
 
-/* ===== VARIAÇÕES ===== */
+
 
 .previewContainer .variationBlock {
   display: grid;
@@ -387,8 +379,6 @@
   font-weight: bold;
 }
 
-/* ===== BOTÕES ===== */
-
 .previewContainer .actions {
   display: grid;
   gap: 10px;
@@ -410,8 +400,6 @@
   transform: translateY(-2px);
   filter: brightness(1.05);
 }
-
-/* ===== SIDEBAR ===== */
 
 .previewContainer .sideBar {
   display: grid;

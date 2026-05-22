@@ -45,6 +45,8 @@ export default function HomePreview({
   const [localSections, setLocalSections] = useState<SectionType[]>(sections);
   const [isSaving, setIsSaving] = useState(false);
   const [draggedItem, setDraggedItem] = useState<{ slug: string; fromIndex: number } | null>(null);
+  const [isSalvarOpen, setIsSalvarOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState("Ordem dos produtos foi alterada com sucesso! ✅");
 
   const handleDragStart = (e: React.DragEvent, slug: string, index: number) => {
     if (!isPreview) return;
@@ -85,6 +87,9 @@ export default function HomePreview({
   };
 
   async function saveHomeOrder() {
+
+     
+    
     setIsSaving(true);
     
     const payload = localSections.flatMap((section) =>
@@ -102,12 +107,17 @@ export default function HomePreview({
       });
 
       if (response.ok) {
-        alert(`✅ Ordem salva! produtos atualizados.`);
+        setModalMessage("Ordem dos produtos foi alterada com sucesso! ✅");
+
+        setIsSalvarOpen(true);
+
       } else {
-        alert("❌ Erro ao salvar.");
+        setModalMessage("❌ Erro ao salvar.");
+        setIsSalvarOpen(true);
       }
     } catch (error) {
-      alert("❌ Erro na requisição.");
+      setModalMessage("❌ Erro na requisição.");
+      setIsSalvarOpen(true);
     } finally {
       setIsSaving(false);
     }
@@ -115,12 +125,33 @@ export default function HomePreview({
 
   const DisabledLink = ({ href, className, children }: any) => {
     if (isPreview) {
-      return <div className={className} style={{ cursor: 'default' }}>{children}</div>;
+      return <div className={className}>{children}</div>;
     }
     return <Link href={href} className={className}>{children}</Link>;
   };
 
   return (
+  <>
+    {isSalvarOpen && (
+  <div
+    className="modalOverlay"
+    onClick={() => setIsSalvarOpen(false)}
+  >
+    <div
+      className="modalBox"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p>{modalMessage}</p>
+
+      <button
+        onClick={() => setIsSalvarOpen(false)} className="btnfecharmod"
+      >
+        Fechar
+      </button>
+    </div>
+  </div>
+)}
+
     <main className="homePage">
       {isPreview && (
         <div className="savebtnord">
@@ -175,13 +206,13 @@ export default function HomePreview({
           </div>
 
           <div 
-            className="productsGrid"
+            className="productsGrid2"
             onDragOver={handleDragOver}
           >
             {items.map((product, index) => (
               <div
                 key={product.id}
-                className="productCard"
+                className="productCard2"
                 draggable={isPreview}
                 onDragStart={(e) => handleDragStart(e, category.slug, index)}
                 onDragOver={handleDragOver}
@@ -214,6 +245,8 @@ export default function HomePreview({
           </div>
         </section>
       ))}
+      
     </main>
+    </>
   );
 }

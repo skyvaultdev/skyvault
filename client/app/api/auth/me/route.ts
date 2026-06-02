@@ -13,14 +13,15 @@ export async function GET() {
 
   try {
 
-    const payload = (await verifyJWT(token)) as { email?: string };
+    const payload = (await verifyJWT(token)) as { role?: string, email?: string };
     const email = payload.email;
     const db = getDB();
-    const result = await db.query(`SELECT FROM admin WHERE email = $1`, [email]);
+    const result = await db.query(`SELECT role FROM admin WHERE email = $1`, [email]);
 
     return NextResponse.json({ 
       logged: true, 
-      admin: result.rows.length > 0 
+      admin: result.rows.length > 0,
+      role: result.rows[0].role 
     });
 
   } catch {

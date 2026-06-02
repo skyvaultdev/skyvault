@@ -15,6 +15,7 @@ import "./dashboard.css";
 import "./modal.css";
 import "./components/homeprev.css";
 import { Role, ROLES } from "@/lib/jwt/permissions";
+import { PATTERNS, type Pattern } from "@/lib/pattern/patterns";
 
 type TypeKey = "products" | "categories" | "coupon";
 
@@ -49,7 +50,8 @@ type BackgroundType =
   | "grid"
   | "diagonal"
   | "cyber"
-  | "hero-icons"
+  | "heroicons"
+  | "skulls"
   | "none";
 
 type StoreSettings = {
@@ -114,7 +116,7 @@ export default function Dashboard() {
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({
     primaryColor: "#b700ff",
     secondaryColor: "#6400ff",
-    backgroundType: "hero-icons",
+    backgroundType: "heroicons",
     backgroundImageUrl: "",
     backgroundCss: ""
   });
@@ -136,6 +138,17 @@ export default function Dashboard() {
   const [colorTarget, setColorTarget] = useState<"primary" | "secondary">("primary");
   const [selectedColor, setSelectedColor] = useState("#b700ff");
   const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
+  const backgrounds: BackgroundType[] = ["lines", "dots", "grid", "diagonal", "cyber", "heroicons", "skulls", "none"];
+  const backgroundLabels: Record<BackgroundType, string> = {
+    lines: "Linhas",
+    dots: "Pontos",
+    grid: "Grade",
+    diagonal: "Diagonal",
+    cyber: "Cyber",
+    heroicons: "Heroicons",
+    skulls: "Caveiras",
+    none: "Nenhum"
+  };
 
   const [admins, setAdmins] = useState<Admin[]>([]);
 
@@ -171,9 +184,12 @@ export default function Dashboard() {
     setIsAddOpen(true);
   }
 
-  const canEditMember = (currentRole: AdminRole, targetRole: AdminRole): boolean => {
-    const hierarchy: Record<AdminRole, number> = { owner: 3, admin: 2, editor: 1 };
-    return hierarchy[currentRole] > hierarchy[targetRole];
+  const canEditMember = (currentRole: AdminRole | null, targetRole: string | undefined): boolean => {
+    if (!currentRole || !targetRole) return false;
+    const hierarchy: Record<string, number> = { owner: 3, admin: 2, editor: 1 };
+    const currentLevel = hierarchy[currentRole.toLowerCase()];
+    const targetLevel = hierarchy[targetRole.toLowerCase()];
+    return currentLevel > targetLevel;
   };
 
   function closeAdd() {
@@ -423,7 +439,7 @@ export default function Dashboard() {
       primaryColor: String(data.primary_color ?? "#b700ff"),
       secondaryColor: String(data.secondary_color ?? "#6400ff"),
       backgroundType: (
-        data.background_style ?? "hero-icons"
+        data.background_style ?? "heroicons"
       ) as BackgroundType,
       backgroundImageUrl: String(data.background_img_url ?? ""),
       backgroundCss: String(data.background_css ?? ""),
@@ -701,32 +717,30 @@ export default function Dashboard() {
         "background",
         <section className="settingsPanel">
           <h3>Background</h3>
-          {[
-            "lines",
-            "dots",
-            "grid",
-            "diagonal",
-            "cyber",
-            "hero-icons",
-            "none",
-          ].map((bg) => (
-            <label className="radioRow" key={bg}>
-              <input
-                type="radio"
-                checked={storeSettings.backgroundType === bg}
-                onChange={() =>
-                  setStoreSettings((p) => ({
-                    ...p,
-                    backgroundType: bg as BackgroundType,
-                  }))
-                }
-              />
+          <div className="backgroundGrid">
+            {backgrounds
 
-              {bg}
-            </label>
-          ))}
+              .map((bg) => (
+                <button
+                  key={bg}
+                  type="button"
+                  className={`bgThumb ${storeSettings.backgroundType === bg ? "active" : ""}
+                ` }
+                  onClick={() => setStoreSettings((p) => ({ ...p, backgroundType: bg as BackgroundType, }))
+                  }
+                >
+
+                <p className="bgLabel">{backgroundLabels[bg]}</p>
+
+                  <div className="bgPreview"
+                    style={PATTERNS[bg]} />
+
+                  <span>{[bg]}</span>
+
+                </button>
+              ))}
+          </div>
           <input type="file" accept="image/*" onChange={(e) => setBackgroundImageFile(e.target.files?.[0] ?? null)} className="settingsInput" />
-          <textarea value={storeSettings.backgroundCss} onChange={(e) => setStoreSettings((p) => ({ ...p, backgroundCss: e.target.value }))} className="settingsTextarea" rows={4} />
           <button className="btn" onClick={() => void saveBackground()}>Salvar background</button>
         </section>
       );

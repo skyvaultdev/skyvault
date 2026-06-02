@@ -37,12 +37,11 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     const db = await getDB();
-    const targetResult = await db.query(`SELECT id, email, role FROM admins WHERE id = $1`, [id]);
+    const targetResult = await db.query(`SELECT id, email, role FROM admin WHERE id = $1`, [id]);
     if (targetResult.rows.length === 0) return fail("NOT_FOUND", 404);
 
     const targetAdmin = targetResult.rows[0];
-
-    // Não pode editar a si mesmo
+    
     if (targetAdmin.email === user.email) return fail("CANNOT_EDIT_SELF", 400);
 
     const ROLE_LEVEL = { owner: 3, admin: 2, editor: 1 };
@@ -50,17 +49,15 @@ export async function PATCH(request: Request, { params }: Params) {
     const targetLevel = ROLE_LEVEL[targetAdmin.role as keyof typeof ROLE_LEVEL];
     const newLevel = ROLE_LEVEL[newRole as keyof typeof ROLE_LEVEL];
 
-    // Só pode editar se tiver nível estritamente maior que o alvo
     if (userLevel <= targetLevel) {
       return fail("ROLE_TOO_HIGH", 403);
     }
 
-    // (Opcional) Impedir promoção a cargo igual ou superior ao seu
     if (newLevel >= userLevel) {
       return fail("CANNOT_PROMOTE_TO_SAME_OR_HIGHER", 403);
     }
 
-    await db.query(`UPDATE admins SET role = $1 WHERE id = $2`, [newRole, id]);
+    await db.query(`UPDATE admin SET role = $1 WHERE id = $2`, [newRole, id]);
     return ok();
   } catch (error) {
     console.error(error);

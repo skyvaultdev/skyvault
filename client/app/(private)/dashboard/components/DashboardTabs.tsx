@@ -38,7 +38,8 @@ type BackgroundType =
   | "grid"
   | "diagonal"
   | "cyber"
-  | "hero-icons"
+  | "skulls"
+  | "heroicons"
   | "none";
 
 type StoreSettings = {

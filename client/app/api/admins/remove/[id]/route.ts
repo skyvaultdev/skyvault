@@ -46,7 +46,7 @@ export async function DELETE(_: Request, { params }: Params) {
       return fail("ROLE_TOO_HIGH", 403);
     }
 
-    await db.query(`DELETE FROM admins WHERE id = $1`,
+    await db.query(`DELETE FROM admin WHERE id = $1`,
       [id]
     );
 

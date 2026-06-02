@@ -76,8 +76,6 @@ export default function CategoryPreview({
         newSections.splice(index, 0, removed);
         setLocalSections(newSections);
         setDraggedIndex(null);
-
-        console.log(`Arrastando ${draggedIndex} para ${index}`);
     }
 
 

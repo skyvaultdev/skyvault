@@ -6,19 +6,19 @@ import Link from "next/link";
 import "./edit.css";
 import { slugify } from "@/lib/utils/slugify";
 
-const parseCurrency = (value: string) => {
-  const cleanValue = value.replace(/[^\d.,]/g, "");
+var parseCurrency = (value: string) => {
+  var cleanValue = value.replace(/[^\d.,]/g, "");
   if (!cleanValue.includes(",") && !cleanValue.includes(".")) {
     return cleanValue;
   }
 
-  const pieces = cleanValue.split(/[.,]/);
-  const decimals = pieces.pop();
-  const integers = pieces.join("");
+  var pieces = cleanValue.split(/[.,]/);
+  var decimals = pieces.pop();
+  var integers = pieces.join("");
   
   return `${integers}.${decimals}`;
 };
-const formatToInput = (value: any) => {
+var formatToInput = (value: any) => {
   if (!value) return "0,00";
   return Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 };
@@ -28,9 +28,9 @@ type Variation = { id: string; name: string; price: string; isNew?: boolean };
 type FormState = { id?: number; name: string; description: string; price: string; categoryId: string; active: boolean; };
 
 export default function EditProductPage() {
-  const params = useParams();
-  const router = useRouter();
-  const productId = params.id;
+  var params = useParams();
+  var router = useRouter();
+  var productId = params.id;
 
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -53,15 +53,15 @@ export default function EditProductPage() {
   useEffect(() => {
     async function init() {
       try {
-        const catRes = await fetch("/api/categories");
-        const catJson = await catRes.json();
-        if (catJson.ok) setCategories(catJson.data);
+        var catRes = await fetch("/api/categories");
+        var catJson = await catRes.json();
+        if  (catJson.ok) setCategories(catJson.data);
 
-        const prodRes = await fetch(`/api/products/${productId}`);
-        const prodJson = await prodRes.json();
+        var prodRes = await fetch(`/api/products/${productId}`);
+        var prodJson = await prodRes.json();
 
         if (prodJson.ok && prodJson.data) {
-          const p = prodJson.data;
+          var p = prodJson.data;
           setForm({
             id: p.id,
             name: p.name,
@@ -91,7 +91,7 @@ export default function EditProductPage() {
     init();
   }, [productId]);
 
-  const previews = useMemo(() => {
+  var previews = useMemo(() => {
     return images.map((img) => {
       if (img instanceof File) return URL.createObjectURL(img);
       return img.url;
@@ -104,20 +104,20 @@ export default function EditProductPage() {
     });
   }, [previews]);
 
-  const selectedVariation = variations.find((v) => v.id === selectedVariationId);
-  const previewPrice = selectedVariation?.price || form.price || "0,00";
+  var selectedVariation = variations.find((v) => v.id === selectedVariationId);
+  var previewPrice = selectedVariation?.price || form.price || "0,00";
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+    var files = Array.from(e.target.files ?? []);
     setImages((prev) => [...prev, ...files]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function reorderImage(index: number, direction: -1 | 1) {
-    const target = index + direction;
+    var target = index + direction;
     if (target < 0 || target >= images.length) return;
-    const next = [...images];
-    const [item] = next.splice(index, 1);
+    var next = [...images];
+    var [item] = next.splice(index, 1);
     next.splice(target, 0, item);
     setImages(next);
   }
@@ -141,7 +141,7 @@ export default function EditProductPage() {
     event.preventDefault();
     setFeedback("Salvando...");
 
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append("id", String(form.id));
     formData.append("name", form.name.trim());
     formData.append("slug", slugify(form.name));
@@ -150,20 +150,20 @@ export default function EditProductPage() {
     formData.append("category_id", form.categoryId);
     formData.append("active", String(form.active));
 
-    const variationsToUpload = variations.map(v => ({
+    var variationsToUpload = variations.map(v => ({
         name: v.name,
         price: parseCurrency(v.price)
     }));
     formData.append("variations", JSON.stringify(variationsToUpload));
 
-    const existingImages = images.filter(img => !(img instanceof File));
+    var existingImages = images.filter(img => !(img instanceof File));
     formData.append("existingImages", JSON.stringify(existingImages));
     images.forEach((img) => {
       if (img instanceof File) formData.append("newImages", img);
     });
 
     try {
-        const response = await fetch(`/api/products/edit/${form.id}`, {
+        var response = await fetch(`/api/products/edit/${form.id}`, {
           method: "PUT",
           body: formData,
         });

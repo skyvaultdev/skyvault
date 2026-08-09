@@ -13,9 +13,8 @@ export async function PATCH(req: Request) {
   let db;
   try {
     db = getDB();
-    const body = await req.json();
-    console.log("Body recebido no servidor:", body); 
-    let payload: ProductOrderPayload[] = [];
+    var body = await req.json();
+    var payload: ProductOrderPayload[] = [];
     if (!Array.isArray(body)) {
       return fail("INVALID_PAYLOAD - Expected array", 400);
     }
@@ -29,15 +28,13 @@ export async function PATCH(req: Request) {
       return fail("INVALID_PAYLOAD - Missing id", 400);
     }
 
-    console.log("Payload processado:", payload);
-    for (const item of payload) {
+    for (var item of payload) {
       await db.query(
         "UPDATE products SET position = $1 WHERE id = $2",
         [item.position, item.id]
       );
     }
 
-    console.log(`Atualizados ${payload.length} produtos`);
     return ok({ updated: payload.length });
 
   } catch (error) {

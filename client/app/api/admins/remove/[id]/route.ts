@@ -19,11 +19,11 @@ const ROLE_LEVEL = {
 export async function DELETE(_: Request, { params }: Params) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    var token = cookieStore.get("auth_token")?.value;
     if (!token) return fail("UNAUTHORIZED", 401);
-    const { id } = await params
+    var { id } = await params
 
-    const user = await verifyJWT(token);
+    var user = await verifyJWT(token);
     if (!user) return fail("INVALID_TOKEN", 401);
 
     if (!user.permissions?.includes("team.manage")) {
@@ -37,7 +37,7 @@ export async function DELETE(_: Request, { params }: Params) {
 
     if (target.rows.length === 0) return fail("NOT_FOUND", 404);
 
-    const targetAdmin = target.rows[0];
+    var targetAdmin = target.rows[0];
     if (targetAdmin.email === user.email) {
       return fail("CANNOT_REMOVE_SELF", 400);
     }

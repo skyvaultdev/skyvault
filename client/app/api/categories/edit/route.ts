@@ -7,18 +7,18 @@ import { slugify } from "@/lib/utils/slugify";
 export async function POST(req: Request) {
   try {
     const db = getDB();
-    const formData = await req.formData();
+    var formData = await req.formData();
 
-    const identifier = String(formData.get("id") ?? "").trim();
-    const name = String(formData.get("name") ?? "").trim();
+    var identifier = String(formData.get("id") ?? "").trim();
+    var name = String(formData.get("name") ?? "").trim();
     
     if (!identifier || !name) return fail("ID_OR_SLUG_REQUIRED", 400);
 
-    const newSlug = slugify(name);
-    const productIdsRaw = String(formData.get("product_ids") ?? "");
-    const productIds: number[] = productIdsRaw? productIdsRaw.split(",").map(Number).filter(n => !isNaN(n)) : [];
+    var newSlug = slugify(name);
+    var productIdsRaw = String(formData.get("product_ids") ?? "");
+    var productIds: number[] = productIdsRaw? productIdsRaw.split(",").map(Number).filter(n => !isNaN(n)) : [];
 
-    const isNumeric = /^\d+$/.test(identifier);
+    var isNumeric = /^\d+$/.test(identifier);
     const updated = await db.query(
       `UPDATE categories 
        SET name = $1, slug = $2 
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     );
 
     if (updated.rowCount === 0) return fail("CATEGORY_NOT_FOUND", 404);
-    const realCategoryId = updated.rows[0].id;
+    var realCategoryId = updated.rows[0].id;
 
     if (productIds.length > 0) {
       await db.query(

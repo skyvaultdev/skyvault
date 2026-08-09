@@ -16,7 +16,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as {
+    var body = (await req.json()) as {
       title?: string;
       subtitle?: string | null;
       imageUrl?: string;

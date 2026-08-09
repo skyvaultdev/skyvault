@@ -8,10 +8,10 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_: Request, { params }: Params) {
     try {
-        const { id } = await params;
+        var { id } = await params;
         const db = getDB();
-        const isNumeric = /^\d+$/.test(id);
-        const result = isNumeric ?
+        var isNumeric = /^\d+$/.test(id);
+        var result = isNumeric ?
         await db.query(`SELECT id,product_id, name, price, position FROM product_variations WHERE product_id = $1`, [Number(id)])
         : await db.query(`SELECT id,product_id,name, price, position FROM product_variations WHERE product_id = $1`, [id])
 

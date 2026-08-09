@@ -146,6 +146,49 @@ h1{color: white;}
      right: -4px;
  }
 
+ .gmail {
+     display: flex;
+     justify-content: center;
+     align-items: center;
+     margin-top: 0px;
+     color: white;
+     font-family: 'Poppins', sans-serif;
+     cursor: pointer;
+ }
+
+ .gmail button {
+    width: 290px;
+     background-color: rgb(255, 255, 255);
+     border: solid 2px rgb(255, 255, 255);
+     padding: 10px 20px;
+     border-radius: 5px;
+     color: black;
+     font-family: 'Poppins', sans-serif;
+     font-size: 16px;
+     cursor: pointer;
+     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+     transition:
+         background-color 0.3s ease,
+         border-color 0.3s ease,
+         transform 0.45s ease,
+         box-shadow 0.2s ease;  
+ }
+
+ .gmail button:hover {
+    background-color: #e0e0e0;
+     transform: scale(1.02);
+     border-color: (33, 33, 180);
+ }
+
+ .google-icon {
+        width: 30px;
+        height: 30px;
+        margin-right: 0px;
+       margin-top: -9px;
+       position: relative;
+       top: 8px;
+ }
+
  p{
     position: relative;
     top: 5px;

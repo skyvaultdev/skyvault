@@ -76,22 +76,22 @@ export default function ProductPage() {
   const itemsPerPage = 3;
   const totalPages = Math.ceil(similar.length / itemsPerPage);
 
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
+  var paginatedProducts = useMemo(() => {
+    var startIndex = (currentPage - 1) * itemsPerPage;
     return similar.slice(startIndex, startIndex + itemsPerPage);
   }, [similar, currentPage]);
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+  var pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadProduct() {
-      const slug = params.slug;
+      var slug = params.slug;
       if (!slug) return;
 
       try {
-        const res = await fetch(`/api/products/${encodeURIComponent(slug)}`);
+        var res = await fetch(`/api/products/${encodeURIComponent(slug)}`);
         if (!res.ok) {
           if (!cancelled && res.status === 404) setNotFound(true);
           return;
@@ -100,7 +100,7 @@ export default function ProductPage() {
         const json = await res.json();
         if (!json.ok || !json.data || cancelled) return;
 
-        const data = json.data as Product;
+        var data = json.data as Product;
         setProduct(null);
         setVariations([]);
         setSimilar([]);
@@ -116,11 +116,11 @@ export default function ProductPage() {
           images: Array.isArray(data.images) ? data.images : [],
         });
 
-        const vData: Variations[] = Array.isArray(json.data.variations)
+        var vData: Variations[] = Array.isArray(json.data.variations)
           ? json.data.variations
           : [];
 
-        const cleaned = vData
+        var cleaned = vData
           .map((v) => ({
             ...v,
             price: Number(v.price),
@@ -155,14 +155,15 @@ export default function ProductPage() {
       if (!product) return;
 
       try {
-        const allRes = await fetch(`/api/products`);
-        const allJson = await allRes.json();
+        var allRes = await fetch(`/api/products`);
+        var allJson = await allRes.json();
 
         const pool: any[] = allJson.data;
 
-        const sameCategory: any[] = [];
-        const similarWords: { item: any; score: number }[] = [];
-        const noCategory: any[] = [];
+        
+        var sameCategory: any[] = [];
+        var similarWords: { item: any; score: number }[] = [];
+        var noCategory: any[] = [];
 
         pool.forEach((item) => {
           if (item.id === product.id) return;
@@ -172,7 +173,7 @@ export default function ProductPage() {
             return;
           }
 
-          const score = getSimilarity(product.name, item.name);
+          var score = getSimilarity(product.name, item.name);
           if (score >= 0.4) {
             similarWords.push({ item, score });
             return;
@@ -184,7 +185,7 @@ export default function ProductPage() {
         });
 
         similarWords.sort((a, b) => b.score - a.score);
-        const finalResults = [
+        var finalResults = [
           ...sameCategory,
           ...similarWords.map((s) => s.item),
           ...noCategory,
@@ -208,27 +209,27 @@ export default function ProductPage() {
     loadExtraData();
   }, [product?.id, product?.category_id, product?.name]);
 
-  const selectedVariation = useMemo(() => {
+  var selectedVariation = useMemo(() => {
     return variations.find((v) => v.id === selectedVariationPos) || null;
   }, [variations, selectedVariationPos]);
 
-  const basePrice = useMemo(() => {
+  var basePrice = useMemo(() => {
     if (!product) return 0;
     return Number(selectedVariation?.price ?? product.price ?? 0);
   }, [selectedVariation, product]);
 
-  const displayedPrice = useMemo(() => {
+  var displayedPrice = useMemo(() => {
     return finalPrice !== null ? Number(finalPrice) : basePrice;
   }, [finalPrice, basePrice]);
 
-  const currentImage = useMemo(() => {
+  var currentImage = useMemo(() => {
     if (!product || !product.images.length) return "/file.svg";
     return product.images[selectedImage]?.url || "/file.svg";
   }, [product, selectedImage]);
 
-  const isAvailable = useMemo(() => {
+  var isAvailable = useMemo(() => {
     if (!product) return false;
-    const target = selectedVariation ?? product;
+    var target = selectedVariation ?? product;
     if (!target) return false;
 
     return target.is_unlimited || target.stock_count > 0;
@@ -237,14 +238,14 @@ export default function ProductPage() {
   async function applyCoupon() {
     if (!product) return;
 
-    const code = couponCode.trim().toUpperCase();
+    var code = couponCode.trim().toUpperCase();
     if (!code) return;
 
     try {
-      const res = await fetch("/api/coupons");
+      var res = await fetch("/api/coupons");
       const json = await res.json();
 
-      const coupon = (json.data as Coupon[]).find((c) => c.code === code && c.active);
+      var coupon = (json.data as Coupon[]).find((c) => c.code === code && c.active);
 
       if (coupon) {
         setFinalPrice(basePrice * (1 - Number(coupon.percent_off) / 100));
@@ -261,8 +262,8 @@ export default function ProductPage() {
     setLoadingAdd(true);
 
     try {
-      const variation_id = selectedVariation ? selectedVariation.id : null;
-      const response = await fetch("/api/cart", {
+      var variation_id = selectedVariation ? selectedVariation.id : null;
+      var response = await fetch("/api/cart", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -347,7 +348,7 @@ export default function ProductPage() {
 
               <div className="variationList">
                 {variations.map((v) => {
-                  const outOfStock = !v.is_unlimited && v.stock_count < 1;
+                  var outOfStock = !v.is_unlimited && v.stock_count < 1;
                   return (
                     <button
                       key={v.id}

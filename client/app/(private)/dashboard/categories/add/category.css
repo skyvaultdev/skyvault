@@ -75,7 +75,7 @@ body{
   padding: 12px;
   border: none;
   border-radius: 10px;
-  background: var(--secondary);
+  background: green;
   color: white;
   font-weight: bold;
   cursor: pointer;
@@ -86,8 +86,9 @@ body{
 }
 
 .saveBtn:hover:not(:disabled) {
-  background: var(--primary);
+  background: var(--secondary);
  transform: scale(1.01);
+ color: black;
 }
 
 .saveBtn:disabled {

@@ -6,7 +6,7 @@ import { fail, ok } from "@/lib/api/response";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_: Request, { params }: Params) {
-  const { id } = await params;
+  var { id } = await params;
   const db = getDB();
   const result = await db.query("SELECT * FROM home_banners WHERE id = $1", [Number(id)]);
   if (result.rows.length === 0) return fail("NOT_FOUND", 404);
@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: Params) {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
-  const { id } = await params;
+  var { id } = await params;
   const body = (await req.json()) as {
     title?: string;
     subtitle?: string | null;
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const current = await db.query("SELECT * FROM home_banners WHERE id = $1", [Number(id)]);
   if (current.rows.length === 0) return fail("NOT_FOUND", 404);
 
-  const row = current.rows[0];
+  var row = current.rows[0];
   const result = await db.query(
     `UPDATE home_banners SET title=$1, subtitle=$2, image_url=$3, link=$4, active=$5, position=$6 WHERE id=$7 RETURNING *`,
     [
@@ -50,7 +50,7 @@ export async function PUT(req: Request, ctx: Params) {
 }
 
 export async function DELETE(_: Request, { params }: Params) {
-  const { id } = await params;
+  var { id } = await params;
   const db = getDB();
   const result = await db.query("DELETE FROM home_banners WHERE id = $1 RETURNING id", [Number(id)]);
   if (result.rows.length === 0) return fail("NOT_FOUND", 404);

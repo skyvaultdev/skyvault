@@ -6,7 +6,7 @@ import { verifyJWT } from "@/lib/jwt/init";
 
 export async function GET() {
     try {
-        const token = (await cookies()).get("auth_token")?.value;
+        var token = (await cookies()).get("auth_token")?.value;
         if (!token) {
             return NextResponse.json({
                 ok: false,
@@ -14,7 +14,7 @@ export async function GET() {
             });
         }
 
-        const payload = await verifyJWT(token);
+        var payload = await verifyJWT(token);
         return NextResponse.json({
             ok: true,
             role: payload.role ?? null,

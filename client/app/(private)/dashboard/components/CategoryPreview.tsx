@@ -40,8 +40,11 @@ export default function CategoryPreview({
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSalvarOpen, setIsSalvarOpen] = useState(false);
+    const [modalMessage, setModalMessage] = useState("Ordem das categorias foi alterada com sucesso! ");
+    const [modalIsError, setModalIsError] = useState(false);
 
-   
+
     function handleDragStart(e: React.DragEvent, index: number) {
         if (!isPreview) return;
         setDraggedIndex(index);
@@ -101,14 +104,18 @@ export default function CategoryPreview({
             });
 
             if (response.ok) {
-                alert(`✅ Ordem salva! categorias atualizadas.`);
+                setModalIsError(false);
+                setModalMessage("Ordem das categorias foi alterada com sucesso!");
             } else {
-                alert("❌ Erro ao salvar.");
+                setModalIsError(true);
+                setModalMessage("❌ Erro ao salvar a ordem das categorias.");
             }
         } catch (error) {
-            alert("❌ Erro na requisição.");
+            setModalIsError(true);
+            setModalMessage("❌ Erro na requisição.");
         } finally {
             setIsSaving(false);
+            setIsSalvarOpen(true);
         }
     }
 
@@ -120,38 +127,64 @@ export default function CategoryPreview({
     };
 
     return (
-        <main className="categoryPreview">
-            {isPreview && (
-                <div className="savebtnord2">
-                    <button onClick={saveHomeOrder} disabled={isSaving}>
-                        {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
-                    </button>
-                    <span>🖱️ Arraste as categorias para reordenar</span>
+        <>
+            {isSalvarOpen && (
+                <div
+                    className="modalOverlay"
+                    onClick={() => setIsSalvarOpen(false)}
+                >
+                    <div
+                        className="modalContent"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className={`modalIcon ${modalIsError ? "modalIconError" : ""}`}>
+                            {modalIsError ? "✕" : "✓"}
+                        </div>
+                        <p className="modaltxt">{modalMessage}</p>
+
+                        <button
+                            onClick={() => setIsSalvarOpen(false)}
+                            className="btnfecharmod"
+                        >
+                            Fechar
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {localSections.map(({ category, index }, i) => (
-                <section key={category.slug} className={`categorySection ${dragOverIndex === index ? 'dragOver' : ''}`}>
-                    <div
-                        className={`categorySection2 ${dragOverIndex === index ? 'is-dragging-over' : ''}`}
-                        draggable={isPreview}
-                        onDragStart={(e) =>
-                            handleDragStart(e, i)}
-                        onDragOver={(e) =>
-                            handleDragOver(e, i)}
-                        onDrop={(e) =>
-                            handleDrop(e, i)
-                        }
-                        onDragLeave={() => setDragOverIndex(null)}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <h2 className="categoryTitle">{category.name}</h2>
+            <main className="categoryPreview">
+                {isPreview && (
+                    <div className="savebtnord2">
+                        <button onClick={saveHomeOrder} disabled={isSaving}>
+                            {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
+                        </button>
+                        <span>🖱️ Arraste as categorias para reordenar</span>
                     </div>
-                    <div className="categoryItemsGrid" onDragOver={(e) =>
-                        handleDragOver(e, i)}>
-                    </div>
-                </section>
-            ))}
-        </main>
+                )}
+
+                {localSections.map(({ category, index }, i) => (
+                    <section key={category.slug} className={`categorySection ${dragOverIndex === index ? 'dragOver' : ''}`}>
+                        <div
+                            className={`categorySection2 ${dragOverIndex === index ? 'is-dragging-over' : ''}`}
+                            draggable={isPreview}
+                            onDragStart={(e) =>
+                                handleDragStart(e, i)}
+                            onDragOver={(e) =>
+                                handleDragOver(e, i)}
+                            onDrop={(e) =>
+                                handleDrop(e, i)
+                            }
+                            onDragLeave={() => setDragOverIndex(null)}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <h2 className="categoryTitle">{category.name}</h2>
+                        </div>
+                        <div className="categoryItemsGrid" onDragOver={(e) =>
+                            handleDragOver(e, i)}>
+                        </div>
+                    </section>
+                ))}
+            </main>
+        </>
     );
 }

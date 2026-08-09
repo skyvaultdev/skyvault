@@ -1,4 +1,4 @@
-    body {
+body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
             Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -52,7 +52,7 @@
     }
 
     .navleft ul li a:hover {
-        color: rgb(200, 200, 200);
+        color: var(--secondary);
         transform: scale(1.1);
 
 
@@ -97,7 +97,7 @@
         align-items: center;
         gap: 8px;
         width: 22px;
-        height: 22px; 
+        height: 22px;
         margin-right: 5px;
     }
 
@@ -201,7 +201,7 @@
         border: none;
         border-radius: 15px;
         font-size: 16px;
-        box-shadow: 0 2px 4px rgba(232, 0, 253, 0.61);
+        box-shadow: 0 2px 4px var(--secondary);
         border: solid 2px var(--primary);
         transition: transform 0.45s ease,
             border-color 0.3s ease,
@@ -227,9 +227,7 @@
         padding: 0 30px;
     }
 
-    .lateral span,
-    span,
-    span {
+    .lateral span {
         display: none;
         width: 25px;
         height: 3px;
@@ -351,8 +349,8 @@
         position: absolute;
         top: -5px;
         right: -5px;
-        background: #2ecc71;
-        color: white;
+        background: var(--secondary);
+        color: rgb(10, 10, 10);
         font-size: 10px;
         padding: 2px 6px;
         border-radius: 50%;
@@ -383,6 +381,12 @@
         border: none;
         color: #aaa;
         cursor: pointer;
+        transition: color 0.3s ease, transform 0.45s ease, box-shadow 0.2s ease;
+    }
+
+    .closeBtncart:hover {
+        color: var(--secondary);
+        transform: scale(1.1);
     }
 
 
@@ -444,23 +448,24 @@
 
     .cartActions {
         display: flex;
-        gap: 10px;
+        gap: 5px;
         align-items: center;
     }
 
     .qtyBox {
-        background: #111;
+        background: var(--primary);
         border: 1px solid #222;
         border-radius: 8px;
         display: flex;
         align-items: center;
+        gap: 8px;
         padding: 4px;
     }
 
     .qtyBtn {
-        background: #1e1433;
-        border: 1px solid #3d2b63;
-        color: #a888ff;
+        background: var(--primary);
+        border: 1px solid var(--secondary);
+        color: white;
         width: 28px;
         height: 28px;
         border-radius: 6px;
@@ -472,7 +477,7 @@
     }
 
     .qtyBtn:hover {
-        background: #2d1f4d;
+        background: var(--secondary);
     }
 
     .qtyValue {
@@ -515,7 +520,7 @@
     .checkoutBtn {
         width: 100%;
         padding: 14px;
-        background: var(--primary);
+        background: var(--secondary);
         color: #000;
         border: none;
         border-radius: 8px;
@@ -648,7 +653,7 @@
 
     .userDropdown hr {
         border: none;
-        border-top: 1px solid var(--primary);
+        border-top: 1px solid var(--secondary);
         margin: 0;
     }
 
@@ -670,6 +675,24 @@
         z-index: 999;
         background: transparent;
     }
+
+    .logo {
+        display: flex;
+        position: absolute;
+        top: 5px;
+        left: 60px;
+        width: 50px;
+        height: 50px;
+            transition:
+            transform 0.15s ease;
+    }
+
+   
+
+    .logo:hover{
+          transform: scale(1.05);
+    }
+
 
     @keyframes dropdownFade {
         from {
@@ -710,7 +733,8 @@
             width: 100%;
             max-width: 300px;
             margin-top: 20px;
-            position: relative; top: -5px;
+            position: relative;
+            top: -5px;
         }
 
 

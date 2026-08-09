@@ -149,7 +149,6 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
         </button>
 
         <section className="productLayout">
-          {/* GALERIA */}
           <div className="card galleryCard">
             <img
               src={currentImage}

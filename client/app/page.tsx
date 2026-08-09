@@ -3,6 +3,7 @@ import { getDB } from "@/lib/database/db";
 import CategoryAutoSelect from "./(components)/CategoryAutoSelect";
 import "./home.css";
 import HighlightsCarousel from "./(private)/dashboard/components/HighlightsCarousel";
+import ChatWidget from "./(components)/chat/ChatWidget";
 
 type Category = { id: number; name: string; slug: string };
 type Banner = { id: number; title: string; subtitle: string | null; image_url: string; link: string | null };
@@ -16,6 +17,8 @@ type Product = {
   category_name: string | null;
   category_slug: string | null;
 };
+
+
 
 async function getHomeData() {
   const db = getDB();
@@ -43,6 +46,8 @@ async function getHomeData() {
     `),
   ]);
 
+  
+
   return {
     banners: bannersRes.rows,
     categories: categoriesRes.rows,
@@ -51,22 +56,22 @@ async function getHomeData() {
 }
 
 export default async function Home() {
-  const { banners, categories, products } = await getHomeData();
-  const highlights = products.slice(0, 5);
-  const uncategorizedItems: Product[] = [];
+  var { banners, categories, products } = await getHomeData();
+  var highlights = products.slice(0, 5);
+  var uncategorizedItems: Product[] = [];
 
-  const map = new Map<string, { category: Category; items: Product[] }>();
-  for (const c of categories) map.set(c.slug, { category: c, items: [] });
+  var map = new Map<string, { category: Category; items: Product[] }>();
+  for (var c of categories) map.set(c.slug, { category: c, items: [] });
 
-  for (const p of products) {
-    const key = p.category_slug;
+  for (var p of products) {
+    var key = p.category_slug;
     
     if (!key) {
       uncategorizedItems.push(p);
       continue;
     }
 
-    const bucket = map.get(key);
+    var bucket = map.get(key);
     if (bucket) bucket.items.push(p);
   }
 
@@ -77,6 +82,8 @@ export default async function Home() {
       items: uncategorizedItems,
     });
   }
+
+  
 
   return (
     <main className="homePage">
@@ -115,7 +122,7 @@ export default async function Home() {
             </div>
 
             <Link className="pillLink" href="/catalog">
-              Ver catálogo completo <span aria-hidden="true">›</span>
+             <p>Ver catálogo completo</p> <span aria-hidden="true">›</span>
             </Link>
           </div>
 
@@ -130,28 +137,30 @@ export default async function Home() {
           <div className="categoryHeaderRow">
             <h2 className="categoryTitle">{category.name}</h2>
             <Link 
-                className="pillLink" 
+                className="pillLink2" 
                 href={category.id === 0 ? "/catalog" : `/catalog?category=${encodeURIComponent(category.slug)}`}
             >
-              Ver mais <span aria-hidden="true">›</span>
+              <p className="pillLinkText">Ver mais</p> <span aria-hidden="true">›</span>
             </Link>
           </div>
-
+            
           <div className="productsGrid">
             {items.slice(0, 6).map((product) => (
-              <article key={product.id} className="productCard">
+              <Link href={`/product/${product.slug}`}
+              key={product.id}
+              className="productCard">
+          <article className="">
                 <img
                   src={product.image_url || "/file.svg"}
                   alt={product.name}
-                  className="productThumb"
-                />
+                  className="productThumb"/>
                 <span className="productCategory">{product.category_name ?? "Outros"}</span>
                 <h3 className="productTitle">{product.name}</h3>
-                <p className="productPrice">R$ {Number(product.price).toFixed(2)}</p>
-                <Link href={`/product/${product.slug}`} className="buyButton">
-                  Comprar agora
-                </Link>
+                <p className="productCardPrice">R$ {Number(product.price).toFixed(2)}</p>
+                <span className="buyButton">Comprar Agora</span>
               </article>
+              </Link>
+
             ))}
           </div>
         </section>

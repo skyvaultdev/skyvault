@@ -8,31 +8,35 @@ import { fail, ok } from "@/lib/api/response";
 
 export async function POST(req: Request) {
     const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    var token = cookieStore.get("auth_token")?.value;
+    if (!token) return fail("UNAUTHORIZED", 401);
 
-    const user = await verifyJWT(token);
+    var user = await verifyJWT(token);
+    if (!user) return fail("UNAUTHORIZED", 401);
     if (!user.permissions?.includes("team.manage")) return fail("NO_PERMISSION", 403);
 
-    const { email, role } = await req.json();
-    if (!ROLES[role]) return fail("INVALID_ROLE", 400);
+    var { email, role } = (await req.json()) as { email: string; role: string };
+    if (!Object.keys(ROLES).includes(role)) return fail("INVALID_ROLE", 400);
+    var typedRole = role as keyof typeof ROLES;
 
     const db = await getDB();
-    const exists = await db.query( `SELECT id FROM admin WHERE email = $1`,
+    var exists = await db.query( `SELECT id FROM admin WHERE email = $1`,
         [email]
     );
 
     if (exists?.rows?.length > 0) return fail("ALREADY_ADMIN", 400);
 
-    const { rows: discordUsers } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [email])
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [email])
-    if(regularUser?.length < 1 && discordUsers?.length < 1) return fail("USER_NOT_FOUND", 400)
+    var { rows: discordUsers } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [email])
+    var { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [email])
+    var { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [email])
+    if(regularUser?.length < 1 && discordUsers?.length < 1 && googleUser?.length < 1) return fail("USER_NOT_FOUND", 400)
 
     await db.query( `INSERT INTO admin (email,role) VALUES($1,$2)`,
-        [email, role]
+        [email, typedRole]
     );
 
     return ok({
-        role,
-        permissions: Object.keys(ROLES[role]),
+        role: typedRole,
+        permissions: Object.keys(ROLES[typedRole]),
     });
 }

@@ -17,8 +17,8 @@ async function ensureSchema() {
 export async function GET(req: Request) {
   try {
     const db = await ensureSchema();
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    var { searchParams } = new URL(req.url);
+    var id = searchParams.get("id");
 
     if (id) {
       const result = await db.query("SELECT id, name, slug, image_url FROM categories WHERE id = $1", [Number(id)]);

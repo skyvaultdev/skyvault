@@ -27,21 +27,21 @@ export default function EditCategoryPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const catRes = await fetch(`/api/categories/${categoryId}`);
-        const catJson = await catRes.json();
+        var catRes = await fetch(`/api/categories/${categoryId}`);
+        var catJson = await catRes.json();
 
-        const prodRes = await fetch("/api/products");
-        const prodJson = await prodRes.json();
+        var prodRes = await fetch("/api/products");
+        var prodJson = await prodRes.json();
 
         if (catJson.ok && prodJson.ok) {
-          const categoryData = catJson.data;
-          const allProducts = prodJson.data ?? [];
+          var categoryData = catJson.data;
+          var allProducts = prodJson.data ?? [];
 
           setName(categoryData.name);
           setCurrentId(categoryData.id);
           setProducts(allProducts);
 
-          const initialSelected = allProducts
+          var initialSelected = allProducts
             .filter((p: Product) => p.category_id === categoryData.id)
             .map((p: Product) => p.id);
 
@@ -67,17 +67,23 @@ export default function EditCategoryPage() {
     if (!name.trim()) return alert("Digite um nome");
 
     setSaving(true);
-    const form = new FormData();
-    form.append("id", String(categoryId));  
+    var form = new FormData();
+    form.append("id", String(categoryId));
     form.append("name", name);
     form.append("product_ids", selected.join(","));
 
-    const res = await fetch("/api/categories/edit", {
+    var res = await fetch("/api/categories/edit", {
       method: "POST",
       body: form,
     });
 
-    const json = await res.json();
+    let json;
+
+    try {
+      json = await res.json();
+    } catch {
+      json = {};
+    }
     setSaving(false);
 
     if (!res.ok) {
@@ -115,8 +121,8 @@ export default function EditCategoryPage() {
 
         <div className="productGrid">
           {products.map((product) => {
-            const isFromThisCategory = product.category_id === currentId;
-            const active = selected.includes(product.id);
+            var isFromThisCategory = product.category_id === currentId;
+            var active = selected.includes(product.id);
 
             return (
               <div
@@ -150,8 +156,9 @@ export default function EditCategoryPage() {
 
       {successData && (
         <div className="modalOverlay">
-          <div className="modalBox">
-            <h2>✅ Sucesso!</h2>
+          <div className="modalContent">
+            <div className="modalIcon">✓</div>
+            <h2>Sucesso!</h2>
             <p>A categoria <strong>{successData.name}</strong> foi atualizada.</p>
             <p>Total de produtos vinculados: {successData.totalProducts}</p>
             <button className="saveBtn" onClick={() => setSuccessData(null)}>Fechar</button>

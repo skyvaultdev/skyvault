@@ -1,18 +1,15 @@
 import "./footer.css";
 
 export default function Footer() {
-    return (
+      return (
+            <footer className="footer">
+                  <div className="infocontainer">
 
-          <footer className="footer">
-            <div className="infocontainer">
-        
-      </div>
-      <div className="fim">
-<p>© 2026 Sky Vault. Todos os direitos reservados.</p>
+                  </div>
+                  <div className="fim">
+                        <p>© 2026 Sky Vault. Todos os direitos reservados.</p>
 
-      </div>
-    </footer>
-
-
-    );
+                  </div>
+            </footer>
+      );
 }

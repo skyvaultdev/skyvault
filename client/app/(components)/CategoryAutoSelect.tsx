@@ -8,8 +8,8 @@ export default function CategoryAutoSelect(props: {
   categories: Category[];
   current?: string;
 }) {
-  const { categories, current } = props;
-  const router = useRouter();
+  var { categories, current } = props;
+  var router = useRouter();
 
   return (
     <div className="selectShell">
@@ -17,7 +17,7 @@ export default function CategoryAutoSelect(props: {
         className="homeSelect"
         value={current ?? ""}
         onChange={(e) => {
-          const value = e.target.value;
+          var value = e.target.value;
           if (!value) {
             router.push("/");
             return;

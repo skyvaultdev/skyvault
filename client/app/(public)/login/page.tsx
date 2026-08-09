@@ -3,7 +3,7 @@
 import "./login.css";
 import "./modal.css";
 import { useRouter } from "next/navigation";
-import { FaDiscord } from "react-icons/fa";
+import { FaDiscord, FaGoogle } from "react-icons/fa";
 import { useState, useEffect } from "react";
 
 export default function Login() {
@@ -36,7 +36,7 @@ export default function Login() {
     setMsg("Enviando email...");
 
     try {
-      const res = await fetch("/api/auth/email", {
+      var res = await fetch("/api/auth/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -75,13 +75,13 @@ export default function Login() {
     setMsg("Enviando email...");
 
     try {
-      const res = await fetch("/api/auth/email", {
+      var res = await fetch("/api/auth/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
 
-      const data = await res.json();
+      var data = await res.json();
 
       if (res.ok) {
         setMsg("Código reenviado para seu email");
@@ -109,13 +109,13 @@ export default function Login() {
 
     
     try {
-      const res = await fetch("/api/auth/email/callback", {
+      var res = await fetch("/api/auth/email/callback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
       });
 
-      const data = await res.json();
+      var data = await res.json();
 
       if (res.ok) {
         setMsg("Código verificado! Login autorizado.");
@@ -167,13 +167,22 @@ export default function Login() {
           </button>
         </div>
 
+        <div className="gmail">
+          <button
+            type="button"
+            onClick={() => (window.location.href = "/api/auth/google")}
+          >
+            <img src="/google-icon.png" alt="Google" className="google-icon" /> Entrar com Google
+          </button>
+        </div>
+
         {msg && <p>{msg}</p>}
       </div>
 
       {isModalOpen && (
         <div className="modalOverlay" onClick={closeModal}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-            <h2>Digite o código</h2>
+            <h2 className="modalTitle">Digite o código</h2>
 
             <p>
               Enviamos um código para: <b>{email}</b>

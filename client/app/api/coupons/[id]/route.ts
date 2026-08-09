@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     const db = getDB();
     const result = await db.query("SELECT * FROM coupons WHERE id = $1", [Number(id)]);
     if (result.rows.length === 0) return fail("NOT_FOUND", 404);
@@ -20,9 +20,9 @@ export async function GET(_: Request, { params }: Params) {
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     const db = getDB();
-    const body = (await req.json()) as {
+    var body = (await req.json()) as {
       code?: string;
       percentOff?: number;
       usageLimit?: number;
@@ -34,10 +34,10 @@ export async function PATCH(req: Request, { params }: Params) {
 
     const current = await db.query("SELECT * FROM coupons WHERE id = $1", [Number(id)]);
     if (current.rows.length === 0) return fail("NOT_FOUND", 404);
-    const row = current.rows[0];
+    var row = current.rows[0];
 
     const result = await db.query(
-      `UPDATE coupons SET code=$1, percent_off=$2, usage_limit=$3, used_count=$4, min_order_value=$5, active=$6, expires_at=$7
+      `UPDATE coupons SET code = $1, percent_off = $2, usage_limit = $3, used_count = $4, min_order_value = $5, active = $6, expires_at = $7
        WHERE id=$8 RETURNING *`,
       [
         body.code?.trim().toUpperCase() || row.code,
@@ -64,7 +64,7 @@ export async function PUT(req: Request, ctx: Params) {
 
 export async function DELETE(_: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     const db = getDB();
     const result = await db.query("DELETE FROM coupons WHERE id=$1 RETURNING id", [Number(id)]);
     if (result.rows.length === 0) return fail("NOT_FOUND", 404);

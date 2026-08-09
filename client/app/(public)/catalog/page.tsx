@@ -29,16 +29,15 @@ async function loadData(categorySlug?: string) {
 }
 
 export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
-  const selected = params.category;
-  const { categories, products } = await loadData(selected);
+  var params = await searchParams;
+  var selected = params.category;
+  var { categories, products } = await loadData(selected);
 
   return (
     <main className="catalog-main">
       <aside className="catalog-aside">
         <h3>Categorias</h3>
         <ul className="categories-list">
-          {/* Classe active se NÃO houver categoria selecionada */}
           <li className={`all ${!selected ? "active-link" : ""}`}>
             <Link href="/catalog">Todos os produtos</Link>
           </li>
@@ -57,7 +56,6 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
       </aside>
 
       <section>
-        {/* Filtros Mobile */}
         <div className="categories-filter">
           <Link href="/catalog" className={`filter-btn ${!selected ? "active" : ""}`}>
             Todos

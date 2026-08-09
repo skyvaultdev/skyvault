@@ -62,14 +62,14 @@
   transition: transform 180ms ease;
 }
 
-/* Hover */
+
 .addHeader a:hover {
   background: var(--secondary);
   border-color: var(--secondary);
   transform: translateY(-1px);
 }
 
-/* Anima a seta */
+
 .addHeader a:hover::after {
   transform: translateX(4px);
 }
@@ -120,7 +120,6 @@ input[type="number"] {
   font-size: 14px;
   transition: all 180ms ease;
   gap: 8px;
-
 }
 
 .addForm select {

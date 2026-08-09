@@ -27,18 +27,31 @@ export default function Header() {
   const [cartAberto, setCartAberto] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [dropAberto, setDropAberto] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
+
+  async function loadStoreSettings() {
+    try {
+      var response = await fetch("/api/store-settings");
+      if (!response.ok) return;
+      var data = await response.json();
+      setLogoUrl(data.data.logo_url);
+    } catch (err) {
+      console.error("Erro ao carregar logo:", err);
+    }
+
+  }
 
   async function fetchData() {
     try {
-      const authRes = await fetch("/api/auth/me");
-      const authData = await authRes.json();
+      var authRes = await fetch("/api/auth/me");
+      var authData = await authRes.json();
       setIsLogged(Boolean(authData.logged));
       setIsAdmin(authData.admin === true);
 
 
-      const cartRes = await fetch("/api/cart");
-      const cartData = await cartRes.json();
+      var cartRes = await fetch("/api/cart");
+      var cartData = await cartRes.json();
       if (cartData.ok) {
         setCartItems(cartData.data || []);
       }
@@ -49,10 +62,11 @@ export default function Header() {
 
   useEffect(() => {
     fetchData();
+    loadStoreSettings();
   }, []);
 
   useEffect(() => {
-    const handleUpdate = () => {
+    var handleUpdate = () => {
       fetchData();
       setCartAberto(true);
     };
@@ -62,14 +76,14 @@ export default function Header() {
 
   function searchSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const q = search.trim();
+    var q = search.trim();
     if (!q) return;
     router.push(`/search/${encodeURIComponent(q)}`);
   }
 
   async function updateQuantity(id: number, newQty: number) {
     try {
-      const res = await fetch(`/api/cart`, {
+      var res = await fetch(`/api/cart`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cart_item_id: id, quantity: newQty }),
@@ -97,9 +111,9 @@ export default function Header() {
     }
   }
 
-  const cartTotal = cartItems.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
+  var cartTotal = cartItems.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
 
-  const CartContent = () => (
+  var CartContent = () => (
     <div className="cartDropdown">
       <div className="cartHeader">
         <h3>Carrinho</h3>
@@ -112,7 +126,7 @@ export default function Header() {
           <p className="emptyMsg">Seu carrinho está vazio.</p>
         ) : (
           cartItems.map((item) => {
-            const canIncrease = item.is_unlimited || item.quantity < item.stock_count;
+            var canIncrease = item.is_unlimited || item.quantity < item.stock_count;
 
             return (
               <div key={item.cart_item_id} className="cartItemContainer">
@@ -192,8 +206,10 @@ export default function Header() {
 
       <nav className="navleft">
         <ul>
+          <Link href="/" className="logollink"> <img 
+          src={logoUrl || "/logo.png"} alt="" className="logo"/> </Link>
           <li><Link href="/">Home</Link></li>
-          <li><Link href="/contact">Contact</Link></li>
+          <li><Link href="/terms">Termos da loja</Link></li>
         </ul>
       </nav>
 

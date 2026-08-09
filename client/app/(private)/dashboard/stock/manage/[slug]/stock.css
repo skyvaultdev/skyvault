@@ -1,42 +1,64 @@
 .pageHeader {
-  padding: 30px;
+  padding: 32px 36px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pageHeader > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+h2 {
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 
 .stockGrid {
-  display: flex;
-  gap: 30px;
-  align-items: flex-start;
-  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: start;
 }
 
-.dashboardContainer {
-  border: solid 1px var(--primary);
-  min-height: 70vh;
-  padding: 20px;
-  width: 100%;
-  border-radius: 15px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  background: #0a0a0a;
-  flex: 1;
-}
 
 .settingsCard {
   display: flex;
   flex-direction: column;
-  padding: 10px 10px;
-  margin-left: 50px;
+  padding: 18px;
+  margin: 0;
   width: 100%;
-  max-width: 300px;
+  max-width: none;
   box-sizing: border-box;
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  position: sticky;
+  top: 24px;
+}
+
+.fieldLabel {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+  display: block;
 }
 
 .stockTargetList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
-  max-width: 250px;
+  max-width: none;
+  margin-top: 12px;
 }
 
 .stockTargetList button {
@@ -44,52 +66,171 @@
 }
 
 .targetBtn {
-  background: #1a1a1a;
-  color: #fff;
-  border: 1px solid #333;
-  padding: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid transparent;
+  padding: 11px 14px;
   border-radius: 10px;
-  margin-top: 10px;
+  margin-top: 0;
   cursor: pointer;
+  text-align: left;
+  font-size: 0.9rem;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.targetBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
 }
 
 .targetBtn.active {
-  border-color: var(--primary);
+  border-color: rgba(30, 215, 96, 0.35);
   background: rgba(30, 215, 96, 0.15);
-  color: var(--primary);
-  font-weight: 600;
-  transform: scale(1.02);
-}
-
-.btnConfirm2 {
-  height: 45px;
-  background-color: #0ac204;
-  border: 1px solid #333;
-  width: 100%;
   color: white;
-  border-radius: 15px;
-  margin-top: 30px;
-  cursor: pointer;
-  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+  font-weight: 600;
+  transform: none;
 }
 
-.btnConfirm2:hover {
-  border-color: var(--secondary);
+
+.dashboardContainer {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 70vh;
+  padding: 28px;
+  width: 100%;
+  border-radius: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: #0a0a0a;
+  flex: 1;
+}
+
+.stockTypeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin-bottom: 28px;
+}
+
+.typeBtn {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid transparent;
+  width: 100%;
+  padding: 10px;
+  border-radius: 9px;
+  margin-top: 0;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.typeBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  transform: none;
+  border-color: transparent;
+}
+
+.typeBtn.active {
+  border-color: transparent;
+  background: var(--secondary);
+  color: #04120a;
+  font-weight: 600;
+}
+
+
+.settingsTextarea {
+  margin-top: 12px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #fff;
+  padding: 16px;
+  min-height: 220px;
+  opacity: 1;
+  outline: none;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.settingsTextarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.settingsTextarea:hover {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.settingsTextarea:focus {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--primary);
+  background-color: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(30, 215, 96, 0.15);
+}
+
+.settingsInput {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 11px 14px;
+  margin: 12px 0;
+  border-radius: 10px;
+  width: 100%;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.settingsInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(30, 215, 96, 0.15);
+}
+
+.settingsInput2 {
+  color: #fff;
   background-color: var(--secondary);
-  transform: scale(1.01) translateY(-2px);
+  border: 1px solid var(--secondary);
+  padding: 11px 14px;
+  margin: 12px 0;
+  border-radius: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  transition: border-color 0.18s ease;
+}
+
+.settingsInput2:hover {
+  border-color: var(--secondary);
 }
 
 small {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  display: block;
+  margin-top: 6px;
 }
 
-h2 {
-  color: white;
+p {
+  color: rgba(255, 255, 255, 0.85);
 }
 
-.fieldLabel {
-
-  color: white;
+.unlimitedToggle {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .checkboxRow {
@@ -102,264 +243,149 @@ h2 {
 
 .checkboxRow input[type="checkbox"] {
   appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--primary);
-  border-radius: 5px;
-  background-color: #1a1a1a;
+  width: 19px;
+  height: 19px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
 }
 
 .checkboxRow input[type="checkbox"]:hover {
-  border-color: var(--secondary);
-  box-shadow: 0 0 5px var(--secondary);
+  border-color: var(--primary);
 }
 
 .checkboxRow input[type="checkbox"]:checked {
-  background-color: var(--primary);
-  border-color: var(--primary);
+  background-color: var(--secondary);
+  border-color: var(--secondary);
 }
 
 .checkboxRow input[type="checkbox"]:checked::after {
   content: "✔";
   position: absolute;
-  top: -2px;
-  left: 2px;
-  font-size: 14px;
-  color: black;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #04120a;
 }
 
 .checkboxRow span {
-  color: white;
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.88rem;
 }
 
 input[type="file"] {
   width: 100%;
   padding: 10px;
-  background-color: rgba(26, 26, 26, 0.6);
-  color: white;
+  background-color: var(--primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  transition: all 0.3s ease;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
 }
 
 input[type="file"]::file-selector-button {
-  background: var(--primary);
+  background: var(--secondary);
   border: none;
-  padding: 8px 12px;
-  margin-right: 10px;
+  padding: 8px 14px;
+  margin-right: 12px;
   border-radius: 8px;
-  color: black;
+  color: #04120a;
+  font-weight: 600;
   cursor: pointer;
-  transition: 0.3s;
+  transition: opacity 0.18s ease;
 }
 
 input[type="file"]::file-selector-button:hover {
-  background: var(--secondary);
+  opacity: 0.85;
 }
 
 input[type="file"]:hover {
-  border-color: var(--secondary);
-  background-color: rgba(26, 26, 26, 0.8);
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.05);
 }
-
-p {
-  color: white;
-}
-
-.textBtn2 {
-  height: 45px;
-  background-color: red;
-  border: 1px solid #333;
-  color: white;
-  border-radius: 15px;
-  cursor: pointer;
-  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
-  width: 100%;
-}
-
-.textBtn2:hover {
-  border-color: #c20404;
-  background-color: #c20404;
-  transform: scale(1.01) translateY(-2px);
-}
-
-.textBtn {
-  background: #1a1a1a;
-  color: #fff;
-  border: 1px solid #333;
-  padding: 10px;
-  border-radius: 10px;
-  text-decoration: none;
-  margin-left: 70px;
-  cursor: pointer;
-  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
-}
-
-.textBtn:hover {
-  border-color: var(--secondary);
-  background-color: var(--secondary);
-  transform: scale(1.05) translateY(-2px);
-}
-
-
-.stockTypeGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-}
-
-
-.typeBtn {
-  background: #1a1a1a;
-  color: #fff;
-  border: 1px solid #333;
-  width: 100%;
-  padding: 10px;
-  border-radius: 15px;
-  margin-top: 15px;
-  cursor: pointer;
-  transition: transform 0.45s ease, border-color 0.3s ease, box-shadow 0.2s ease, background-color 0.3s ease;
-}
-
-.typeBtn.active {
-  border-color: var(--primary);
-  background: rgba(30, 215, 96, 0.1);
-  color: var(--primary);
-}
-
-.typeBtn:hover {
-  border-color: var(--secondary);
-  background-color: var(--secondary);
-  transform: scale(1.02);
-}
-
-.settingsTextarea {
-  margin-top: 15px;
-  width: 100%;
-  background-color: rgba(26, 26, 26, 0.44);
-  border: 1px dashed var(--primary);
-  border-radius: 8px;
-  color: white;
-  padding: 15px;
-  min-height: 200px;
-  opacity: 0.8;
-  outline: none;
-  transition: 0.3s;
-  box-sizing: border-box;
-}
-
-.settingsTextarea:hover {
-  opacity: 1;
-  border-color: var(--secondary);
-}
-
-.settingsTextarea:focus {
-  opacity: 1;
-  border-style: solid;
-  border-color: var(--primary);
-  box-shadow: 0 0 10px var(--primary);
-}
-
-
-.settingsInput {
-  color: white;
-  background-color: #1a1a1ab9;
-  border: none;
-  padding: 5px 10px;
-  margin: 10px 0;
-  border-radius: 10px;
-  width: 100%}
-
-.settingsInput2 {
-  color: white;
-  background-color: #1a1a1a;
-  border: none;
-  padding: 5px 10px;
-  margin: 10px 0;
-  border-radius: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  max-width: 100%;
-}
-  
-
 
 .fileUploadZone {
-  display: flex; 
+  display: flex;
   flex-direction: column;
-  padding: 20px;
-  border: solid 2px var(--primary);
-  background-color: #1a1a1ab2;
-  border-radius: 15px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 14px;
   width: 100%;
-  max-width: 400px;
-  margin: 40px auto;
+  max-width: 420px;
+  margin: 8px auto 0;
   box-sizing: border-box;
   overflow: hidden;
 }
 
 .currentFileContainer {
-  margin-top: 15px;
-  padding: 12px;
-  width: 100%; 
-  background: #2b2b2b;
-  border-radius: 8px;
-  border: 1px solid #292828;
+  margin-top: 16px;
+  padding: 14px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   box-sizing: border-box;
-}
-
-.fileNameText {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-  display: block;
 }
 
 .fileInfo {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
+}
+
+.fileNameText {
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  font-size: 0.85rem;
+  margin: 0;
+  display: block;
 }
 
 .downloadLink {
-  border: solid 2px var(--primary);
-  background-color: var(--primary);
-  border-radius: 5px;
-  padding: 6px;
-  box-shadow: 0 0 5px var(--primary);
-  color: #0070f3;
+  border: 1px solid var(--primary);
+  background-color: transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: none;
+  color: var(--primary);
   text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: bold;
-  transition: all 0.3s ease;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .downloadLink:hover {
-  background-color: var(--secondary);
-  border-color: var(--secondary);
-  transform: scale(1.02) translateY(-2px);
-  box-shadow: 0 0 8px var(--secondary);
+  background-color: var(--primary);
+  color: #04120a;
+  transform: none;
+  box-shadow: none;
   text-decoration: none;
 }
 
-
 .filePreview {
-  margin-top: 10px;
+  margin-top: 12px;
   width: 100%;
   max-height: 200px;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #333333;
-  border: 1px dashed var(--primary);
-  padding: 10px; 
-  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  padding: 10px;
+  border-radius: 8px;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -368,27 +394,97 @@ p {
   max-width: 100%;
   height: auto;
   max-height: 200px;
-  object-fit: contain; 
+  object-fit: contain;
+  border-radius: 4px;
 }
 
 .noPreview {
-  padding: 20px;
-  color: #888;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.35);
   font-size: 0.8rem;
   text-align: center;
-  background: #f2f2f2;
+  background: transparent;
   width: 100%;
 }
 
 
+
+.btnConfirm2 {
+  height: 46px;
+  background-color: var(--secondary);
+  border: none;
+  width: 100%;
+  color: #04120a;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border-radius: 12px;
+  margin-top: 32px;
+  cursor: pointer;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.btnConfirm2:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.btnConfirm2:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.textBtn2 {
+  height: 44px;
+  background-color: transparent;
+  border: 1px solid rgba(255, 59, 48, 0.4);
+  color: #ff6b60;
+  font-weight: 500;
+  border-radius: 12px;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+  width: 100%;
+}
+
+.textBtn2:hover {
+  border-color: #ff3b30;
+  background-color: rgba(255, 59, 48, 0.1);
+  transform: none;
+}
+
+.textBtn {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border: none;
+  padding: 6px 0;
+  border-radius: 0;
+  text-decoration: none;
+  margin-left: 0;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: color 0.18s ease;
+}
+
+.textBtn:hover {
+  color: var(--primary);
+  border-color: transparent;
+  background-color: transparent;
+  transform: none;
+}
+
+
 @media (max-width: 968px) {
+  .pageHeader {
+    padding: 20px;
+  }
+
   .stockGrid {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .settingsCard {
-    margin-left: 0;
     max-width: 100%;
+    position: static;
   }
 
   .stockTypeGrid {
@@ -404,9 +500,11 @@ p {
   .stockTargetList {
     flex-direction: row;
     overflow-x: auto;
+    padding-bottom: 4px;
   }
 
   .stockTargetList button {
-    min-width: 160px;
+    min-width: 150px;
+    flex-shrink: 0;
   }
 }

@@ -6,12 +6,12 @@ type RouteParams = {
 };
 
 export async function GET(req: Request, { params }: RouteParams) {
-  const { id, target } = await params;
+  var { id, target } = await params;
   try {
-    const { target, id } = params;
+    var { target, id } = params;
     const db = await getDB();
-    const table = target === "variation" ? "product_variations" : "products";
-    const keyColumn = target === "variation" ? "variation_id" : "product_id";
+    var table = target === "variation" ? "product_variations" : "products";
+    var keyColumn = target === "variation" ? "variation_id" : "product_id";
 
     const info = await db.query(
       `SELECT stock_type, stock_file_path FROM ${table} WHERE id = $1`,

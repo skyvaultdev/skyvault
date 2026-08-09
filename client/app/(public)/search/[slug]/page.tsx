@@ -10,6 +10,7 @@ type Product = {
     slug: string;
     price: number;
     image_url?: string | null;
+    category_name?: string | null;
 };
 
 export default function SearchPage() {
@@ -64,6 +65,9 @@ export default function SearchPage() {
                         <div key={product.id} className="productCard">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={product.image_url || "/file.svg"} alt={product.name} />
+                            {product.category_name ? (
+                                <span className="productCategory">{product.category_name}</span>
+                            ) : null}
                             <h3>{product.name}</h3>
                             <p>R$ {Number(product.price).toFixed(2)}</p>
                             <a href={`/product/${product.slug}`} className="viewButton">

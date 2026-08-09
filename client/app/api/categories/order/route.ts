@@ -13,7 +13,7 @@ export async function PATCH(req: Request) {
   let db;
   try {
     db = getDB();
-    const body = await req.json();
+    var body = await req.json();
     let payload: CategoryOrderPayload[] = [];
     if (!Array.isArray(body)) {
       return fail("INVALID_PAYLOAD - Expected array", 400);
@@ -28,9 +28,7 @@ export async function PATCH(req: Request) {
       return fail("INVALID_PAYLOAD - Missing id", 400);
     }
 
-    console.log(payload)
-
-    for (const item of payload) {
+    for (var item of payload) {
       await db.query(
         "UPDATE categories SET position = $1 WHERE id = $2",
         [item.position, item.id]

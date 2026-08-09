@@ -23,8 +23,8 @@ export default function AddCategoryPage() {
 
   useEffect(() => {
     async function loadProducts() {
-      const response = await fetch("/api/products?withoutCategory=1");
-      const json = await response.json();
+      var response = await fetch("/api/products?withoutCategory=1");
+      var json = await response.json();
 
       if (json.ok) {
         setProducts(
@@ -52,15 +52,15 @@ export default function AddCategoryPage() {
 
     setLoading(true);
 
-    const form = new FormData();
+    var form = new FormData();
     form.append("name", name);
     form.append("product_ids", selected.join(","));
-    const res = await fetch("/api/categories/add", {
+    var res = await fetch("/api/categories/add", {
       method: "POST",
       body: form,
     });
 
-    const json = await res.json();
+    var json = await res.json();
     setLoading(false);
 
     if (!res.ok) {
@@ -99,7 +99,7 @@ export default function AddCategoryPage() {
 
         <div className="productGrid">
           {products.map((product) => {
-            const active = selected.includes(product.id);
+            var active = selected.includes(product.id);
 
             return (
               <div

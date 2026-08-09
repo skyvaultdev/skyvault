@@ -3,13 +3,13 @@ import { fail, ok } from "@/lib/api/response";
 
 export async function POST(req: Request) {
   try {
-    const { productId, variationId, orderId } = await req.json();
+    var { productId, variationId, orderId } = await req.json();
     const db = await getDB();
 
-    const isVariation = !!variationId;
-    const targetId = isVariation ? variationId : productId;
-    const table = isVariation ? "product_variations" : "products";
-    const keyColumn = isVariation ? "variation_id" : "product_id";
+    var isVariation = !!variationId;
+    var targetId = isVariation ? variationId : productId;
+    var table = isVariation ? "product_variations" : "products";
+    var keyColumn = isVariation ? "variation_id" : "product_id";
 
     const info = await db.query(
       `SELECT stock_type, stock_file_path FROM ${table} WHERE id = $1`,
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     );
 
     if (info.rows.length === 0) return fail("Item não encontrado.");
-    const { stock_type, stock_file_path } = info.rows[0];
+    var { stock_type, stock_file_path } = info.rows[0];
 
     if (stock_type === "key") {
       const res = await db.query(

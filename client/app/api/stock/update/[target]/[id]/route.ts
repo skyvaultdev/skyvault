@@ -12,31 +12,31 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const BANNED_EXTENSIONS = [".exe", ".bat", ".cmd", ".sh", ".php", ".js", ".vbs"];
 
 export async function POST(req: Request, { params }: RouteParams) {
-  const { id, target } = await params;
+  var { id, target } = await params;
 
   try {
-    const formData = await req.formData();
-    const type = formData.get("type") as string;
-    const ghostStock = formData.get("ghost_stock") as string;
+    var formData = await req.formData();
+    var type = formData.get("type") as string;
+    var ghostStock = formData.get("ghost_stock") as string;
     let content = (formData.get("content") as string) || "";
     let isUnlimited = (formData.get("is_unlimited") as boolean) || false;
-    const file = formData.get("file") as File | null;
+    var file = formData.get("file") as File | null;
 
     if (type === "file" && file && file.size > 0) {
       if (file.size > MAX_FILE_SIZE) return fail("TOO_LARGE_FILE", 400);
 
-      const fileName = file.name.toLowerCase();
+      var fileName = file.name.toLowerCase();
       if (BANNED_EXTENSIONS.some(ext => fileName.endsWith(ext))) {
         return fail("BANNED_FILE_EXTENSION", 400);
       }
 
-      const uploadDir = join(process.cwd(), "stock", "products", "uploads");
+      var uploadDir = join(process.cwd(), "stock", "products", "uploads");
       if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true });
 
-      const uniqueName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-      const filePath = join(uploadDir, uniqueName);
+      var uniqueName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+      var filePath = join(uploadDir, uniqueName);
 
-      const bytes = await file.arrayBuffer();
+      var bytes = await file.arrayBuffer();
       await writeFile(filePath, Buffer.from(bytes));
 
       content = uniqueName;
@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
     
     const db = getDB();
-    const table = target === "variation" ? "product_variations" : "products";
+    var table = target === "variation" ? "product_variations" : "products";
     await db.query(
       `UPDATE ${table} 
        SET stock_type = $1, 

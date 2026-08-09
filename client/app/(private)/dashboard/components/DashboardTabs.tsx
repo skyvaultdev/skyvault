@@ -2,7 +2,7 @@
 
 import "./components.css";
 import "./stocktabs.css";
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardTab } from "./Sidebar";
 import Link from "next/link";
@@ -59,7 +59,9 @@ type DashboardTabsProps = {
   onChangeSelectedColor: (value: string) => void;
   onSaveColors: () => Promise<void>;
   storeSettings: StoreSettings;
-  onBackgroundTypeChange: (type: "lines" | "dots") => void;
+  // Widened to match the full set of background options the store actually
+  // supports (previously only allowed "lines" | "dots").
+  onBackgroundTypeChange: (type: BackgroundType) => void;
   onBackgroundCssChange: (css: string) => void;
   onBackgroundImageChange: (file: File | null) => void;
   onSaveBackground: () => Promise<void>;
@@ -71,6 +73,17 @@ type DashboardTabsProps = {
   onAddAdmin?: (email: string) => Promise<void>;
   onRemoveAdmin?: (id: number) => Promise<void>;
 };
+
+const BACKGROUND_OPTIONS: { value: BackgroundType; label: string }[] = [
+  { value: "lines", label: "Linhas" },
+  { value: "dots", label: "Pontos" },
+  { value: "grid", label: "Grade" },
+  { value: "diagonal", label: "Diagonal" },
+  { value: "cyber", label: "Cyber" },
+  { value: "skulls", label: "Caveiras" },
+  { value: "heroicons", label: "Heroicons" },
+  { value: "none", label: "Nenhum" },
+];
 
 export default function DashboardTabs(props: DashboardTabsProps) {
   const {
@@ -93,13 +106,11 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     admins,
   } = props;
 
-
-
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [openVariationId, setOpenVariationId] = useState<number | null>(null);
 
-  const itemsPerPage = 12;
+  const itemsPerPage = 8;
   const router = useRouter();
 
   const filteredProducts = useMemo(() => {
@@ -116,12 +127,26 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredProducts, currentPage]);
 
-  const manageStock = (productId: any) => {
-    router.push(`/dashboard/stock/manage/${productId}`);
-  };
-
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
-  const previewCards = useMemo(() => previewProducts.slice(0, 4), [previewProducts]);
+
+  // Reset to page 1 when the search term changes or the underlying product
+  // count changes (e.g. after a reload), so the user never lands on a page
+  // that no longer has any items. Keyed off `.length` rather than the array
+  // reference so a simple reorder (same length) doesn't reset the page.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, orderedProducts.length]);
+
+  // Close any open variation dropdown when the page changes, since the
+  // product it belongs to may no longer be visible.
+  useEffect(() => {
+    setOpenVariationId(null);
+  }, [currentPage]);
+
+  const handleManageStock = useCallback((slug?: string) => {
+    if (!slug) return;
+    router.push(`/dashboard/stock/manage/${slug}`);
+  }, [router]);
 
   if (selectedTab === "estoque") {
     return (
@@ -136,10 +161,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
             type="text"
             placeholder="Buscar por nome ou slug..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="searchInput"
           />
         </div>
@@ -151,13 +173,21 @@ export default function DashboardTabs(props: DashboardTabsProps) {
             return (
               <div key={product.id} className="inventoryCard">
                 <div className="productImagePreview">
-                  <Link href={`/product/${product.slug}`}>
+                  {product.slug ? (
+                    <Link href={`/product/${product.slug}`}>
+                      <img
+                        src={product.image_url || "/file.svg"}
+                        alt={product.name}
+                        className="stockProductImg"
+                      />
+                    </Link>
+                  ) : (
                     <img
                       src={product.image_url || "/file.svg"}
                       alt={product.name}
                       className="stockProductImg"
                     />
-                  </Link>
+                  )}
                 </div>
                 <div className="productInfoCell">
                   <strong>{product.name}</strong>
@@ -167,9 +197,9 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                 </div>
 
                 <div className="infoProd">
-                  <div className="slug">• {product.slug}</div>
+                  <div className="slug">• {product.slug ?? "sem slug"}</div>
                   <div className="tipo">• {
-                    product.stock_type === 'key' ? `Keys` :
+                    product.stock_type === 'key' ? 'Keys' :
                       product.stock_type === 'file' ? 'Arquivo' :
                         product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
                   }</div>
@@ -185,9 +215,9 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                   )}
 
                   {isMenuOpen && (
-                    <div className="variações">
+                    <div className="variationsList">
                       {product.variations.map((v) => (
-                        <div className="variação" key={v.id}>
+                        <div className="variationItem" key={v.id}>
                           {v.name} ({v.is_unlimited ? '∞' : v.stock_count})
                         </div>
                       ))}
@@ -196,7 +226,11 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                 </div>
 
                 <div className="cardActions">
-                  <button className="btnEditSmall" onClick={() => manageStock(product.slug)}>
+                  <button
+                    className="btnEditSmall"
+                    onClick={() => handleManageStock(product.slug)}
+                    disabled={!product.slug}
+                  >
                     ⚙️ Configurar
                   </button>
                 </div>
@@ -222,7 +256,13 @@ export default function DashboardTabs(props: DashboardTabsProps) {
               > {num}
               </button>
             ))}
-
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              className="btnPagination"
+            >
+              &rarr;
+            </button>
           </div>
         )}
 
@@ -266,22 +306,16 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     return (
       <section className="settingsPanel">
         <h3>Background</h3>
-        <label className="radioRow">
-          <input
-            type="radio"
-            checked={(storeSettings.backgroundType ?? "lines") === "lines"}
-            onChange={() => onBackgroundTypeChange("lines")}
-          />
-          Linhas
-        </label>
-        <label className="radioRow">
-          <input
-            type="radio"
-            checked={(storeSettings.backgroundType ?? "lines") === "dots"}
-            onChange={() => onBackgroundTypeChange("dots")}
-          />
-          Pontos
-        </label>
+        {BACKGROUND_OPTIONS.map((option) => (
+          <label className="radioRow" key={option.value}>
+            <input
+              type="radio"
+              checked={(storeSettings.backgroundType ?? "lines") === option.value}
+              onChange={() => onBackgroundTypeChange(option.value)}
+            />
+            {option.label}
+          </label>
+        ))}
         <label className="fieldLabel" htmlFor="background-image">Upload de imagem</label>
         <input
           id="background-image"

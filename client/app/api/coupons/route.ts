@@ -35,7 +35,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const db = await ensureCouponsSchema();
-    const body = (await req.json()) as {
+    var body = (await req.json()) as {
       code?: string;
       percentOff?: number;
       usageLimit?: number;

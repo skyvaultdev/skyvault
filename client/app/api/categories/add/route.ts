@@ -21,13 +21,13 @@ export async function POST(req: Request) {
   try {
     const db = await ensureSchema();
 
-    const contentType = req.headers.get("content-type") ?? "";
+    var contentType = req.headers.get("content-type") ?? "";
     if (!contentType.includes("multipart/form-data")) {
       return fail("INVALID_CONTENT_TYPE", 400);
     }
 
-    const formData = await req.formData();
-    const name = String(formData.get("name") ?? "").trim();
+    var formData = await req.formData();
+    var name = String(formData.get("name") ?? "").trim();
     if (!name) return fail("MISSING_NAME", 400);
 
     let slug = slugify(name);
@@ -39,8 +39,8 @@ export async function POST(req: Request) {
       slug = `${slug}-${crypto.randomUUID().slice(0, 6)}`;
     }
     
-    const productsRaw = String(formData.get("product_ids") ?? "");
-    const productIds: number[] = productsRaw
+    var productsRaw = String(formData.get("product_ids") ?? "");
+    var productIds: number[] = productsRaw
       ? productsRaw
         .split(",")
         .map((v) => Number(v))
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       [name, slug]
     );
 
-    const categoryId = created.rows[0].id;
+    var categoryId = created.rows[0].id;
     if (productIds.length > 0) {
       await db.query(`UPDATE products SET category_id = $1 WHERE id = ANY($2::bigint[]) AND category_id IS NULL`,
         [categoryId, productIds]

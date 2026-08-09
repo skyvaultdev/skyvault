@@ -5,10 +5,9 @@ import { getDB } from "@/lib/database/db";
 import { ROLES } from "@/lib/jwt/permissions";
 
 export async function POST(req: Request) {
-  const { email } = await req.json();
+  var { email } = await req.json();
 
   const db = getDB();
-
   const adminRow = await db.query(
     `SELECT role FROM admin WHERE email = $1`,
     [email]
@@ -18,7 +17,7 @@ export async function POST(req: Request) {
   let permissions: string[] = [];
 
   if (adminRow.rows.length > 0) {
-    const roleFromDb = adminRow.rows[0].role;
+    var roleFromDb = adminRow.rows[0].role;
 
     if (roleFromDb in ROLES) {
       role = roleFromDb;

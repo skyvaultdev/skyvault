@@ -226,8 +226,9 @@ input[type="number"] {
 }
 
 .addbtn:hover {
-  background: rgba(0, 255, 0, 0.85);
+  background:var(--secondary);
   transform: scale(1.02);
+  color: black;
 }
 
 .salvarbtn {

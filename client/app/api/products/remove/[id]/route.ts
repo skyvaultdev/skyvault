@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function DELETE(_: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     if (!/^\d+$/.test(id)) return fail("INVALID_ID", 400);
 
     const db = getDB();

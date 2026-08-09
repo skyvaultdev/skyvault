@@ -14,6 +14,11 @@ export const config = {
         port: Number(process.env.DB_PORT),
     },
 
+    google: {
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+
     discord: {
         clientId: process.env.DISCORD_CLIENT_ID!,
         clientToken: process.env.DISCORD_CLIENT_TOKEN!,

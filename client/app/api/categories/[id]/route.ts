@@ -8,11 +8,11 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     const db = getDB();
 
-    const isNumeric = /^\d+$/.test(id);
-    const insertId = isNumeric ? Number(id) : id;
+    var isNumeric = /^\d+$/.test(id);
+    var insertId = isNumeric ? Number(id) : id;
     const category = await db.query("SELECT id, name, slug, image_url FROM categories WHERE slug = $1", 
       [insertId]
     );
@@ -27,16 +27,16 @@ export async function GET(_: Request, { params }: Params) {
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     const db = getDB();
-    const body = (await req.json()) as { name?: string; slug?: string; imageUrl?: string | null; productIds?: number[] };
+    var body = (await req.json()) as { name?: string; slug?: string; imageUrl?: string | null; productIds?: number[] };
 
     const current = await db.query("SELECT * FROM categories WHERE id = $1", [Number(id)]);
     if (current.rows.length === 0) return fail("NOT_FOUND", 404);
 
-    const nextName = body.name?.trim() || current.rows[0].name;
-    const nextSlug = slugify(body.slug || nextName);
-    const nextImage = body.imageUrl ?? current.rows[0].image_url;
+    var nextName = body.name?.trim() || current.rows[0].name;
+    var nextSlug = slugify(body.slug || nextName);
+    var nextImage = body.imageUrl ?? current.rows[0].image_url;
 
     const updated = await db.query(
       "UPDATE categories SET name = $1, slug = $2, image_url = $3 WHERE id = $4 RETURNING id, name, slug, image_url",
@@ -63,7 +63,7 @@ export async function PUT(req: Request, ctx: Params) {
 
 export async function DELETE(_: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
     const db = getDB();
     await db.query("UPDATE products SET category_id = NULL WHERE category_id = $1", [Number(id)]);
     const deleted = await db.query("DELETE FROM categories WHERE id = $1 RETURNING id", [Number(id)]);

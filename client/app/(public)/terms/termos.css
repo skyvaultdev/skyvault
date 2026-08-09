@@ -1,0 +1,142 @@
+
+.termos-container {
+  max-width: 860px;
+  margin: 50px auto;
+  padding: 48px 40px;
+  background: linear-gradient(160deg, #161616 0%, #0f0f0fc9 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.384),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+  color: #e5e5e5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.7;
+}
+
+.termos-title {
+  text-align: center;
+  margin: 0 0 8px 0;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--secondary);
+  background: linear-gradient(90deg,var(--secondary), var(--primary) 135%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.termos-span {
+  display: block;
+  width: 70px;
+  height: 3px;
+  margin: 0 auto 36px auto;
+  background: linear-gradient(90deg, transparent, var(--secondary), transparent);
+  border-radius: 3px;
+  opacity: 0.65;
+}
+
+.termos-content {
+  margin: 0 0 18px 0;
+  padding: 0;
+  font-size: 1rem;
+  color: #d1d1d1;
+  line-height: 1.75;
+  max-width: 100%;
+  box-shadow: none;
+}
+
+.termos-content strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.termos-clausulas {
+  display: block;
+  margin: 44px 0 14px 0;
+  padding: 0 0 0 16px;
+  font-size: 1.22rem;
+  font-weight: 650;
+  color: var(--secondary);
+   background: linear-gradient(90deg,var(--secondary), var(--primary) 155%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.01em;
+  position: relative;
+  max-width: 100%;
+  box-shadow: none;
+  justify-content: initial;
+  justify-items: initial;
+}
+
+.termos-clausulas::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 4px;
+  background: linear-gradient(180deg, #ffffff, #777777);
+  border-radius: 4px;
+}
+
+
+.termos-list {
+  margin: 10px 0 28px 0;
+  padding-left: 0;
+  list-style: none;
+  
+}
+
+.termos-list li {
+  position: relative;
+  padding: 11px 14px 11px 32px;
+  margin-bottom: 6px;
+  color: #d1d1d1;
+  font-size: 0.975rem;
+  line-height: 1.65;
+  border-radius: 10px;
+  
+}
+
+
+
+.termos-list li::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 19px;
+  width: 7px;
+  height: 7px;
+  background: #ffffff;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+.termos-list li strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .termos-container {
+    margin: 20px 16px;
+    padding: 32px 22px;
+    border-radius: 14px;
+  }
+
+  .termos-title {
+    font-size: 1.5rem;
+  }
+
+  .termos-clausulas {
+    font-size: 1.12rem;
+  }
+
+  .termos-content,
+  .termos-list li {
+    font-size: 0.95rem;
+  }
+}

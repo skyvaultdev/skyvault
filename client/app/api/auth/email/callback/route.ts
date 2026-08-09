@@ -19,9 +19,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "INVALID_DATA" }, { status: 400 });
     }
 
-    const username = email.split("@")[0] as String
+    var username = email.split("@")[0] as String
     const db = getDB();
-    const codeHash = hashCode(code);
+    var codeHash = hashCode(code);
     const result = await db.query(`SELECT * FROM email_verification WHERE email = $1 AND code_hash = $2 AND expires_at > NOW()`,
         [email, codeHash]
     );
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     res.cookies.set("auth_token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
     });

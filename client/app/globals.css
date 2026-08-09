@@ -26,6 +26,31 @@ body {
   font-family: var(--font-geist-sans), sans-serif;
 }
 
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--primary);
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--secondary);
+}
+
 .page-wrapper {
   display: flex;
   flex-direction: column;
@@ -41,7 +66,7 @@ body {
 .transparency-box {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.116);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   pointer-events: none;
@@ -55,4 +80,20 @@ body::before {
   pointer-events: none;
   z-index: -1;
   opacity: 0.55;
+}
+
+.productCard,
+.productCard:link,
+.productCard:visited,
+.productCard:hover,
+.productCard:active {
+    color: inherit;
+    text-decoration: none;
+}
+
+.productCard h3,
+.productCard p,
+.productCard span {
+    color: inherit;
+    text-decoration: none;
 }

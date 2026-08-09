@@ -41,7 +41,7 @@ export default function HomePreview({
   sections,
   isPreview = false,
 }: HomePreviewProps) {
-  
+
   const [localSections, setLocalSections] = useState<SectionType[]>(sections);
   const [isSaving, setIsSaving] = useState(false);
   const [draggedItem, setDraggedItem] = useState<{ slug: string; fromIndex: number } | null>(null);
@@ -70,13 +70,11 @@ export default function HomePreview({
     const newSections = [...localSections];
     const sectionIndex = newSections.findIndex(s => s.category.slug === slug);
     const section = newSections[sectionIndex];
-    
-
     const newItems = [...section.items];
-    
+
     const [removed] = newItems.splice(draggedItem.fromIndex, 1);
     newItems.splice(toIndex, 0, removed);
-    
+
     newSections[sectionIndex] = { ...section, items: newItems };
     setLocalSections(newSections);
     setDraggedItem(null);
@@ -88,10 +86,10 @@ export default function HomePreview({
 
   async function saveHomeOrder() {
 
-     
-    
+
+
     setIsSaving(true);
-    
+
     const payload = localSections.flatMap((section) =>
       section.items.map((item, index) => ({
         id: item.id,
@@ -107,7 +105,7 @@ export default function HomePreview({
       });
 
       if (response.ok) {
-        setModalMessage("Ordem dos produtos foi alterada com sucesso! ✅");
+        setModalMessage("Ordem dos produtos foi alterada com sucesso! ");
 
         setIsSalvarOpen(true);
 
@@ -131,122 +129,123 @@ export default function HomePreview({
   };
 
   return (
-  <>
-    {isSalvarOpen && (
-  <div
-    className="modalOverlay"
-    onClick={() => setIsSalvarOpen(false)}
-  >
-    <div
-      className="modalBox"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <p>{modalMessage}</p>
+    <>
+      {isSalvarOpen && (
+        <div
+          className="modalOverlay"
+          onClick={() => setIsSalvarOpen(false)}
+        >
+          <div
+            className="modalContent"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modalIcon">✓</div>
+            <p className="modaltxt">{modalMessage}</p>
 
-      <button
-        onClick={() => setIsSalvarOpen(false)} className="btnfecharmod"
-      >
-        Fechar
-      </button>
-    </div>
-  </div>
-)}
-
-    <main className="homePage">
-      {isPreview && (
-        <div className="savebtnord">
-          <button onClick={saveHomeOrder} disabled={isSaving}>
-            {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
-          </button>
-          <span>🖱️ Arraste os produtos para reordenar</span>
+            <button
+              onClick={() => setIsSalvarOpen(false)} className="btnfecharmod"
+            >
+              Fechar
+            </button>
+          </div>
         </div>
       )}
 
-      {banners.length > 0 && (
-        <section className="bannerList">
-          {banners.map((banner) => (
-            <DisabledLink key={banner.id} href={banner.link || "#"} className="bannerLink">
-              <div className="bannerCard">
-                <img src={banner.image_url} alt={banner.title} className="bannerImage" />
-                <div className="bannerContent">
-                  <h2>{banner.title}</h2>
-                  {banner.subtitle && <p>{banner.subtitle}</p>}
+      <main className="homePage">
+        {isPreview && (
+          <div className="savebtnord">
+            <button onClick={saveHomeOrder} disabled={isSaving}>
+              {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
+            </button>
+            <span>🖱️ Arraste os produtos para reordenar</span>
+          </div>
+        )}
+
+        {banners.length > 0 && (
+          <section className="bannerList">
+            {banners.map((banner) => (
+              <DisabledLink key={banner.id} href={banner.link || "#"} className="bannerLink">
+                <div className="bannerCard">
+                  <img src={banner.image_url} alt={banner.title} className="bannerImage" />
+                  <div className="bannerContent">
+                    <h2>{banner.title}</h2>
+                    {banner.subtitle && <p>{banner.subtitle}</p>}
+                  </div>
+                </div>
+              </DisabledLink>
+            ))}
+          </section>
+        )}
+
+        {highlights.length > 0 && (
+          <section className="highlights">
+            <div className="highlightsTop">
+              <div className="highlightsTitle">
+                <span className="badgeStar">★</span>
+                <div>
+                  <h2>Destaques da Loja</h2>
+                  <p>Os produtos selecionados pra elevar seu nível.</p>
                 </div>
               </div>
-            </DisabledLink>
-          ))}
-        </section>
-      )}
-
-      {highlights.length > 0 && (
-        <section className="highlights">
-          <div className="highlightsTop">
-            <div className="highlightsTitle">
-              <span className="badgeStar">★</span>
-              <div>
-                <h2>Destaques da Loja</h2>
-                <p>Os produtos selecionados pra elevar seu nível.</p>
-              </div>
+              <DisabledLink href="/catalog" className="pillLink">Ver catálogo ›</DisabledLink>
             </div>
-            <DisabledLink href="/catalog" className="pillLink">Ver catálogo ›</DisabledLink>
-          </div>
-          <div className="highlightsRow">
-            <HighlightsCarousel highlights={highlights as any} />
-          </div>
-        </section>
-      )}
+            <div className="highlightsRow">
+              <HighlightsCarousel highlights={highlights as any} />
+            </div>
+          </section>
+        )}
 
-      {localSections.map(({ category, items }) => (
-        <section key={category.slug} className="categorySection">
-          <div className="categoryHeaderRow">
-            <h2 className="categoryTitle">{category.name}</h2>
-            <DisabledLink href={`/catalog?category=${category.slug}`} className="pillLink">
-              Ver mais ›
-            </DisabledLink>
-          </div>
+        {localSections.map(({ category, items }) => (
+          <section key={category.slug} className="categorySection">
+            <div className="categoryHeaderRow">
+              <h2 className="categoryTitle">{category.name}</h2>
+              <DisabledLink href={`/catalog?category=${category.slug}`} className="pillLink">
+                Ver mais ›
+              </DisabledLink>
+            </div>
 
-          <div 
-            className="productsGrid2"
-            onDragOver={handleDragOver}
-          >
-            {items.map((product, index) => (
-              <div
-                key={product.id}
-                className="productCard2"
-                draggable={isPreview}
-                onDragStart={(e) => handleDragStart(e, category.slug, index)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, category.slug, index)}
-                onDragEnd={handleDragEnd}
-                style={{
-                  cursor: isPreview ? 'grab' : 'pointer',
-                }}
-              >
-                <img
-                  src={product.image_url || "/file.svg"}
-                  alt={product.name}
-                  className="productThumb"
-                />
-                <span className="productCategory">
-                  {product.category_name ?? "Outros"}
-                </span>
-                <h3 className="productTitle">{product.name}</h3>
-                <p className="productPrice">
-                  R$ {Number(product.price).toFixed(2)}
-                </p>
-                <DisabledLink
-                  href={`/product/${product.slug}`}
-                  className="buyButton"
+            <div
+              className="productsGrid2"
+              onDragOver={handleDragOver}
+            >
+              {items.map((product, index) => (
+                <div
+                  key={product.id}
+                  className="productCard2"
+                  draggable={isPreview}
+                  onDragStart={(e) => handleDragStart(e, category.slug, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, category.slug, index)}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    cursor: isPreview ? 'grab' : 'pointer',
+                  }}
                 >
-                  Comprar agora
-                </DisabledLink>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-      
-    </main>
+                  <img
+                    src={product.image_url || "/file.svg"}
+                    alt={product.name}
+                    className="productThumb"
+                  />
+                  <span className="productCategory">
+                    {product.category_name ?? "Outros"}
+                  </span>
+                  <h3 className="productTitle">{product.name}</h3>
+                  <p className="productPrice">
+                    R$ {Number(product.price).toFixed(2)}
+                  </p>
+                  <DisabledLink
+                    href={`/product/${product.slug}`}
+                    className="buyButton"
+                  >
+                    Comprar agora
+                  </DisabledLink>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+
+      </main>
     </>
   );
 }

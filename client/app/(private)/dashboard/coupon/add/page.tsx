@@ -1,96 +1,146 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import '../coupon.css';
+import { useRouter } from "next/navigation";
+import "./add.css";
 
 export default function AddCouponPage() {
+  const router = useRouter();
+
   const [code, setCode] = useState("");
-  const [percentOff, setPercentOff] = useState("10");
-  const [usageLimit, setUsageLimit] = useState("0");
-  const [minOrderValue, setMinOrderValue] = useState("");
+  const [percentOff, setPercentOff] = useState("");
+  const [usageLimit, setUsageLimit] = useState("");
+  const [minOrderValue, setMinOrderValue] = useState<number | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [active, setActive] = useState(true);
 
   async function submit() {
-    await fetch("/api/coupons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code,
-        percentOff: Number(percentOff),
-        usageLimit: Number(usageLimit),
-        minOrderValue: minOrderValue ? Number(minOrderValue) : null,
-      }),
-    });
+    try {
+      const percent = Number(percentOff);
+      const limit = Number(usageLimit);
+      if (percentOff === "") {
+        alert("Informe o percentual de desconto.");
+        return;
+      }
+
+      if (usageLimit === "") {
+        alert("Informe o limite de uso.");
+        return;
+      }
+
+      if (percent <= 0 || percent > 100) {
+        alert("O desconto deve estar entre 1% e 100%.");
+        return;
+      }
+
+      if (limit < 0) {
+        alert("O limite de uso não pode ser negativo.");
+        return;
+      }
+
+      var response = await fetch("/api/coupon/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          code,
+          percentOff: percent,
+          usageLimit: limit,
+          minOrderValue,
+          active,
+          expiresAt,
+        }),
+      });
+
+      var text = await response.text();
+      if (!response.ok) {
+        alert("Erro ao criar cupom.");
+        console.error(text);
+        return;
+      }
+      alert("Cupom criado com sucesso!");
+
+      setCode("");
+      setPercentOff("");
+      setUsageLimit("");
+      setMinOrderValue(null);
+      setExpiresAt(null);
+      setActive(true);
+
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao conectar com o servidor.")
+    }
+
   }
 
   return (
-    <main className="coupon-page-container">
-      <Link href="/dashboard" className="back-link">
-        ← Voltar
-      </Link>
+    <main className="cupom-container">
+      <button className="voltarBtn" onClick={() => router.back()}>
+        &larr; Voltar
+      </button>
+
       <div className="coupon-card">
-        <div className="coupon-badge">Novo Cupom</div>
-
-        <div className="coupon-form-wrapper">
-          <div className="coupon-info">
-            <h3 className="coupon-discount">Configurar Desconto</h3>
-
-            <div className="input-group">
-              <input
-                className="coupon-code-input"
-                value={code}
-                onChange={(event) => setCode(event.target.value.toUpperCase())}
-                placeholder="CÓDIGO DO CUPOM"
-              />
-
-              <div className="input-row">
-                <div className="field">
-                  <label>Desconto (%)</label>
-                  <input
-                    className="coupon-field"
-                    value={percentOff}
-                    onChange={(event) => setPercentOff(event.target.value)}
-                    type="number"
-                    placeholder="Ex: 20"
-                  />
-                </div>
-
-                <div className="field">
-                  <label>Limite de Uso</label>
-                  <input
-                    className="coupon-field"
-                    value={usageLimit}
-                    onChange={(event) => setUsageLimit(event.target.value)}
-                    type="number"
-                    placeholder="Ex: 100"
-                  />
-                </div>
-              </div>
-
-              <div className="field">
-                <label>Valor Mínimo do Pedido</label>
-                <input
-                  className="coupon-field"
-                  value={minOrderValue}
-                  onChange={(event) => setMinOrderValue(event.target.value)}
-                  type="number"
-                  placeholder="R$ 0,00"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="coupon-actions-container">
-            <button
-              className="coupon-btn"
-              type="button"
-              onClick={() => void submit()}
-            >
-              Salvar cupom
-            </button>
-          </div>
+        <h2 className="coupon-title">Detalhes do Cupom</h2>
+        <div className="coupon-form">
+          <input
+            className="coupon-input"
+            value={code}
+            onChange={(e) => setCode(e.target.value.trimStart().toLocaleUpperCase())}
+            placeholder="INSIRA O CODIGO DO CUPOM" />
+          <input
+            className="coupon-input"
+            type="number"
+            min={1}
+            max={100}
+            value={percentOff}
+            onChange={(e) => setPercentOff(e.target.value)}
+            placeholder="PERCENTUAL DE DESCONTO"
+          />
+          <input
+            className="coupon-input"
+            type="number"
+            min={0}
+            value={usageLimit}
+            onChange={(e) => setUsageLimit(e.target.value)}
+            placeholder="LIMITE DE USO"
+          />
+          <input
+            className="coupon-input"
+            type="number"
+            min={0}
+            step="0.01"
+            value={minOrderValue ?? ""}
+            onChange={(e) =>
+              setMinOrderValue(e.target.value ? Number(e.target.value) : null)
+            }
+            placeholder="VALOR MINIMO DO PEDIDO"
+          />
+          <input
+            className="coupon-input"
+            type="date"
+            value={expiresAt ?? ""}
+            onChange={(e) => setExpiresAt(e.target.value || null)}
+          />
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />  <p className="checkbox-label">Cupom ativo</p>
+          </label>
+          <button
+            type="button"
+            className="coupon-button"
+            onClick={submit}
+          >
+            Salvar Cupom
+          </button>
         </div>
       </div>
+
     </main>
-  );
+  )
 }

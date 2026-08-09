@@ -11,33 +11,32 @@ export default function StoreThemeLoader() {
 
     async function loadTheme() {
       try {
-        const response = await fetch("/api/store-settings", { cache: "no-store" });
+        var response = await fetch("/api/store-settings", { cache: "no-store" });
         if (!response.ok) return;
 
-        // 1) pega o json cru
-        const raw = (await response.json()) as StoreSettingsRaw;
-
-        // 2) se seu ok() estiver embrulhando, tenta pegar raw.data também
-        const data = raw?.data ?? raw;
+        //  pega o json cru
+        var raw = (await response.json()) as StoreSettingsRaw;
+        // se seu ok() estiver embrulhando, tenta pegar raw.data também
+        var data = raw?.data ?? raw;
 
         if (cancelled) return;
 
-        // 3) normaliza camelCase OU snake_case
-        const primaryColor = data.primaryColor ?? data.primary_color ?? "#b700ff";
-        const secondaryColor = data.secondaryColor ?? data.secondary_color ?? "#6400ff";
+        //normaliza camelCase OU snake_case
+        var primaryColor = data.primaryColor ?? data.primary_color ?? "#b700ff";
+        var secondaryColor = data.secondaryColor ?? data.secondary_color ?? "#6400ff";
 
-        const backgroundType =
+        var backgroundType =
           data.backgroundType ?? data.background_style ?? "lines";
 
-        const backgroundImageUrl =
+        var backgroundImageUrl =
           data.backgroundImageUrl ?? data.background_img_url ?? null;
 
-        const backgroundCss =
+        var backgroundCss =
           data.backgroundCss ?? data.background_css ?? null;
 
         // 4) aplica global
-        const root = document.documentElement;
-        const body = document.body;
+        var root = document.documentElement;
+        var body = document.body;
 
         root.style.setProperty("--primary", primaryColor);
         root.style.setProperty("--secondary", secondaryColor);
@@ -56,7 +55,7 @@ export default function StoreThemeLoader() {
 
         // 5) injeta css custom
         const tagId = "store-custom-background";
-        const previousTag = document.getElementById(tagId);
+        var previousTag = document.getElementById(tagId);
         if (previousTag) previousTag.remove();
 
         if (backgroundCss) {

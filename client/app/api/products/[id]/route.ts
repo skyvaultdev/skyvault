@@ -6,13 +6,11 @@ import { slugify } from "@/lib/utils/slugify";
 
 type Params = { params: Promise<{ id: string }> };
 
-type Params = { params: Promise<{ id: string }> };
-
 export async function GET(_: Request, { params }: Params) {
   try {
-    const { id } = await params;
+    var { id } = await params;
+    var isNumeric = /^\d+$/.test(id);
     const db = getDB();
-    const isNumeric = /^\d+$/.test(id);
 
     const result = await db.query(
       `SELECT p.*, c.name as category_name, c.slug as category_slug
@@ -24,7 +22,7 @@ export async function GET(_: Request, { params }: Params) {
 
     if (result.rows.length === 0) return fail("NOT_FOUND", 404);
 
-    const product = result.rows[0];
+    var product = result.rows[0];
     const images = await db.query(
       `SELECT id, url, position FROM product_images WHERE product_id = $1 ORDER BY position ASC`,
       [product.id]

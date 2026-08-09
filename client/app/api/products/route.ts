@@ -47,11 +47,11 @@ export async function GET(req: Request) {
       return ok(result.rows);
     }
 
-    const name = searchParams.get("name")?.trim();
-    const category = searchParams.get("category")?.trim();
+    var name = searchParams.get("name")?.trim();
+    var category = searchParams.get("category")?.trim();
 
-    const params: Array<string | number> = [];
-    const where: string[] = [];
+    var params: Array<string | number> = [];
+    var where: string[] = [];
 
     if (name) {
       params.push(`%${name}%`);
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    var whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
     const result = await db.query(
       `
       SELECT p.id, p.name, p.slug, p.description, p.price, p.active, p.position,

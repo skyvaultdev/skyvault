@@ -37,15 +37,15 @@ async function ensureProductSchema() {
 export async function POST(req: Request) {
   try {
     const db = getDB();
-    const formData = await req.formData();
+    var formData = await req.formData();
 
-    const name = String(formData.get("name") ?? "").trim();
-    const rawSlug = String(formData.get("slug") ?? "").trim();
-    const description = String(formData.get("description") ?? "").trim();
+    var name = String(formData.get("name") ?? "").trim();
+    var rawSlug = String(formData.get("slug") ?? "").trim();
+    var description = String(formData.get("description") ?? "").trim();
     
-    const price = parseFloat(String(formData.get("price") ?? "0"));
-    const categoryId = formData.get("category_id") ? Number(formData.get("category_id")) : null;
-    const active = formData.get("active") === "true";
+    var price = parseFloat(String(formData.get("price") ?? "0"));
+    var categoryId = formData.get("category_id") ? Number(formData.get("category_id")) : null;
+    var active = formData.get("active") === "true";
 
     if (!name || isNaN(price) || price <= 0) {
       return fail("DADOS_INVALIDOS", 400);
@@ -60,11 +60,11 @@ export async function POST(req: Request) {
     );
 
     const productId = productResult.rows[0].id;
-    const variationsRaw = formData.get("variations");
+    var variationsRaw = formData.get("variations");
     if (variationsRaw) {
       const variations = JSON.parse(String(variationsRaw));
       for (const v of variations) {
-        const vPrice = parseFloat(String(v.price ?? "0"));
+        var vPrice = parseFloat(String(v.price ?? "0"));
         if (v.name && !isNaN(vPrice)) {
           await db.query(
             `INSERT INTO product_variations (product_id, name, price)
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const images = formData.getAll("images") as File[];
+    var images = formData.getAll("images") as File[];
     if (images.length > 0) {
       const uploadDir = path.join(process.cwd(), "public/uploads/products");
       await mkdir(uploadDir, { recursive: true });
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
         const file = images[i];
         if (!file.type.startsWith("image/")) continue;
 
-        const ext = path.extname(file.name) || ".jpg";
+        var ext = path.extname(file.name) || ".jpg";
         const fileName = `${crypto.randomUUID()}${ext}`;
         const filePath = path.join(uploadDir, fileName);
 

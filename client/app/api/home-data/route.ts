@@ -52,9 +52,9 @@ export async function GET() {
         `),
       ]);
 
-    const banners = bannersRes.rows;
-    const categories = categoriesRes.rows;
-    const products = productsRes.rows;
+    var banners = bannersRes.rows;
+    var categories = categoriesRes.rows;
+    var products = productsRes.rows;
 
     const highlights = products.slice(0, 3);
     const uncategorized: any[] = [];

@@ -8,27 +8,28 @@ import { cookies } from "next/headers";
 export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    var token = cookieStore.get("auth_token")?.value;
     if (!token) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    const decoded = await verifyJWT(token);
+    var decoded = await verifyJWT(token);
     if (!decoded || !decoded.email) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    const userEmail = decoded.email;
+    var userEmail = decoded.email;
     const db = getDB();
 
     const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
+    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
 
-    if (discUser.length === 0 && regularUser.length === 0) {
+    if (discUser.length === 0 && regularUser.length === 0 && googleUser.length === 0) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    const userId = discUser.length > 0 ? discUser[0].id : regularUser[0].id;
+    const userId = discUser[0]?.id ?? regularUser[0]?.id ?? googleUser[0]?.id;
     const result = await db.query(`
       SELECT 
           c.id AS cart_item_id,
@@ -61,34 +62,36 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    var token = cookieStore.get("auth_token")?.value;
 
     if (!token) return fail("UNAUTHORIZED_TOKEN", 401);
-    const decoded = await verifyJWT(token);
+    var decoded = await verifyJWT(token);
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
-    const userEmail = decoded.email;
+    var userEmail = decoded.email;
 
     const db = getDB();
     const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
+    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
 
     let userId: number | string;
     if (discUser.length > 0) userId = discUser[0].id;
     else if (regularUser.length > 0) userId = regularUser[0].id;
+    else if (googleUser.length > 0) userId = googleUser[0].id;
     else return fail("USER_NOT_FOUND", 404);
 
-    const body = await req.json();
-    const product_id = Number(body.product_id);
-    const variation_id = body.variation_id ? Number(body.variation_id) : null;
-    const quantityToAdd = Number(body.quantity ?? 1);
+    var body = await req.json();
+    var product_id = Number(body.product_id);
+    var variation_id = body.variation_id ? Number(body.variation_id) : null;
+    var quantityToAdd = Number(body.quantity ?? 1);
 
     if (!product_id || quantityToAdd <= 0) return fail("INVALID_DATA", 400);
-    const stockCheckQuery = variation_id
+    var stockCheckQuery = variation_id
       ? `SELECT stock_count, is_unlimited FROM product_variations WHERE id = $1 AND product_id = $2`
       : `SELECT stock_count, is_unlimited FROM products WHERE id = $1`;
 
-    const stockParams = variation_id ? [variation_id, product_id] : [product_id];
+    var stockParams = variation_id ? [variation_id, product_id] : [product_id];
     const { rows: stockData } = await db.query(stockCheckQuery, stockParams);
 
     if (stockData.length === 0) return fail("PRODUCT_NOT_FOUND", 404);
@@ -128,23 +131,25 @@ export async function PUT(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    var token = cookieStore.get("auth_token")?.value;
 
     if (!token) return fail("UNAUTHORIZED_TOKEN", 401);
-    const decoded = await verifyJWT(token);
+    var decoded = await verifyJWT(token);
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
-    const userEmail = decoded.email;
+    var userEmail = decoded.email;
     const db = getDB();
     const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
     const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
+    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
 
     let userId: number | string;
     if (discUser.length > 0) userId = discUser[0].id;
     else if (regularUser.length > 0) userId = regularUser[0].id;
+    else if (googleUser.length > 0) userId = googleUser[0].id;
     else return fail("USER_NOT_FOUND", 404);
 
-    const { cart_item_id, quantity } = await req.json();
+    var { cart_item_id, quantity } = await req.json();
     if (!cart_item_id) return fail("MISSING_ITEM_ID", 400);
 
     if (quantity <= 0) {
@@ -164,9 +169,9 @@ export async function POST(req: NextRequest) {
 
     if (validateStock.rowCount === 0) return fail("ITEM_NOT_FOUND", 404);
 
-    const info = validateStock.rows[0];
-    const isUnlimited = info.variation_id ? info.v_unlim : info.p_unlim;
-    const stockCount = info.variation_id ? info.v_stock : info.p_stock;
+    var info = validateStock.rows[0];
+    var isUnlimited = info.variation_id ? info.v_unlim : info.p_unlim;
+    var stockCount = info.variation_id ? info.v_stock : info.p_stock;
 
     if (!isUnlimited && stockCount < quantity) {
       return fail("INSUFFICIENT_STOCK", 400);

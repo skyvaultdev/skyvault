@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-import Sidebar, { type DashboardTab } from "./components/Sidebar";
+import Sidebar, { type DashboardTab, type Permission } from "./components/Sidebar";
 import DashboardTabs from "./components/DashboardTabs";
 import ProductPreview from "./components/ProductPreview";
 import PermissionGuard from "./components/PermissionGuard";
 import HomePreview from "./components/HomePreview";
+import StaffChatPanel from "./components/StaffChatPanel";
 import "./components/categoryprev.css"
 import CategoryPreview from "./components/CategoryPreview";
 import "@/app/home.css";
@@ -24,18 +25,9 @@ type Item = {
   id: number;
   name: string;
   slug?: string;
+  code?: string;
   variations: [];
   position?: number | null;
-};
-
-type ProductItem = {
-  id: number;
-  name: string;
-  slug?: string;
-  position?: number | null;
-  variations: [];
-  stock_type?: "key" | "file" | "infinite";
-  stock_count?: number;
 };
 
 type Stats = {
@@ -60,6 +52,8 @@ type StoreSettings = {
   backgroundType: BackgroundType;
   backgroundImageUrl: string;
   backgroundCss: string;
+  logoUrl: string;
+  storeName: string;
 };
 
 type Admin = {
@@ -76,12 +70,14 @@ const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   editor: ["Editar produtos", "Organizar catálogo"],
 };
 
-const TAB_PERMISSIONS: Record<DashboardTab, string> = {
+const TAB_PERMISSIONS: Record<DashboardTab, Permission> = {
   inicio: "dashboard.access",
+  infos: "dashboard.access",
   cores: "store.customize",
   background: "store.customize",
   posicao: "products.write",
   estoque: "products.write",
+  chat: "chat.access",
   equipe: "team.manage",
 };
 
@@ -93,14 +89,47 @@ const roleHierarchy: Record<Role, number> = {
 
 export default function Dashboard() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
-  const [type, setType] = useState<TypeKey>("products");
+  const [itemType, setItemType] = useState<TypeKey>("products");
   const [selectedTab, setSelectedTab] = useState<DashboardTab>("inicio");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   const [items, setItems] = useState<Item[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [itemsError, setItemsError] = useState("");
+
+  const [orderedProducts, setOrderedProducts] = useState<Item[]>([]);
+
+  const previewProducts = useMemo(
+    () => (orderedProducts.length > 0 ? orderedProducts : items),
+    [items, orderedProducts]
+  );
+
+  const filteredProducts = useMemo(() => {
+    const source = itemType === "products" ? previewProducts : items;
+    return source.filter((product) =>
+      product.name?.toLowerCase().includes(search.toLowerCase()) ||
+      product.slug?.toLowerCase().includes(search.toLowerCase()) ||
+      product.code?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [items, previewProducts, itemType, search]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredProducts, currentPage]);
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  // Reset to page 1 whenever the search term or item type changes, so the
+  // user never lands on a page that no longer exists after filtering.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, itemType]);
 
   const [stats, setStats] = useState<Stats>({
     acessos: 0,
@@ -116,9 +145,11 @@ export default function Dashboard() {
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({
     primaryColor: "#b700ff",
     secondaryColor: "#6400ff",
-    backgroundType: "heroicons",
+    backgroundType: "none",
     backgroundImageUrl: "",
-    backgroundCss: ""
+    backgroundCss: "",
+    logoUrl: "",
+    storeName: "",
   });
 
   const [homeData, setHomeData] = useState({
@@ -134,10 +165,12 @@ export default function Dashboard() {
   });
 
   const [loadingHomeData, setLoadingHomeData] = useState(false);
+  const [loadingCategoryData, setLoadingCategoryData] = useState(false);
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
   const [colorTarget, setColorTarget] = useState<"primary" | "secondary">("primary");
   const [selectedColor, setSelectedColor] = useState("#b700ff");
   const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
+  const [backgroundImagePreview, setBackgroundImagePreview] = useState<string | null>(null);
   const backgrounds: BackgroundType[] = ["lines", "dots", "grid", "diagonal", "cyber", "heroicons", "skulls", "none"];
   const backgroundLabels: Record<BackgroundType, string> = {
     lines: "Linhas",
@@ -152,7 +185,6 @@ export default function Dashboard() {
 
   const [admins, setAdmins] = useState<Admin[]>([]);
 
-  const [orderedProducts, setOrderedProducts] = useState<Item[]>([]);
   const [draggedProductId, setDraggedProductId] = useState<number | null>(null);
 
   const [addEmail, setAddEmail] = useState("");
@@ -174,7 +206,24 @@ export default function Dashboard() {
   const [editBusy, setEditBusy] = useState(false);
 
   const [isSalvarOpen, setIsSalvarOpen] = useState(false);
-  const [modalMessage, setModalMessage] = useState("Cores salvas com sucesso! ✅");
+  const [modalMessage, setModalMessage] = useState("Cores salvas com sucesso!");
+  const [shouldReloadOnClose, setShouldReloadOnClose] = useState(false);
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [storeName, setStoreName] = useState("");
+
+  function openSalvarModal(message: string, reload: boolean = false) {
+    setModalMessage(message);
+    setShouldReloadOnClose(reload);
+    setIsSalvarOpen(true);
+  }
+
+  function closeSalvarModal() {
+    setIsSalvarOpen(false);
+    if (shouldReloadOnClose) {
+      window.location.reload();
+    }
+  }
 
   function openAdd() {
     setAddEmail("");
@@ -184,11 +233,29 @@ export default function Dashboard() {
     setIsAddOpen(true);
   }
 
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  useEffect(() => {
+    async function loadChatUnread() {
+      try {
+        const res = await fetch("/api/chat/unread-count", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        setChatUnreadCount(Number(json.count) || 0);
+      } catch {
+        // ignora erro pontual
+      }
+    }
+    void loadChatUnread();
+    const interval = setInterval(loadChatUnread, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
   const canEditMember = (currentRole: AdminRole | null, targetRole: string | undefined): boolean => {
     if (!currentRole || !targetRole) return false;
-    const hierarchy: Record<string, number> = { owner: 3, admin: 2, editor: 1 };
-    const currentLevel = hierarchy[currentRole.toLowerCase()];
-    const targetLevel = hierarchy[targetRole.toLowerCase()];
+    const currentLevel = roleHierarchy[currentRole as Role];
+    const targetLevel = roleHierarchy[targetRole.toLowerCase() as Role];
+    if (currentLevel === undefined || targetLevel === undefined) return false;
     return currentLevel > targetLevel;
   };
 
@@ -240,10 +307,10 @@ export default function Dashboard() {
 
   const loadCategoryData = useCallback(async () => {
     try {
+      setLoadingCategoryData(true);
       const res = await fetch("/api/categories/data");
       if (!res.ok) return;
       const json = await res.json();
-      const formatedSections = []
 
       setCategoryData({
         categories: json.data?.categories || [],
@@ -252,8 +319,15 @@ export default function Dashboard() {
     } catch (error) {
       console.error(error);
     } finally {
-      setLoadingHomeData(false);
+      setLoadingCategoryData(false);
     }
+  }, []);
+
+  const loadAdmins = useCallback(async () => {
+    const response = await fetch("/api/admins", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    setAdmins(data.data ?? []);
   }, []);
 
   async function handleAddConfirm() {
@@ -282,6 +356,8 @@ export default function Dashboard() {
 
       await loadAdmins();
       closeAdd();
+    } catch (err: any) {
+      setAddError(err?.message || "Erro de rede.");
     } finally {
       setAddBusy(false);
     }
@@ -299,12 +375,6 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: editRole }),
       });
-
-      if (!res.ok) {
-        const json = await res.json();
-        setEditError(json.error || "Erro ao editar membro.");
-        return;
-      }
 
       const json = await res.json();
 
@@ -344,6 +414,8 @@ export default function Dashboard() {
 
       await loadAdmins();
       closeRemove();
+    } catch (err: any) {
+      setRemoveError(err?.message || "Erro de rede.");
     } finally {
       setRemoveBusy(false);
     }
@@ -402,8 +474,8 @@ export default function Dashboard() {
       setItemsError("");
 
       const url = query?.trim()
-        ? `/api/${type}?name=${encodeURIComponent(query.trim())}`
-        : `/api/${type}`;
+        ? `/api/${itemType}?name=${encodeURIComponent(query.trim())}`
+        : `/api/${itemType}`;
 
       const res = await fetch(url, { method: "GET" });
 
@@ -417,7 +489,7 @@ export default function Dashboard() {
       const loadedItems = Array.isArray(json.data) ? json.data : [];
       setItems(loadedItems);
 
-      if (type === "products" && !query?.trim()) {
+      if (itemType === "products" && !query?.trim()) {
         setOrderedProducts(loadedItems);
       }
     } catch {
@@ -426,8 +498,12 @@ export default function Dashboard() {
     } finally {
       setLoadingItems(false);
     }
-  }, [type]);
+  }, [itemType]);
 
+  // Fetches and applies the store's visual settings. Deliberately does not
+  // depend on `colorTarget` — syncing `selectedColor` to the active target
+  // is handled by the dedicated effect below, so this fetch only needs to
+  // run when the settings themselves need reloading.
   const loadStoreSettings = useCallback(async () => {
     const response = await fetch("/api/store-settings", { cache: "no-store" });
     if (!response.ok) return;
@@ -438,25 +514,28 @@ export default function Dashboard() {
     const nextSettings: StoreSettings = {
       primaryColor: String(data.primary_color ?? "#b700ff"),
       secondaryColor: String(data.secondary_color ?? "#6400ff"),
-      backgroundType: (
-        data.background_style ?? "heroicons"
-      ) as BackgroundType,
+      backgroundType: (data.background_style ?? "heroicons") as BackgroundType,
       backgroundImageUrl: String(data.background_img_url ?? ""),
       backgroundCss: String(data.background_css ?? ""),
+      logoUrl: String(data.logo_url ?? ""),
+      storeName: String(data.store_name ?? ""),
     };
 
     setStoreSettings(nextSettings);
-    setSelectedColor(colorTarget === "primary" ? nextSettings.primaryColor : nextSettings.secondaryColor);
-    document.documentElement.style.setProperty("--primary", nextSettings.primaryColor);
-    document.documentElement.style.setProperty("--secondary", nextSettings.secondaryColor);
-  }, [colorTarget]);
 
-  async function loadAdmins() {
-    const response = await fetch("/api/admins", { cache: "no-store" });
-    if (!response.ok) return;
-    const data = await response.json();
-    setAdmins(data.data ?? []);
-  }
+    const root = document.documentElement;
+    root.style.setProperty("--primary", nextSettings.primaryColor);
+    root.style.setProperty("--secondary", nextSettings.secondaryColor);
+    root.style.setProperty("--background-image", nextSettings.backgroundImageUrl ? `url(${nextSettings.backgroundImageUrl})` : "none");
+
+    let styleTag = document.getElementById("dynamic-bg-style") as HTMLStyleElement | null;
+    if (!styleTag) {
+      styleTag = document.createElement("style");
+      styleTag.id = "dynamic-bg-style";
+      document.head.appendChild(styleTag);
+    }
+    styleTag.textContent = nextSettings.backgroundCss || "";
+  }, []);
 
   useEffect(() => {
     async function fetchCurrentUserRole() {
@@ -480,20 +559,30 @@ export default function Dashboard() {
     void loadAdmins();
     void loadHomeData();
     void loadCategoryData();
-  }, [loadItems, loadStoreSettings, loadHomeData]);
+  }, [loadItems, loadStoreSettings, loadAdmins, loadHomeData, loadCategoryData]);
 
   useEffect(() => {
     const delay = setTimeout(() => void loadItems(search), 400);
     return () => clearTimeout(delay);
-  }, [search, type, loadItems]);
+  }, [search, itemType, loadItems]);
 
   useEffect(() => {
     setSelectedColor(colorTarget === "primary" ? storeSettings.primaryColor : storeSettings.secondaryColor);
   }, [colorTarget, storeSettings.primaryColor, storeSettings.secondaryColor]);
 
+  // Revoke the background preview object URL when it changes or the
+  // component unmounts, to avoid leaking blob URLs.
+  useEffect(() => {
+    return () => {
+      if (backgroundImagePreview) {
+        URL.revokeObjectURL(backgroundImagePreview);
+      }
+    };
+  }, [backgroundImagePreview]);
+
   function handleEdit(slugOrId: string | number | undefined) {
     if (!slugOrId) return;
-    router.push(`/dashboard/${type}/edit/${slugOrId}`);
+    router.push(`/dashboard/${itemType}/edit/${slugOrId}`);
   }
 
   function openDeleteModal(id: number) {
@@ -512,7 +601,7 @@ export default function Dashboard() {
 
     try {
       setIsDeleting(true);
-      const res = await fetch(`/api/${type}/remove/${itemToDelete}`, { method: "DELETE" });
+      const res = await fetch(`/api/${itemType}/remove/${itemToDelete}`, { method: "DELETE" });
       if (res.ok) {
         closeDeleteModal();
         void loadItems(search);
@@ -523,6 +612,51 @@ export default function Dashboard() {
       alert("Erro de rede.");
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function saveStoreName() {
+    if (!storeName.trim()) {
+      alert("O nome da loja não pode ser vazio.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("storeName", storeName);
+
+    const response = await fetch("/api/store-settings", {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    });
+    const json = await response.json();
+
+    if (response.ok) {
+      await loadStoreSettings();
+      setStoreName("");
+      openSalvarModal("Nome da loja salvo com sucesso! ", true);
+    } else {
+      alert(json?.error || "Erro ao salvar o nome da loja.");
+    }
+  }
+
+  async function saveLogo() {
+    if (!logoFile) return;
+    const formData = new FormData();
+    formData.append("logoUrl", logoFile);
+    const response = await fetch("/api/store-settings", {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    });
+
+    const json = await response.json();
+
+    if (response.ok) {
+      await loadStoreSettings();
+      setLogoFile(null);
+      openSalvarModal("Logo salva com sucesso! ", true);
+    } else {
+      alert(json?.error || "Erro ao salvar a logo.");
     }
   }
 
@@ -541,21 +675,38 @@ export default function Dashboard() {
 
     if (response.ok) {
       await loadStoreSettings();
+      openSalvarModal("Cores salvas com sucesso! ");
+    } else {
+      alert("Erro ao salvar as cores.");
     }
   }
 
-  async function saveBackground() {
+  async function saveBackground(fileOverride?: File | null) {
     const formData = new FormData();
     formData.append("backgroundStyle", storeSettings.backgroundType);
     formData.append("backgroundCss", storeSettings.backgroundCss);
-    if (backgroundImageFile) {
-      formData.append("backgroundImage", backgroundImageFile);
+
+    const fileToSend = fileOverride !== undefined ? fileOverride : backgroundImageFile;
+    if (fileToSend) {
+      formData.append("backgroundImage", fileToSend);
     }
 
-    const response = await fetch("/api/store-settings", { method: "POST", body: formData });
+    const response = await fetch("/api/store-settings", {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    });
     if (response.ok) {
       await loadStoreSettings();
       setBackgroundImageFile(null);
+      if (backgroundImagePreview) {
+        URL.revokeObjectURL(backgroundImagePreview);
+      }
+      setBackgroundImagePreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      openSalvarModal("Background salvo com sucesso!", true);
+    } else {
+      alert("Erro ao salvar o background.");
     }
   }
 
@@ -587,16 +738,15 @@ export default function Dashboard() {
 
     if (response.ok) {
       await loadItems();
+      openSalvarModal("Posições salvas com sucesso!");
+    } else {
+      alert("Erro ao salvar as posições.");
     }
   }
-  const deleteLabel = type === "products" ? "produto" : type === "categories" ? "categoria" : "cupom";
+  const deleteLabel = itemType === "products" ? "produto" : itemType === "categories" ? "categoria" : "cupom";
 
-  const previewProducts = useMemo(
-    () => (orderedProducts.length > 0 ? orderedProducts : items),
-    [items, orderedProducts]
-  );
-
-  const [permissions, setPermissions] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
   useEffect(() => {
     async function loadPermissions() {
       try {
@@ -608,7 +758,7 @@ export default function Dashboard() {
       } catch (err) {
         console.error(err);
       } finally {
-
+        setPermissionsLoading(false);
       }
     }
 
@@ -634,6 +784,10 @@ export default function Dashboard() {
   const renderTabContent = () => {
     if (selectedTab === "inicio" && previewSlug) {
       return <ProductPreview slug={previewSlug} onBack={() => setPreviewSlug(null)} />;
+    }
+
+    if (selectedTab === "chat") {
+      return renderProtected("chat", <StaffChatPanel />);
     }
 
     if (selectedTab === "estoque") {
@@ -692,22 +846,204 @@ export default function Dashboard() {
       );
     }
 
+    if (selectedTab === "infos") {
+      return renderProtected(
+        "infos",
+        <section className="settingsPanel">
+          <div className="previewHeader">
+            <h3>Informações da loja</h3>
+          </div>
+
+          <div className="homePreviewWrapper">
+            <div className="browserToolbar"></div>
+
+            <div className="previewScrollContainer">
+              <div className="previewRealSize">
+
+                <div className="infoGrid">
+
+                  <div className="infoCard">
+                    <div className="infoCardHeader">
+                      <span className="infoCardIcon">🖼️</span>
+                      <div>
+                        <h4 className="infoCardTitle">Logo da loja</h4>
+                        <p className="infoCardSubtitle">PNG, JPG ou WEBP — até 5MB, recomendado: 150x150px, máx: 1024x1024px</p>
+                      </div>
+                    </div>
+
+                    <div className="infoCardBody">
+                      <div className="logoPreviewBox">
+                        {storeSettings.logoUrl ? (
+                          <img
+                            src={storeSettings.logoUrl}
+                            alt="Logo atual"
+                            className="logoThumb"
+                          />
+                        ) : (
+                          <div className="logoThumbEmpty">Sem logo</div>
+                        )}
+                        <span className="logoThumbLabel">
+                          {storeSettings.logoUrl ? "Logo atual" : "Nenhuma logo enviada"}
+                        </span>
+                      </div>
+
+                      <label htmlFor="logoFileInput" className="inputlogo">
+                        <input
+                          id="logoFileInput"
+                          className="inputlogoHidden"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+
+                            if (!file) return;
+
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert("O arquivo deve ser menor que 5MB.");
+                              return;
+                            }
+
+                            const img = new Image();
+                            const objectUrl = URL.createObjectURL(file);
+
+                            img.onload = () => {
+                              const width = img.width;
+                              const height = img.height;
+
+                              URL.revokeObjectURL(objectUrl);
+
+                              if (width > 1024 || height > 1024) {
+                                alert("A imagem deve ter no máximo 1024x1024 pixels.");
+                                return;
+                              }
+
+                              setLogoFile(file);
+                            };
+
+                            img.onerror = () => {
+                              URL.revokeObjectURL(objectUrl);
+                              alert("Não foi possível ler a imagem selecionada.");
+                            };
+
+                            img.src = objectUrl;
+                          }}
+                        /> <p>Clique ou arraste uma imagem aqui</p>
+                        <span className="inputlogoIcon">📁</span>
+                        <span className="inputlogoText">
+                          {logoFile ? logoFile.name : "Clique ou arraste uma imagem aqui"}
+                        </span>
+                      </label>
+
+                      {logoFile && (
+                        <p className="infoCardHint">Arquivo selecionado: {logoFile.name}</p>
+                      )}
+
+                      <button className="btn btnPrimaryAction" onClick={() => void saveLogo()} disabled={!logoFile}>
+                        Salvar logo
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="infoCard">
+                    <div className="infoCardHeader">
+                      <span className="infoCardIcon">🏷️</span>
+                      <div>
+                        <h4 className="infoCardTitle">Nome da loja</h4>
+                        <p className="infoCardSubtitle">Como sua loja aparece para os clientes</p>
+                      </div>
+                    </div>
+
+                    <div className="infoCardBody">
+                      <label className="fieldLabelModern">Nome atual</label>
+
+                      <input
+                        type="text"
+                        value={storeName ?? ""}
+                        placeholder={storeSettings.storeName || "Nome da loja"}
+                        onChange={(e) => setStoreName(e.target.value)}
+                        className="settingsInput inputModern"
+                      />
+
+                      <button className="btn btnPrimaryAction" onClick={() => void saveStoreName()} disabled={!storeName.trim()}>
+                        Salvar nome da loja
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
     if (selectedTab === "cores") {
       return renderProtected(
         "cores",
         <section className="settingsPanel">
-          <h3>Cores da loja</h3>
-          <label className="fieldLabel">Grupo de cor</label>
-          <select
-            value={colorTarget}
-            onChange={(e) => setColorTarget(e.target.value as "primary" | "secondary")}
-            className="settingsInput"
-          >
-            <option value="primary">Primária</option>
-            <option value="secondary">Secundária</option>
-          </select>
-          <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="colorPicker" />
-          <button className="btn" onClick={() => void saveColors()}>Salvar cores</button>
+          <div className="previewHeader">
+            <h3>Cores da loja</h3>
+          </div>
+
+          <div className="homePreviewWrapper">
+            <div className="browserToolbar"></div>
+
+            <div className="previewScrollContainer">
+              <div className="previewRealSize">
+
+                <div className="colorSection">
+                  <label className="fieldLabel">Grupo de cor</label>
+
+                  <select
+                    value={colorTarget}
+                    onChange={(e) => setColorTarget(e.target.value as "primary" | "secondary")}
+                    className="settingsInput modernSelect"
+                  >
+                    <option value="primary">Cor Primária</option>
+                    <option value="secondary">Cor Secundária</option>
+                  </select>
+
+                  <div
+                    onClick={() => {
+                      const colorInput = document.getElementById('colorInput') as HTMLInputElement;
+                      colorInput?.click();
+                    }}
+                    className="colorPickerContainer">
+                    <div
+                      className="colorSwatch"
+                      style={{ backgroundColor: selectedColor }}
+                      onClick={() => {
+                        const colorInput = document.getElementById('colorInput') as HTMLInputElement;
+                        colorInput?.click();
+                      }}
+                    />
+
+                    <input
+                      id="colorInput"
+                      type="color"
+                      value={selectedColor}
+                      onChange={(e) => setSelectedColor(e.target.value)}
+                      className="hiddenColorInput"
+                    />
+
+                    <div className="colorInfo">
+                      <span className="hexValue">{selectedColor.toUpperCase()}</span>
+                      <span className="colorLabel">
+                        {colorTarget === "primary" ? "Primária" : "Secundária"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button className="btn saveColorBtn" onClick={() => void saveColors()}>
+                    Salvar cores
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
         </section>
       );
     }
@@ -716,32 +1052,106 @@ export default function Dashboard() {
       return renderProtected(
         "background",
         <section className="settingsPanel">
-          <h3>Background</h3>
-          <div className="backgroundGrid">
-            {backgrounds
-
-              .map((bg) => (
-                <button
-                  key={bg}
-                  type="button"
-                  className={`bgThumb ${storeSettings.backgroundType === bg ? "active" : ""}
-                ` }
-                  onClick={() => setStoreSettings((p) => ({ ...p, backgroundType: bg as BackgroundType, }))
-                  }
-                >
-
-                <p className="bgLabel">{backgroundLabels[bg]}</p>
-
-                  <div className="bgPreview"
-                    style={PATTERNS[bg]} />
-
-                  <span>{[bg]}</span>
-
-                </button>
-              ))}
+          <div className="previewHeader">
+            <h3>Background</h3>
           </div>
-          <input type="file" accept="image/*" onChange={(e) => setBackgroundImageFile(e.target.files?.[0] ?? null)} className="settingsInput" />
-          <button className="btn" onClick={() => void saveBackground()}>Salvar background</button>
+
+          <div className="homePreviewWrapper">
+            <div className="browserToolbar"></div>
+
+            <div className="previewScrollContainer">
+              <div className="previewRealSize">
+
+                <div className="backgroundGrid">
+                  {backgrounds.map((bg) => {
+                    const currentBgType = storeSettings?.backgroundType || "none";
+                    const isActive = currentBgType === bg;
+
+                    return (
+                      <button
+                        key={bg}
+                        type="button"
+                        className={`bgThumb ${isActive ? "active" : ""}`}
+                        onClick={() =>
+                          setStoreSettings((p) => ({
+                            ...p,
+                            backgroundType: bg as BackgroundType,
+                          }))
+                        }
+                      >
+                        <p className="bgLabel">
+                          {backgroundLabels[bg] || "Nenhum"}
+                        </p>
+
+                        <div
+                          className="bgPreview"
+                          style={PATTERNS[bg] || {}}
+                        />
+
+                        <span>{bg}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="fieldLabel">Imagem de fundo</p>
+
+                <div className="logoPreviewBox">
+                  {backgroundImagePreview ? (
+                    <img
+                      src={backgroundImagePreview}
+                      alt="Preview do background selecionado"
+                      className="logoThumb"
+                    />
+                  ) : storeSettings.backgroundImageUrl ? (
+                    <img
+                      src={storeSettings.backgroundImageUrl}
+                      alt="Background atual"
+                      className="logoThumb"
+                    />
+                  ) : (
+                    <div className="logoThumbEmpty">Sem imagem</div>
+                  )}
+                  <span className="logoThumbLabel">
+                    {backgroundImageFile
+                      ? backgroundImageFile.name
+                      : storeSettings.backgroundImageUrl
+                        ? "Background atual"
+                        : "Nenhuma imagem enviada"}
+                  </span>
+                </div>
+
+                <input
+                  key="isolated-file-input"
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="settingsInput"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setBackgroundImageFile(file);
+
+                    if (backgroundImagePreview) {
+                      URL.revokeObjectURL(backgroundImagePreview);
+                    }
+
+                    setBackgroundImagePreview(file ? URL.createObjectURL(file) : null);
+                  }}
+                />
+
+                <button
+                  className="btn"
+                  onClick={() => {
+                    const file = fileInputRef.current?.files?.[0] || null;
+                    void saveBackground(file);
+                  }}
+                >
+                  Salvar background
+                </button>
+
+              </div>
+            </div>
+          </div>
         </section>
       );
     }
@@ -749,13 +1159,29 @@ export default function Dashboard() {
     if (selectedTab === "posicao") {
       return renderProtected(
         "posicao",
-        <div className="previewRealSize">
-          <CategoryPreview
-            categories={categoryData.categories}
-            sections={categoryData.sections}
-            isPreview={true}
-          />
-        </div>
+        <section className="settingsPanel">
+          <div className="previewHeader">
+            <h3>Prévia das Categorias</h3>
+          </div>
+
+          <div className="homePreviewWrapper">
+            <div className="browserToolbar"></div>
+
+            <div className="previewScrollContainer">
+              <div className="previewRealSize">
+                {loadingCategoryData ? (
+                  <div className="previewPlaceholder">Carregando visualização...</div>
+                ) : (
+                  <CategoryPreview
+                    categories={categoryData.categories}
+                    sections={categoryData.sections}
+                    isPreview={true}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       );
     }
 
@@ -763,52 +1189,64 @@ export default function Dashboard() {
       return renderProtected(
         "equipe",
         <section className="settingsPanel">
-          <h3>Equipe</h3>
-
-          <div>
-            <button type="button" className="addbtn" onClick={openAdd}>Adicionar Equipe</button>
-            <button type="button" className="removebtn" onClick={openRemove} disabled={admins.length === 0}>Remover Equipe</button>
+          <div className="previewHeader">
+            <h3>Equipe</h3>
           </div>
 
-          <table className="teamTable">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentUserRole === null ? (
-                <tr><td colSpan={4}>Carregando permissões...</td></tr>
-              ) : (
-                admins.map((admin) => (
-                  <tr key={admin.id}>
-                    <td>{admin.id}</td>
-                    <td>{admin.email}</td>
-                    <td>{admin.role ?? "-"}</td>
-                    <td>
-                      {canEditMember(currentUserRole, admin.role as AdminRole) ? (
-                        <button className="editBtn" onClick={() => openEdit(admin)}>
-                          Editar
-                        </button>
-                      ) : (
-                        <span className="disabledAction">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <div className="homePreviewWrapper">
+            <div className="browserToolbar"></div>
+
+            <div className="previewScrollContainer">
+              <div className="previewRealSize">
+
+                <div>
+                  <button type="button" className="addbtn" onClick={openAdd}>Adicionar Equipe</button>
+                  <button type="button" className="removebtn" onClick={openRemove} disabled={admins.length === 0}>Remover Equipe</button>
+                </div>
+
+                <table className="teamTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentUserRole === null ? (
+                      <tr><td colSpan={4}>Carregando permissões...</td></tr>
+                    ) : (
+                      admins.map((admin) => (
+                        <tr key={admin.id}>
+                          <td>{admin.id}</td>
+                          <td>{admin.email}</td>
+                          <td>{admin.role ?? "-"}</td>
+                          <td>
+                            {canEditMember(currentUserRole, admin.role as AdminRole) ? (
+                              <button className="editBtn" onClick={() => openEdit(admin)}>
+                                Editar
+                              </button>
+                            ) : (
+                              <span className="disabledAction">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+
+              </div>
+            </div>
+          </div>
 
           {isAddOpen && (
             <div className="modalOverlay">
               <div className="modalContent">
                 <h4>Adicionar equipe</h4>
-                <input value={addEmail} onChange={(e) => setAddEmail(e.target.value)} className="settingsInput" />
-                <select value={addRole} onChange={(e) => setAddRole(e.target.value as AdminRole)} className="settingsInput">
+                <input value={addEmail ?? ""} onChange={(e) => setAddEmail(e.target.value)} className="settingsInput" />
+                <select value={addRole ?? ""} onChange={(e) => setAddRole(e.target.value as AdminRole)} className="settingsInput">
                   <option value="owner">Owner</option>
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
@@ -820,7 +1258,7 @@ export default function Dashboard() {
                 </ul>
                 {addError && <p>{addError}</p>}
                 <button className="btnSecondary" onClick={closeAdd}>Cancelar</button>
-                <button className="btnadc" onClick={() => void handleAddConfirm()}>{addBusy ? "Salvando..." : "Adicionar"}</button>
+                <button className="btnadc" onClick={() => void handleAddConfirm()} disabled={addBusy}>{addBusy ? "Salvando..." : "Adicionar"}</button>
               </div>
             </div>
           )}
@@ -831,12 +1269,12 @@ export default function Dashboard() {
                 <h4>Remover equipe</h4>
                 <select value={removeId ?? ""} onChange={(e) => setRemoveId(Number(e.target.value))} className="settingsInputR">
                   {admins.map((a) => (
-                    <option key={a.id} value={a.id}>{a.email}</option>
+                    <option key={a.id} value={a.id ?? ""}>{a.email}</option>
                   ))}
                 </select>
                 {removeError && <p>{removeError}</p>}
                 <button className="btncancel" onClick={closeRemove}>Cancelar</button>
-                <button className="removebutton" onClick={() => void handleRemoveConfirm()}>{removeBusy ? "Removendo..." : "Remover"}</button>
+                <button className="removebutton" onClick={() => void handleRemoveConfirm()} disabled={removeBusy}>{removeBusy ? "Removendo..." : "Remover"}</button>
               </div>
             </div>
           )}
@@ -847,7 +1285,7 @@ export default function Dashboard() {
                 <h4>Editar membro</h4>
                 <p><strong>Email:</strong> {editEmail}</p>
                 <select
-                  value={editRole}
+                  value={editRole ?? ""}
                   onChange={(e) => setEditRole(e.target.value as AdminRole)}
                   className="settingsInput"
                 >
@@ -874,9 +1312,10 @@ export default function Dashboard() {
           )}
         </section>
       );
-    };
-  }
+    }
 
+    return null;
+  };
 
   return (
     <div className="app">
@@ -902,16 +1341,23 @@ export default function Dashboard() {
       <main className="content">
         <section className="mainArea">
           <div className="dashboardBuilder">
-            <Sidebar selectedTab={selectedTab} onSelect={setSelectedTab} />
+            <Sidebar
+              selectedTab={selectedTab}
+              onSelect={setSelectedTab}
+              permissions={permissions}
+              permissionsLoading={permissionsLoading}
+              chatUnreadCount={chatUnreadCount}
+            />
             <div className="tabContentContainer">{renderTabContent()}</div>
           </div>
         </section>
 
         <aside className="sidebar">
           <div className="searchRow">
-            <button className="iconBtn iconAdd" onClick={() => router.push(`/dashboard/${type}/add`)}>+</button>
-            <input className="searchInput" placeholder="Pesquisar..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            <select className="searchSelect" value={type} onChange={(e) => setType(e.target.value as TypeKey)}>
+            <button className="iconBtn iconAdd" onClick={() => router.push(`/dashboard/${itemType}/add`)}>+</button>
+            <input className="searchInput" placeholder="Pesquisar..." value={search ?? ""} onChange={(e) => setSearch(e.target.value)} />
+            <button className="iconBtn iconRefresh" onClick={() => void loadItems()}>⟳</button>
+            <select className="searchSelect" value={itemType ?? ""} onChange={(e) => setItemType(e.target.value as TypeKey)}>
               <option value="products">Produtos</option>
               <option value="categories">Categorias</option>
               <option value="coupon">Cupons</option>
@@ -920,15 +1366,15 @@ export default function Dashboard() {
 
           <div className="productList">
             {loadingItems && <div>Carregando...</div>}
-            {!loadingItems && items.map((item) => (
+            {!loadingItems && paginatedItems.map((item) => (
               <div className="productItem" key={item.id}>
                 <a onClick={() => {
-                  if (type === "products" && item.slug) {
-                    setPreviewSlug(item.slug);
+                  if (itemType === "products" && item.slug) {
+                    setPreviewSlug(item?.slug);
                     setSelectedTab("inicio");
                   }
                 }}>
-                  {item.name}
+                  {item.name || item.code}
                 </a>
                 <div className="productActions">
                   <button className="iconBtn iconEdit" onClick={() => handleEdit(item.slug ?? item.id)}>✎</button>
@@ -936,18 +1382,60 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+            {!loadingItems && itemsError && <div className="errorText">{itemsError}</div>}
+            {!loadingItems && totalPages > 1 && (
+              <div className="pagination">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  className="btnPagination"
+                >
+                  &larr;
+                </button>
+                {pageNumbers.map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => setCurrentPage(num)}
+                    className={`pageNumber ${currentPage === num ? "active" : ""} btnPagination`}
+                  > {num}
+                  </button>
+                ))}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  className="btnPagination"
+                >
+                  &rarr;
+                </button>
+              </div>
+            )}
           </div>
         </aside>
       </main>
 
       {isDeleteOpen && (
         <div className="modalOverlay" onClick={closeDeleteModal}>
-          <div className="modalBox" onClick={(e) => e.stopPropagation()}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <div className="modalIcon">✓</div>
             <h3>Confirmar exclusão</h3>
             <p>Tem certeza que deseja deletar este {deleteLabel}?</p>
             <div className="modalActions">
-              <button className="btnCancel" onClick={closeDeleteModal}>Cancelar</button>
-              <button className="btnConfirm" onClick={() => void confirmDelete()}>Confirmar</button>
+              <button className="btnCancel" onClick={closeDeleteModal} disabled={isDeleting}>Cancelar</button>
+              <button className="btnConfirm" onClick={() => void confirmDelete()} disabled={isDeleting}>
+                {isDeleting ? "Deletando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSalvarOpen && (
+        <div className="modalOverlay" onClick={closeSalvarModal}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <div className="modalIcon">✓</div>
+            <h3>{modalMessage}</h3>
+            <div className="modalActions">
+              <button className="btnConfirm" onClick={closeSalvarModal}>OK</button>
             </div>
           </div>
         </div>

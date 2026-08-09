@@ -5,19 +5,18 @@ import { existsSync } from "fs";
 import { fail } from "@/lib/api/response";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const fileName = searchParams.get("file");
+  var { searchParams } = new URL(req.url);
+  var fileName = searchParams.get("file");
 
   if (!fileName) return fail("FILE_NOT_SPECIFIED", 400);
-
-  const filePath = join(process.cwd(), "uploads", "products", fileName);
+  var filePath = join(process.cwd(), "uploads", "products", fileName);
 
   if (!existsSync(filePath)) {
     return fail("FILE_NOT_FOUND", 404);
   }
 
   try {
-    const fileBuffer = await readFile(filePath);
+    var fileBuffer = await readFile(filePath);
     
     return new NextResponse(fileBuffer, {
       headers: {

@@ -6,12 +6,12 @@ import { config } from "@/config/configuration";
 
 declare global {
   var pgPool: Pool | undefined;
-  //var intialized: boolean | undefined;
+  
 }
 const database = config.database;
 
 export async function initApp() {
-  //if (global.intialized = true) return;
+  
 
   try {
     if (!global.pgPool) {
@@ -29,7 +29,6 @@ export async function initApp() {
     await global.pgPool.query("SELECT 1");
 
     log.info("PostgreSQL conectado com sucesso");
-    //global.intialized = true;
   } catch (err) {
     log.error("Falha ao conectar no PostgreSQL");
     console.error(err);

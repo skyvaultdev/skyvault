@@ -6,12 +6,12 @@ type RouteParams = {
 };
 
 export async function GET(req: Request, { params }: RouteParams) {
-  const { id, target } = await params;
+  var { id, target } = await params;
   
   try {
     const db = getDB();
-    const table = target === "variation" ? "product_variations" : "products";
-    const keyColumn = target === "variation" ? "variation_id" : "product_id";
+    var table = target === "variation" ? "product_variations" : "products";
+    var keyColumn = target === "variation" ? "variation_id" : "product_id";
 
     const infoResult = await db.query(
       `SELECT stock_type, stock_content, stock_count, is_unlimited 
@@ -24,7 +24,7 @@ export async function GET(req: Request, { params }: RouteParams) {
       return fail("TARGET_NOT_FOUND", 404);
     }
 
-    const info = infoResult.rows[0];
+    var info = infoResult.rows[0];
     let keys = [];
     if (info.stock_type === "key") {
       const keysResult = await db.query(

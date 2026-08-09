@@ -14,8 +14,13 @@ import "./globals.css";
 
 import { initApp } from "@/lib/database/init";
 import { getDB } from "@/lib/database/db";
+import { getSession } from "@/lib/jwt/session";
 
 import { PATTERNS, type Pattern } from "@/lib/pattern/patterns";
+import ChatWidgetGate from "./(components)/chat/ChatWidgetGate";
+
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,13 +32,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Sky Vault | Our Pre-Alpha",
-  description: "Where all your dreams come true",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  await initApp();
+  const db = await getDB();
+
+  const result = await db.query(`
+SELECT store_name, logo_url FROM store_settings ORDER BY id DESC LIMIT 1`);
+
+  const storeName = result.rows[0]?.store_name ?? "Minha Loja";
+  const logoUrl = result.rows[0]?.logo_url;
+
+  return {
+    title: storeName,
+    description: ` ${storeName} Where your dreams come true! `,
+    icons: logoUrl
+      ? {
+          icon: logoUrl,
+          shortcut: logoUrl,
+          apple: logoUrl,
+        }
+      : undefined,
+  }
+}
 
 function getBackgroundStyle(type: string) {
-  const validType = (type in PATTERNS)? type as Pattern : "none";
+  const validType = (type in PATTERNS) ? type as Pattern : "none";
   const pattern = PATTERNS[validType];
   return {
     backgroundImage: pattern.backgroundImage,
@@ -49,7 +72,7 @@ export default async function RootLayout({
 }) {
   await initApp();
 
-  const db = getDB();
+  const db = await getDB();
 
   const result = await db.query(`
     SELECT
@@ -57,64 +80,67 @@ export default async function RootLayout({
       secondary_color,
       background_style,
       background_img_url,
-      background_css
+      background_css,
+      store_name  
     FROM store_settings
     ORDER BY id DESC
     LIMIT 1
   `);
 
-  const theme = result.rows[0] ?? {};
+  var theme = result.rows[0] ?? {};
 
-  const primary =
+  var primary =
     theme.primary_color ?? "#b700ff";
 
-  const secondary =
+  var secondary =
     theme.secondary_color ?? "#6400ff";
 
-  const backgroundType =
-    theme.background_style ?? "hero-icons";
+  var backgroundType =
+    theme.background_style ?? "heroicons";
 
-  const backgroundImg =
+  var backgroundImg =
     theme.background_img_url ?? null;
 
-  const backgroundCss =
+  var backgroundCss =
     theme.background_css ?? null;
 
-  const bgStyle =
+  var bgStyle =
     getBackgroundStyle(backgroundType);
 
-  const patternImage =
+  var patternImage =
     bgStyle.backgroundImage;
 
-  const patternSize =
+  var patternSize =
     bgStyle.backgroundSize;
 
-  const backgroundColor =
+  var backgroundColor =
     bgStyle.backgroundColor ?? "#050505";
 
-  const finalBackgroundImage = backgroundImg
+  var finalBackgroundImage = backgroundImg
     ? patternImage
       ? `${patternImage}, url(${backgroundImg})`
       : `url(${backgroundImg})`
     : patternImage;
 
-  const finalBackgroundSize = backgroundImg
+  var finalBackgroundSize = backgroundImg
     ? patternImage
       ? `${patternSize}, cover`
       : "cover"
     : patternSize;
 
-  const finalBackgroundRepeat = backgroundImg
+  var finalBackgroundRepeat = backgroundImg
     ? patternImage
       ? "repeat, no-repeat"
       : "no-repeat"
     : "repeat";
 
-  const finalBackgroundPosition = backgroundImg
+  var finalBackgroundPosition = backgroundImg
     ? patternImage
       ? "top left, center center"
       : "center center"
     : undefined;
+
+  const session = await getSession();
 
   return (
     <html
@@ -167,6 +193,8 @@ export default async function RootLayout({
 
           <Footer />
         </div>
+
+        <ChatWidgetGate isLoggedIn={!!session} />
 
         {backgroundCss && (
           <style

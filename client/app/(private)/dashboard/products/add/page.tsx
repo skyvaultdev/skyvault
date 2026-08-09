@@ -6,15 +6,15 @@ import { useRouter } from "next/navigation"; // Importado para navegação
 import "./add.css";
 import { slugify } from "@/lib/utils/slugify";
 
-const parseCurrency = (value: string) => {
-  const cleanValue = value.replace(/[^\d.,]/g, "");
+var parseCurrency = (value: string) => {
+  var cleanValue = value.replace(/[^\d.,]/g, "");
   if (!cleanValue.includes(",") && !cleanValue.includes(".")) {
     return cleanValue;
   }
 
-  const pieces = cleanValue.split(/[.,]/);
-  const decimals = pieces.pop();
-  const integers = pieces.join("");
+  var pieces = cleanValue.split(/[.,]/);
+  var decimals = pieces.pop();
+  var integers = pieces.join("");
   
   return `${integers}.${decimals}`;
 };
@@ -37,7 +37,7 @@ type FormState = {
 
 export default function AddProductPage() {
   const router = useRouter(); // Hook para redirecionar
-  const [form, setForm] = useState<FormState>({
+  var [form, setForm] = useState<FormState>({
     name: "",
     description: "",
     price: "",
@@ -55,18 +55,18 @@ export default function AddProductPage() {
   const [newVariation, setNewVariation] = useState({ name: "", price: "" });
   const [selectedVariationId, setSelectedVariationId] = useState<string>("");
 
-  const slug = slugify(form.name);
+  var slug = slugify(form.name);
 
   useEffect(() => {
     async function loadCategories() {
-      const response = await fetch("/api/categories");
-      const json = await response.json();
+      var response = await fetch("/api/categories");
+      var json = await response.json();
       if (json.ok && Array.isArray(json.data)) setCategories(json.data);
     }
     void loadCategories();
   }, []);
 
-  const previews = useMemo(
+  var previews = useMemo(
     () => images.map((file) => URL.createObjectURL(file)),
     [images]
   );
@@ -76,16 +76,16 @@ export default function AddProductPage() {
   }, [previews]);
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+    var files = Array.from(e.target.files ?? []);
     setImages((prev) => [...prev, ...files]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function reorderImage(index: number, direction: -1 | 1) {
-    const target = index + direction;
+    var target = index + direction;
     if (target < 0 || target >= images.length) return;
-    const next = [...images];
-    const [item] = next.splice(index, 1);
+    var next = [...images];
+    var [item] = next.splice(index, 1);
     next.splice(target, 0, item);
     setImages(next);
   }
@@ -96,7 +96,7 @@ export default function AddProductPage() {
 
   function addVariation() {
     if (!newVariation.name || !newVariation.price) return;
-    const variation: Variation = {
+    var variation: Variation = {
       id: crypto.randomUUID(),
       name: newVariation.name,
       price: newVariation.price,
@@ -110,8 +110,8 @@ export default function AddProductPage() {
     if (selectedVariationId === id) setSelectedVariationId("");
   }
 
-  const selectedVariation = variations.find((v) => v.id === selectedVariationId);
-  const previewPrice = selectedVariation?.price || form.price || "0,00";
+  var selectedVariation = variations.find((v) => v.id === selectedVariationId);
+  var previewPrice = selectedVariation?.price || form.price || "0,00";
 
   function handleRedefini() {
     setForm({ name: "", description: "", price: "", categoryId: "", active: true });
@@ -128,7 +128,7 @@ export default function AddProductPage() {
     event.preventDefault();
     setFeedback("Criando...");
 
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append("name", form.name.trim());
     formData.append("slug", slug);
     formData.append("description", form.description);
@@ -136,7 +136,7 @@ export default function AddProductPage() {
     formData.append("category_id", form.categoryId);
     formData.append("active", String(form.active));
 
-    const variationsToUpload = variations.map(v => ({
+    var variationsToUpload = variations.map(v => ({
         ...v,
         price: parseCurrency(v.price)
     }));
@@ -144,7 +144,7 @@ export default function AddProductPage() {
 
     images.forEach((file) => formData.append("images", file));
 
-    const response = await fetch("/api/products/add", {
+    var response = await fetch("/api/products/add", {
       method: "POST",
       body: formData,
     });

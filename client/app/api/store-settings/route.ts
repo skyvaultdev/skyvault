@@ -6,6 +6,17 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
+type StoreSettings = {
+  id: number;
+  primary_color: string;
+  secondary_color: string;
+  logo_url: string;
+  background_style: string;
+  background_img_url: string;
+  background_css: string;
+  updated_at: Date;
+};
+
 async function ensureSchema() {
   const db = await getDB();
   await db.query(`
@@ -24,6 +35,7 @@ async function ensureSchema() {
   const columns = [
     "primary_color TEXT NOT NULL DEFAULT '#b700ff'",
     "secondary_color TEXT NOT NULL DEFAULT '#6400ff'",
+    "store_name TEXT",
     "logo_url TEXT",
     "background_style TEXT",
     "background_img_url TEXT",
@@ -31,8 +43,8 @@ async function ensureSchema() {
     "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
   ];
 
-  for (const col of columns) {
-    const colName = col.split(" ")[0];
+  for (var col of columns) {
+    var colName = col.split(" ")[0];
     await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ${col}`);
   }
 
@@ -66,42 +78,65 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const db = await ensureSchema();
-    const contentType = req.headers.get("content-type") ?? "";
+    var contentType = req.headers.get("content-type") ?? "";
 
-    let primaryColor: string | undefined;
-    let secondaryColor: string | undefined;
-    let backgroundStyle: string | undefined;
-    let backgroundCss: string | undefined;
-    let backgroundImgUrl: string | undefined;
+    var primaryColor: string | undefined;
+    var secondaryColor: string | undefined;
+    var storeName: string | undefined;
+    var logoUrl: string | undefined;
+    var backgroundStyle: string | undefined;
+    var backgroundCss: string | undefined;
+    var backgroundImgUrl: string | undefined;
 
     if (contentType.includes("multipart/form-data")) {
-      const form = await req.formData();
+      var form = await req.formData();
 
       primaryColor = form.get("primaryColor")?.toString().trim() || undefined;
       secondaryColor = form.get("secondaryColor")?.toString().trim() || undefined;
       backgroundStyle = form.get("backgroundStyle")?.toString().trim() || undefined;
       backgroundCss = form.get("backgroundCss")?.toString() || undefined;
+      storeName = form.get("storeName")?.toString().trim() || undefined;
 
-      const image = form.get("backgroundImage");
-      
+      var image = form.get("backgroundImage");
+      var logo = form.get("logoUrl");
+
       if (image instanceof File && image.size > 0) {
-        const uploadDir = path.join(process.cwd(), "public", "store");
+        var uploadDir = path.join(process.cwd(), "public", "store");
         await mkdir(uploadDir, { recursive: true });
 
-        const ext = path.extname(image.name) || ".jpg";
-        const fileName = `${crypto.randomUUID()}${ext}`;
-        const filePath = path.join(uploadDir, fileName);
+        var ext = path.extname(image.name) || ".jpg";
+        var fileName = `${crypto.randomUUID()}${ext}`;
+        var filePath = path.join(uploadDir, fileName);
 
-        const bytes = Buffer.from(await image.arrayBuffer());
+        var bytes = Buffer.from(await image.arrayBuffer());
         await writeFile(filePath, bytes);
 
         backgroundImgUrl = `/store/${fileName}`;
       }
+
+      if (logo instanceof File && logo.size > 0) {
+        var uploadDir = path.join(process.cwd(), "public", "store");
+
+        await mkdir(uploadDir, { recursive: true });
+
+        var ext = path.extname(logo.name) || ".png";
+        var fileName = `logo-${crypto.randomUUID()}${ext}`;
+        var filePath = path.join(uploadDir, fileName);
+
+        var bytes = Buffer.from(await logo.arrayBuffer());
+
+        await writeFile(filePath, bytes);
+
+        logoUrl = `/store/${fileName}`;
+      }
+
     } else {
-      const body = await req.json();
+      var body = await req.json();
 
       primaryColor = body.primaryColor?.trim();
       secondaryColor = body.secondaryColor?.trim();
+      storeName = body.storeName?.trim();
+      logoUrl = body.logoUrl?.trim();
       backgroundStyle = body.backgroundStyle?.trim();
       backgroundCss = body.backgroundCss;
       backgroundImgUrl = body.backgroundImgUrl?.trim();
@@ -111,7 +146,7 @@ export async function POST(req: Request) {
       SELECT * FROM store_settings ORDER BY id DESC LIMIT 1
     `);
 
-    const row = current.rows[0];
+    var row = current.rows[0];
     if (!row) return fail("STORE_SETTINGS_NOT_FOUND", 404);
 
     const updated = await db.query(
@@ -120,16 +155,20 @@ export async function POST(req: Request) {
       SET
         primary_color = COALESCE($1, primary_color),
         secondary_color = COALESCE($2, secondary_color),
-        background_style = COALESCE($3, background_style),
-        background_css = COALESCE($4, background_css),
-        background_img_url = COALESCE($5, background_img_url),
+        store_name = COALESCE($3, store_name),
+        logo_url = COALESCE($4, logo_url),
+        background_style = COALESCE($5, background_style),
+        background_css = COALESCE($6, background_css),
+        background_img_url = COALESCE($7, background_img_url),
         updated_at = NOW()
-      WHERE id = $6
+      WHERE id = $8
       RETURNING *
       `,
       [
         primaryColor ?? null,
         secondaryColor ?? null,
+        storeName ?? null,
+        logoUrl ?? null,
         backgroundStyle ?? null,
         backgroundCss ?? null,
         backgroundImgUrl ?? null,
@@ -142,4 +181,6 @@ export async function POST(req: Request) {
     console.error("POST Store Settings Error:", error);
     return fail("INTERNAL_ERROR", 500);
   }
+
+
 }

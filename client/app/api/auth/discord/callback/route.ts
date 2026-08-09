@@ -24,8 +24,8 @@ async function sendWebhookLog(content: any) {
 
 
 export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const code = searchParams.get("code");
+    var { searchParams } = new URL(req.url);
+    var code = searchParams.get("code");
     if (!code) {
         return NextResponse.redirect(config.WEBSITE_URL + "/login");
     }
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
         );
     }
 
-    const user = await userRes.json();
+    var user = await userRes.json();
     if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 401 });
 
     const userFormatted = [
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
         ["/login"]
     );
 
-    const email = user?.email
+    var email = user?.email
     await sendWebhookLog({
         embeds: [
             {
@@ -126,11 +126,10 @@ export async function GET(req: Request) {
     });
 
     const res = NextResponse.redirect(config.WEBSITE_URL);
-
     res.cookies.set("auth_token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
     });

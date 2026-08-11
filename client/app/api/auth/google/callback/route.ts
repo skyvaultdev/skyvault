@@ -5,6 +5,7 @@ import { config } from "@/config/configuration";
 import { getDB } from "@/lib/database/db";
 import { signJWT } from "@/lib/jwt/init";
 import { ROLES } from "@/lib/jwt/permissions"
+import { upsertCanonicalUser } from "@/lib/auth/identity";
 
 const google = config.google;
 type Role = keyof typeof ROLES
@@ -75,27 +76,36 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "EMAIL_NOT_VERIFIED" }, { status: 401 });
     }
 
-    const userFormatted = [
-        String(user.name ?? user.email.split("@")[0]),
-        String(user.email),
-        String(tokenData.access_token),
-        String(tokenData.refresh_token ?? ""),
-        Number(tokenData.expires_in),
-    ];
+    const email = String(user.email);
+    const displayName = String(user.name ?? email.split("@")[0]);
     const db = getDB();
 
+    const userId = await upsertCanonicalUser(email, displayName);
+
     await db.query(`
-        INSERT INTO googleuser 
-        (username, email, access_token, refresh_token, expires_in)
-        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING`, userFormatted
+        INSERT INTO googleuser
+        (username, email, access_token, refresh_token, expires_in, user_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (email) DO UPDATE SET
+          username = EXCLUDED.username,
+          access_token = EXCLUDED.access_token,
+          refresh_token = EXCLUDED.refresh_token,
+          expires_in = EXCLUDED.expires_in,
+          user_id = EXCLUDED.user_id`,
+        [
+            displayName,
+            email,
+            String(tokenData.access_token),
+            String(tokenData.refresh_token ?? ""),
+            Number(tokenData.expires_in),
+            userId,
+        ]
     );
 
     await db.query(
         "INSERT INTO page_views (path) VALUES ($1)",
         ["/login"]
     );
-
-    var email = user?.email
     await sendWebhookLog({
         embeds: [
             {
@@ -125,6 +135,7 @@ export async function GET(req: Request) {
     }
 
     const token = await signJWT({
+        sub: String(userId),
         email,
         role,
         permissions,

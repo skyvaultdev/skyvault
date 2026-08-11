@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { verifyJWT } from "@/lib/jwt/init";
+import { resolveUserId } from "@/lib/auth/identity";
 import { cookies } from "next/headers";
 
 
@@ -18,18 +19,12 @@ export async function GET(req: NextRequest) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    var userEmail = decoded.email;
     const db = getDB();
-
-    const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
-    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
-
-    if (discUser.length === 0 && regularUser.length === 0 && googleUser.length === 0) {
+    const userId = await resolveUserId(decoded);
+    if (userId === null) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    const userId = discUser[0]?.id ?? regularUser[0]?.id ?? googleUser[0]?.id;
     const result = await db.query(`
       SELECT 
           c.id AS cart_item_id,
@@ -68,18 +63,9 @@ export async function PUT(req: NextRequest) {
     var decoded = await verifyJWT(token);
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
-    var userEmail = decoded.email;
-
     const db = getDB();
-    const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
-    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
-
-    let userId: number | string;
-    if (discUser.length > 0) userId = discUser[0].id;
-    else if (regularUser.length > 0) userId = regularUser[0].id;
-    else if (googleUser.length > 0) userId = googleUser[0].id;
-    else return fail("USER_NOT_FOUND", 404);
+    const userId = await resolveUserId(decoded);
+    if (userId === null) return fail("USER_NOT_FOUND", 404);
 
     var body = await req.json();
     var product_id = Number(body.product_id);
@@ -137,17 +123,9 @@ export async function POST(req: NextRequest) {
     var decoded = await verifyJWT(token);
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
-    var userEmail = decoded.email;
     const db = getDB();
-    const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
-    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
-
-    let userId: number | string;
-    if (discUser.length > 0) userId = discUser[0].id;
-    else if (regularUser.length > 0) userId = regularUser[0].id;
-    else if (googleUser.length > 0) userId = googleUser[0].id;
-    else return fail("USER_NOT_FOUND", 404);
+    const userId = await resolveUserId(decoded);
+    if (userId === null) return fail("USER_NOT_FOUND", 404);
 
     var { cart_item_id, quantity } = await req.json();
     if (!cart_item_id) return fail("MISSING_ITEM_ID", 400);

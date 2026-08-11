@@ -5,6 +5,7 @@ import { config } from "@/config/configuration";
 import { getDB } from "@/lib/database/db";
 import { signJWT } from "@/lib/jwt/init";
 import { ROLES } from "@/lib/jwt/permissions"
+import { upsertCanonicalUser } from "@/lib/auth/identity";
 const discord = config.discord;
 type Role = keyof typeof ROLES
 
@@ -70,27 +71,37 @@ export async function GET(req: Request) {
     var user = await userRes.json();
     if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 401 });
 
-    const userFormatted = [
-        String(user.username),
-        String(user.email),
-        String(tokenData.access_token),
-        String(tokenData.refresh_token),
-        Number(tokenData.expires_in),
-    ];
+    const email = String(user.email);
+    const username = String(user.username);
     const db = getDB();
 
+    const userId = await upsertCanonicalUser(email, username);
+    const expiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000);
+
     await db.query(`
-        INSERT INTO discuser 
-        (username, email, access_token, refresh_token, expires_in)
-        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING`, userFormatted
+        INSERT INTO discuser
+        (username, email, access_token, refresh_token, expires_at, user_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (email) DO UPDATE SET
+          username = EXCLUDED.username,
+          access_token = EXCLUDED.access_token,
+          refresh_token = EXCLUDED.refresh_token,
+          expires_at = EXCLUDED.expires_at,
+          user_id = EXCLUDED.user_id`,
+        [
+            username,
+            email,
+            String(tokenData.access_token),
+            String(tokenData.refresh_token),
+            expiresAt,
+            userId,
+        ]
     );
 
     await db.query(
         "INSERT INTO page_views (path) VALUES ($1)",
         ["/login"]
     );
-
-    var email = user?.email
     await sendWebhookLog({
         embeds: [
             {
@@ -120,6 +131,7 @@ export async function GET(req: Request) {
     }
 
     const token = await signJWT({
+        sub: String(userId),
         email,
         role,
         permissions,

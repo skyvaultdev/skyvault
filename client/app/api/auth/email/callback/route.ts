@@ -6,6 +6,7 @@ import { getDB } from "@/lib/database/db";
 import { config } from "@/config/configuration"
 import { signJWT, verifyJWT } from "@/lib/jwt/init";
 import { ROLES } from "@/lib/jwt/permissions"
+import { upsertCanonicalUser } from "@/lib/auth/identity";
 type Role = keyof typeof ROLES
 
 function hashCode(code: string) {
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "INVALID_DATA" }, { status: 400 });
     }
 
-    var username = email.split("@")[0] as String
+    const username = email.split("@")[0];
     const db = getDB();
     var codeHash = hashCode(code);
     const result = await db.query(`SELECT * FROM email_verification WHERE email = $1 AND code_hash = $2 AND expires_at > NOW()`,
@@ -38,9 +39,7 @@ export async function POST(req: Request) {
         [email]
     );
 
-    await db.query(`INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (email) DO NOTHING`,
-        [username, email]
-    );
+    const userId = await upsertCanonicalUser(email, username);
 
     const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
     let role: Role | "regular_citizen" = "regular_citizen";
@@ -55,6 +54,7 @@ export async function POST(req: Request) {
     }
 
     const token = await signJWT({
+        sub: String(userId),
         email,
         role,
         permissions,

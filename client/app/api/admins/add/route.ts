@@ -26,10 +26,8 @@ export async function POST(req: Request) {
 
     if (exists?.rows?.length > 0) return fail("ALREADY_ADMIN", 400);
 
-    var { rows: discordUsers } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [email])
-    var { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [email])
-    var { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [email])
-    if(regularUser?.length < 1 && discordUsers?.length < 1 && googleUser?.length < 1) return fail("USER_NOT_FOUND", 400)
+    var { rows: existingUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [email]);
+    if (existingUser.length < 1) return fail("USER_NOT_FOUND", 400);
 
     await db.query( `INSERT INTO admin (email,role) VALUES($1,$2)`,
         [email, typedRole]

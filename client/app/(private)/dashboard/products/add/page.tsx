@@ -21,10 +21,14 @@ var parseCurrency = (value: string) => {
 
 type Category = { id: number; name: string; slug: string };
 
+type ProductType = "digital" | "physical";
+
 type Variation = {
   id: string;
   name: string;
   price: string;
+  stockCount: string;
+  isUnlimited: boolean;
 };
 
 type FormState = {
@@ -33,6 +37,14 @@ type FormState = {
   price: string;
   categoryId: string;
   active: boolean;
+  productType: ProductType;
+  sku: string;
+  weightGrams: string;
+  lengthCm: string;
+  widthCm: string;
+  heightCm: string;
+  stockCount: string;
+  stockIsUnlimited: boolean;
 };
 
 export default function AddProductPage() {
@@ -43,6 +55,14 @@ export default function AddProductPage() {
     price: "",
     categoryId: "",
     active: true,
+    productType: "digital",
+    sku: "",
+    weightGrams: "",
+    lengthCm: "",
+    widthCm: "",
+    heightCm: "",
+    stockCount: "",
+    stockIsUnlimited: false,
   });
 
   const [images, setImages] = useState<File[]>([]);
@@ -52,7 +72,7 @@ export default function AddProductPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false); // Estado do Modal
 
   const [variations, setVariations] = useState<Variation[]>([]);
-  const [newVariation, setNewVariation] = useState({ name: "", price: "" });
+  const [newVariation, setNewVariation] = useState({ name: "", price: "", stockCount: "", isUnlimited: false });
   const [selectedVariationId, setSelectedVariationId] = useState<string>("");
 
   var slug = slugify(form.name);
@@ -100,9 +120,11 @@ export default function AddProductPage() {
       id: crypto.randomUUID(),
       name: newVariation.name,
       price: newVariation.price,
+      stockCount: newVariation.stockCount,
+      isUnlimited: newVariation.isUnlimited,
     };
     setVariations((prev) => [...prev, variation]);
-    setNewVariation({ name: "", price: "" });
+    setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
   }
 
   function removeVariation(id: string) {
@@ -114,10 +136,14 @@ export default function AddProductPage() {
   var previewPrice = selectedVariation?.price || form.price || "0,00";
 
   function handleRedefini() {
-    setForm({ name: "", description: "", price: "", categoryId: "", active: true });
+    setForm({
+      name: "", description: "", price: "", categoryId: "", active: true,
+      productType: "digital", sku: "", weightGrams: "", lengthCm: "", widthCm: "", heightCm: "",
+      stockCount: "", stockIsUnlimited: false,
+    });
     setImages([]);
     setVariations([]);
-    setNewVariation({ name: "", price: "" });
+    setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
     setSelectedVariationId("");
     setFeedback("");
     setShowSuccessModal(false);
@@ -128,6 +154,8 @@ export default function AddProductPage() {
     event.preventDefault();
     setFeedback("Criando...");
 
+    var isPhysical = form.productType === "physical";
+
     var formData = new FormData();
     formData.append("name", form.name.trim());
     formData.append("slug", slug);
@@ -135,10 +163,23 @@ export default function AddProductPage() {
     formData.append("price", parseCurrency(form.price));
     formData.append("category_id", form.categoryId);
     formData.append("active", String(form.active));
+    formData.append("product_type", form.productType);
+
+    if (isPhysical) {
+      formData.append("sku", form.sku.trim());
+      formData.append("weight_grams", form.weightGrams);
+      formData.append("length_cm", form.lengthCm);
+      formData.append("width_cm", form.widthCm);
+      formData.append("height_cm", form.heightCm);
+      formData.append("stock_is_unlimited", String(form.stockIsUnlimited));
+      formData.append("stock_count", form.stockCount || "0");
+    }
 
     var variationsToUpload = variations.map(v => ({
-        ...v,
-        price: parseCurrency(v.price)
+        name: v.name,
+        price: parseCurrency(v.price),
+        stockCount: isPhysical ? Number(v.stockCount || 0) : undefined,
+        isUnlimited: isPhysical ? v.isUnlimited : undefined,
     }));
     formData.append("variations", JSON.stringify(variationsToUpload));
 
@@ -191,6 +232,17 @@ export default function AddProductPage() {
             />
           </label>
 
+          <label className="full">
+            Tipo de produto
+            <select
+              value={form.productType}
+              onChange={(e) => setForm((prev) => ({ ...prev, productType: e.target.value as ProductType }))}
+            >
+              <option value="digital">Digital (key, arquivo ou ilimitado)</option>
+              <option value="physical">Físico (envio por transportadora)</option>
+            </select>
+          </label>
+
           <label>
             Preço base (Ex: 999,99)
             <input
@@ -224,6 +276,80 @@ export default function AddProductPage() {
             />
           </label>
 
+          {form.productType === "physical" && (
+            <div className="full physicalFieldsSection">
+              <h3>Dados de envio</h3>
+              <div className="physicalFieldsGrid">
+                <label>
+                  SKU
+                  <input
+                    value={form.sku}
+                    onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))}
+                    placeholder="Código interno"
+                  />
+                </label>
+                <label>
+                  Peso (g)
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.weightGrams}
+                    onChange={(e) => setForm((prev) => ({ ...prev, weightGrams: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  Comprimento (cm)
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.lengthCm}
+                    onChange={(e) => setForm((prev) => ({ ...prev, lengthCm: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  Largura (cm)
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.widthCm}
+                    onChange={(e) => setForm((prev) => ({ ...prev, widthCm: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  Altura (cm)
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.heightCm}
+                    onChange={(e) => setForm((prev) => ({ ...prev, heightCm: e.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <label className="checkboxRow">
+                <input
+                  type="checkbox"
+                  checked={form.stockIsUnlimited}
+                  onChange={(e) => setForm((prev) => ({ ...prev, stockIsUnlimited: e.target.checked }))}
+                />
+                Estoque ilimitado
+              </label>
+
+              {!form.stockIsUnlimited && (
+                <label>
+                  Quantidade em estoque
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.stockCount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, stockCount: e.target.value }))}
+                  />
+                </label>
+              )}
+              <small>Sem variações, esses dados valem para o produto. Com variações, cada uma tem seu próprio estoque abaixo (peso/dimensões seguem os do produto principal).</small>
+            </div>
+          )}
+
           <div className="variationSection">
             <h3>Variações</h3>
             <div className="variationCreate">
@@ -238,12 +364,36 @@ export default function AddProductPage() {
                 value={newVariation.price}
                 onChange={(e) => setNewVariation((prev) => ({ ...prev, price: e.target.value.replace(/[^0-9,.]/g, "") }))}
               />
+              {form.productType === "physical" && !newVariation.isUnlimited && (
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Estoque"
+                  value={newVariation.stockCount}
+                  onChange={(e) => setNewVariation((prev) => ({ ...prev, stockCount: e.target.value }))}
+                />
+              )}
+              {form.productType === "physical" && (
+                <label className="checkboxRow">
+                  <input
+                    type="checkbox"
+                    checked={newVariation.isUnlimited}
+                    onChange={(e) => setNewVariation((prev) => ({ ...prev, isUnlimited: e.target.checked }))}
+                  />
+                  Ilimitado
+                </label>
+              )}
               <button type="button" onClick={addVariation} className="addbtn">Adicionar</button>
             </div>
             <div className="variationList">
               {variations.map((v) => (
                 <div key={v.id} className="variationItem">
                   {v.name} - R$ {v.price}
+                  {form.productType === "physical" && (
+                    <span className="variationStockHint">
+                      {" "}({v.isUnlimited ? "ilimitado" : `${v.stockCount || 0} em estoque`})
+                    </span>
+                  )}
                   <button type="button" onClick={() => removeVariation(v.id)}>✕</button>
                 </div>
               ))}

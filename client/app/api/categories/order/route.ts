@@ -2,6 +2,7 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 type CategoryOrderPayload = {
   id: number;
@@ -12,6 +13,9 @@ type CategoryOrderPayload = {
 export async function PATCH(req: Request) {
   let db;
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     db = getDB();
     var body = await req.json();
     let payload: CategoryOrderPayload[] = [];

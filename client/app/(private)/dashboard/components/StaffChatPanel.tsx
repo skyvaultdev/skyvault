@@ -514,12 +514,10 @@ export default function StaffChatPanel() {
           onClick={() => mediaIndex >= 0 && setLightboxIndex(mediaIndex)}
         />
       ) : (
-        <video
-          src={m.attachment_url}
-          className="chatAttachmentImg"
-          onClick={() => mediaIndex >= 0 && setLightboxIndex(mediaIndex)}
-          muted
-        />
+        <div className="chatVideoThumbWrap" onClick={() => mediaIndex >= 0 && setLightboxIndex(mediaIndex)}>
+          <video src={m.attachment_url} className="chatAttachmentImg" muted />
+          <span className="chatVideoPlayIcon" aria-hidden="true" />
+        </div>
       );
     }
 

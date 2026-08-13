@@ -6,6 +6,7 @@ import { slugify } from "@/lib/utils/slugify";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { requirePermission } from "@/lib/auth/guard";
 
 async function ensureSchema() {
   const db = getDB();
@@ -19,6 +20,9 @@ async function ensureSchema() {
 
 export async function POST(req: Request) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     const db = await ensureSchema();
 
     var contentType = req.headers.get("content-type") ?? "";

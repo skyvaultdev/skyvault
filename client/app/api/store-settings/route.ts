@@ -2,9 +2,13 @@
 
 import { fail, ok } from "@/lib/api/response";
 import { getDB } from "@/lib/database/db";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { requirePermission } from "@/lib/auth/guard";
+
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 type StoreSettings = {
   id: number;
@@ -77,6 +81,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const { denied } = await requirePermission("store.customize");
+    if (denied) return denied;
+
     const db = await ensureSchema();
     var contentType = req.headers.get("content-type") ?? "";
 
@@ -101,7 +108,10 @@ export async function POST(req: Request) {
       var logo = form.get("logoUrl");
 
       if (image instanceof File && image.size > 0) {
-        var uploadDir = path.join(process.cwd(), "public", "store");
+        if (image.size > MAX_IMAGE_SIZE) return fail("IMAGE_TOO_LARGE", 400);
+        if (!ALLOWED_IMAGE_TYPES.includes(image.type)) return fail("INVALID_IMAGE_TYPE", 400);
+
+        var uploadDir = path.join(process.cwd(), "public", "uploads", "store");
         await mkdir(uploadDir, { recursive: true });
 
         var ext = path.extname(image.name) || ".jpg";
@@ -111,11 +121,14 @@ export async function POST(req: Request) {
         var bytes = Buffer.from(await image.arrayBuffer());
         await writeFile(filePath, bytes);
 
-        backgroundImgUrl = `/store/${fileName}`;
+        backgroundImgUrl = `/uploads/store/${fileName}`;
       }
 
       if (logo instanceof File && logo.size > 0) {
-        var uploadDir = path.join(process.cwd(), "public", "store");
+        if (logo.size > MAX_IMAGE_SIZE) return fail("IMAGE_TOO_LARGE", 400);
+        if (!ALLOWED_IMAGE_TYPES.includes(logo.type)) return fail("INVALID_IMAGE_TYPE", 400);
+
+        var uploadDir = path.join(process.cwd(), "public", "uploads", "store");
 
         await mkdir(uploadDir, { recursive: true });
 
@@ -127,7 +140,7 @@ export async function POST(req: Request) {
 
         await writeFile(filePath, bytes);
 
-        logoUrl = `/store/${fileName}`;
+        logoUrl = `/uploads/store/${fileName}`;
       }
 
     } else {
@@ -176,6 +189,9 @@ export async function POST(req: Request) {
       ]
     );
 
+    await deleteOldStoreFile(logoUrl, row.logo_url);
+    await deleteOldStoreFile(backgroundImgUrl, row.background_img_url);
+
     return ok(updated.rows[0]);
   } catch (error) {
     console.error("POST Store Settings Error:", error);
@@ -183,4 +199,16 @@ export async function POST(req: Request) {
   }
 
 
+}
+
+async function deleteOldStoreFile(newUrl: string | undefined, oldUrl: string | null | undefined) {
+  if (!newUrl || !oldUrl || newUrl === oldUrl) return;
+  if (!oldUrl.startsWith("/uploads/store/")) return;
+
+  try {
+    var oldPath = path.join(process.cwd(), "public", oldUrl.replace(/^\/+/, ""));
+    await unlink(oldPath);
+  } catch {
+    // arquivo antigo já não existe ou não pôde ser removido — ignora
+  }
 }

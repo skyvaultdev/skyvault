@@ -10,7 +10,11 @@ export type DashboardTab = "inicio"
   | "posicao"
   | "estoque"
   | "chat"
-  | "equipe";
+  | "equipe"
+  | "pedidos"
+  | "saldo"
+  | "transportadoras"
+  | "pagamentos";
 
 // Keeping this as a literal union (instead of a bare `string`) means a typo
 // like "dashbord.access" fails at compile time instead of silently locking
@@ -20,7 +24,12 @@ export type Permission =
   | "store.customize"
   | "products.write"
   | "chat.access"
-  | "team.manage";
+  | "team.manage"
+  | "orders.read"
+  | "orders.manage"
+  | "wallet.manage"
+  | "shipping.manage"
+  | "payments.manage";
 
 type SidebarProps = {
   selectedTab: DashboardTab;
@@ -44,6 +53,10 @@ const MENU_ITEMS: Array<{ key: DashboardTab; label: string; permission: Permissi
   { key: "posicao", label: "Posição Categorias", permission: "products.write" },
   { key: "estoque", label: "Estoque", permission: "products.write" },
   { key: "chat", label: "Chat", permission: "chat.access" },
+  { key: "pedidos", label: "Pedidos", permission: "orders.read" },
+  { key: "saldo", label: "Saldo", permission: "wallet.manage" },
+  { key: "transportadoras", label: "Transportadoras", permission: "shipping.manage" },
+  { key: "pagamentos", label: "Pagamentos", permission: "payments.manage" },
   { key: "equipe", label: "Equipe", permission: "team.manage" },
 ];
 

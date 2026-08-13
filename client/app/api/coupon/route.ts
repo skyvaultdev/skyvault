@@ -2,6 +2,7 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 async function ensureCouponsSchema() {
   const db = getDB();
@@ -23,6 +24,9 @@ async function ensureCouponsSchema() {
 
 export async function GET() {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     const db = await ensureCouponsSchema();
     const result = await db.query("SELECT * FROM coupons ORDER BY created_at DESC");
     return ok(result.rows);

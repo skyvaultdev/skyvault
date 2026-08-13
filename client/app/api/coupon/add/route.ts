@@ -1,5 +1,6 @@
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 async function ensureCouponsSchema() {
   const db = getDB();
@@ -21,6 +22,9 @@ async function ensureCouponsSchema() {
 
 export async function POST(req: Request) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     const db = await ensureCouponsSchema();
     var body = (await req.json()) as {
       code?: string;

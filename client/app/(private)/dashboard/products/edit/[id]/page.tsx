@@ -24,8 +24,13 @@ var formatToInput = (value: any) => {
 };
 
 type Category = { id: number; name: string; slug: string };
-type Variation = { id: string; name: string; price: string; isNew?: boolean };
-type FormState = { id?: number; name: string; description: string; price: string; categoryId: string; active: boolean; };
+type ProductType = "digital" | "physical";
+type Variation = { id: string; name: string; price: string; isNew?: boolean; stockCount: string; isUnlimited: boolean };
+type FormState = {
+  id?: number; name: string; description: string; price: string; categoryId: string; active: boolean;
+  productType: ProductType; sku: string; weightGrams: string; lengthCm: string; widthCm: string; heightCm: string;
+  stockCount: string; stockIsUnlimited: boolean;
+};
 
 export default function EditProductPage() {
   var params = useParams();
@@ -38,14 +43,22 @@ export default function EditProductPage() {
     price: "",
     categoryId: "",
     active: true,
+    productType: "digital",
+    sku: "",
+    weightGrams: "",
+    lengthCm: "",
+    widthCm: "",
+    heightCm: "",
+    stockCount: "",
+    stockIsUnlimited: false,
   });
 
-  const [images, setImages] = useState<any[]>([]); 
+  const [images, setImages] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [feedback, setFeedback] = useState("");
   const [variations, setVariations] = useState<Variation[]>([]);
-  const [newVariation, setNewVariation] = useState({ name: "", price: "" });
+  const [newVariation, setNewVariation] = useState({ name: "", price: "", stockCount: "", isUnlimited: false });
   const [selectedVariationId, setSelectedVariationId] = useState<string>(""); // Para o Preview
   const [loading, setLoading] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -69,13 +82,23 @@ export default function EditProductPage() {
             price: formatToInput(p.price),
             categoryId: String(p.category_id || ""),
             active: Boolean(p.active),
+            productType: p.product_type === "physical" ? "physical" : "digital",
+            sku: p.sku || "",
+            weightGrams: p.weight_grams != null ? String(p.weight_grams) : "",
+            lengthCm: p.length_cm != null ? String(p.length_cm) : "",
+            widthCm: p.width_cm != null ? String(p.width_cm) : "",
+            heightCm: p.height_cm != null ? String(p.height_cm) : "",
+            stockCount: p.stock_count != null ? String(p.stock_count) : "",
+            stockIsUnlimited: Boolean(p.is_unlimited),
           });
 
           if (p.variations) {
             setVariations(p.variations.map((v: any) => ({
               id: String(v.id),
               name: v.name,
-              price: formatToInput(v.price)
+              price: formatToInput(v.price),
+              stockCount: v.stock_count != null ? String(v.stock_count) : "",
+              isUnlimited: Boolean(v.is_unlimited),
             })));
           }
           if (p.images) {
@@ -128,18 +151,22 @@ export default function EditProductPage() {
 
   function addVariation() {
     if (!newVariation.name || !newVariation.price) return;
-    setVariations((prev) => [...prev, { 
-      id: crypto.randomUUID(), 
-      name: newVariation.name, 
+    setVariations((prev) => [...prev, {
+      id: crypto.randomUUID(),
+      name: newVariation.name,
       price: newVariation.price,
-      isNew: true 
+      isNew: true,
+      stockCount: newVariation.stockCount,
+      isUnlimited: newVariation.isUnlimited,
     }]);
-    setNewVariation({ name: "", price: "" });
+    setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setFeedback("Salvando...");
+
+    var isPhysical = form.productType === "physical";
 
     var formData = new FormData();
     formData.append("id", String(form.id));
@@ -149,10 +176,23 @@ export default function EditProductPage() {
     formData.append("price", parseCurrency(form.price));
     formData.append("category_id", form.categoryId);
     formData.append("active", String(form.active));
+    formData.append("product_type", form.productType);
+
+    if (isPhysical) {
+      formData.append("sku", form.sku.trim());
+      formData.append("weight_grams", form.weightGrams);
+      formData.append("length_cm", form.lengthCm);
+      formData.append("width_cm", form.widthCm);
+      formData.append("height_cm", form.heightCm);
+      formData.append("stock_is_unlimited", String(form.stockIsUnlimited));
+      formData.append("stock_count", form.stockCount || "0");
+    }
 
     var variationsToUpload = variations.map(v => ({
         name: v.name,
-        price: parseCurrency(v.price)
+        price: parseCurrency(v.price),
+        stockCount: isPhysical ? Number(v.stockCount || 0) : undefined,
+        isUnlimited: isPhysical ? v.isUnlimited : undefined,
     }));
     formData.append("variations", JSON.stringify(variationsToUpload));
 
@@ -210,6 +250,16 @@ export default function EditProductPage() {
             <input value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} required />
           </label>
 
+          <label className="full">Tipo de produto
+            <select
+              value={form.productType}
+              onChange={(e) => setForm({ ...form, productType: e.target.value as ProductType })}
+            >
+              <option value="digital">Digital (key, arquivo ou ilimitado)</option>
+              <option value="physical">Físico (envio por transportadora)</option>
+            </select>
+          </label>
+
           <label>Preço base (R$)
             <input type="text" value={form.price} onChange={(e) => setForm({...form, price: e.target.value.replace(/[^0-9,.]/g, "")})} required />
           </label>
@@ -225,17 +275,86 @@ export default function EditProductPage() {
             <textarea value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} rows={5} />
           </label>
 
+          {form.productType === "physical" && (
+            <div className="full physicalFieldsSection">
+              <h3>Dados de envio</h3>
+              <div className="physicalFieldsGrid">
+                <label>
+                  SKU
+                  <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="Código interno" />
+                </label>
+                <label>
+                  Peso (g)
+                  <input type="number" min="0" value={form.weightGrams} onChange={(e) => setForm({ ...form, weightGrams: e.target.value })} />
+                </label>
+                <label>
+                  Comprimento (cm)
+                  <input type="number" min="0" value={form.lengthCm} onChange={(e) => setForm({ ...form, lengthCm: e.target.value })} />
+                </label>
+                <label>
+                  Largura (cm)
+                  <input type="number" min="0" value={form.widthCm} onChange={(e) => setForm({ ...form, widthCm: e.target.value })} />
+                </label>
+                <label>
+                  Altura (cm)
+                  <input type="number" min="0" value={form.heightCm} onChange={(e) => setForm({ ...form, heightCm: e.target.value })} />
+                </label>
+              </div>
+
+              <label className="checkboxRow">
+                <input
+                  type="checkbox"
+                  checked={form.stockIsUnlimited}
+                  onChange={(e) => setForm({ ...form, stockIsUnlimited: e.target.checked })}
+                />
+                Estoque ilimitado
+              </label>
+
+              {!form.stockIsUnlimited && (
+                <label>
+                  Quantidade em estoque
+                  <input type="number" min="0" value={form.stockCount} onChange={(e) => setForm({ ...form, stockCount: e.target.value })} />
+                </label>
+              )}
+              <small>Sem variações, esses dados valem para o produto. Com variações, cada uma tem seu próprio estoque abaixo (peso/dimensões seguem os do produto principal).</small>
+            </div>
+          )}
+
           <div className="variationSection">
             <h3>Variações</h3>
             <div className="variationCreate">
               <input placeholder="Nome" value={newVariation.name} onChange={(e) => setNewVariation({...newVariation, name: e.target.value})} />
               <input placeholder="Preço" value={newVariation.price} onChange={(e) => setNewVariation({...newVariation, price: e.target.value.replace(/[^0-9,.]/g, "")})} />
+              {form.productType === "physical" && !newVariation.isUnlimited && (
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Estoque"
+                  value={newVariation.stockCount}
+                  onChange={(e) => setNewVariation({ ...newVariation, stockCount: e.target.value })}
+                />
+              )}
+              {form.productType === "physical" && (
+                <label className="checkboxRow">
+                  <input
+                    type="checkbox"
+                    checked={newVariation.isUnlimited}
+                    onChange={(e) => setNewVariation({ ...newVariation, isUnlimited: e.target.checked })}
+                  />
+                  Ilimitado
+                </label>
+              )}
               <button type="button" onClick={addVariation} className="addbtn">Adicionar</button>
             </div>
             <div className="variationList">
               {variations.map((v) => (
                 <div key={v.id} className="variationItem">
                   {v.name} - R$ {v.price}
+                  {form.productType === "physical" && (
+                    <span className="variationStockHint">
+                      {" "}({v.isUnlimited ? "ilimitado" : `${v.stockCount || 0} em estoque`})
+                    </span>
+                  )}
                   <button type="button" onClick={() => setVariations(variations.filter(x => x.id !== v.id))}>✕</button>
                 </div>
               ))}

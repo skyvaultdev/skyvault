@@ -1,0 +1,334 @@
+.devPage {
+  min-height: 100vh;
+  width: 100%;
+  background: #09090b;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.devPage,
+.devPage * {
+  box-sizing: border-box;
+}
+
+.devLoginWrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.devLoginCard {
+  width: 100%;
+  max-width: 400px;
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 18, 20, 0.9);
+}
+
+.devLoginCard h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.devLoginCard p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.devLoginCard input {
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 9, 11, 0.9);
+  color: #fff;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.devLoginCard button {
+  height: 46px;
+  border-radius: 12px;
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.devLoginCard button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.devError {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 0, 0, 0.12);
+  border: 1px solid rgba(255, 0, 0, 0.35);
+  color: #ffb4b4;
+  font-size: 13px;
+}
+
+.devHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.devHeader h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.devHeader button {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.devContent {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+}
+
+.devTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.devTabs button {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.devTabs button.active {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+
+.devSection {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 18, 20, 0.7);
+}
+
+.devSection h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.devSection h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.devHelperText {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.devStatusBadge {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  width: fit-content;
+}
+
+.devStatusBadge.ok {
+  background: rgba(0, 200, 90, 0.15);
+  color: #6bffb0;
+}
+
+.devStatusBadge.pending {
+  background: rgba(240, 180, 41, 0.15);
+  color: #f0b429;
+}
+
+.devStatusBadge.danger {
+  background: rgba(255, 0, 0, 0.15);
+  color: #ff8484;
+}
+
+.devForm {
+  display: grid;
+  gap: 12px;
+}
+
+.devForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 0;
+}
+
+.devForm input[type="text"],
+.devForm input[type="password"],
+.devForm input:not([type]) {
+  height: 44px;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 9, 11, 0.9);
+  color: #fff;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+
+.devForm input[type="file"] {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.devCheckboxRow {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.devCheckboxRow input {
+  width: auto;
+  height: auto;
+}
+
+.devTag {
+  color: #6bffb0;
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.devBtn {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.devBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.devBtnSecondary {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.devBtnDanger {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 0, 0, 0.4);
+  background: rgba(255, 0, 0, 0.12);
+  color: #ff8484;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.devSuspendReasonLabel {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 400px;
+}
+
+.devSuspendReasonLabel input {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 9, 11, 0.9);
+  color: #fff;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+
+.devList {
+  display: grid;
+  gap: 8px;
+}
+
+.devRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 0;
+}
+
+.devRowMain {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.devRowMain strong {
+  font-size: 13.5px;
+}
+
+.devRowMain span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 520px) {
+  .devContent {
+    padding: 16px;
+  }
+
+  .devSection {
+    padding: 14px;
+  }
+}

@@ -21,20 +21,18 @@ export async function GET(req: NextRequest) {
     var userEmail = decoded.email;
     const db = getDB();
 
-    const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
-    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
-
-    if (discUser.length === 0 && regularUser.length === 0 && googleUser.length === 0) {
+    const { rows: userRows } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
+    if (userRows.length === 0) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    const userId = discUser[0]?.id ?? regularUser[0]?.id ?? googleUser[0]?.id;
+    const userId = userRows[0].id;
     const result = await db.query(`
       SELECT 
           c.id AS cart_item_id,
           p.name AS product_name,
           p.slug,
+          p.product_type,
           COALESCE(v.name, 'Padrão') AS variation_name,
           COALESCE(v.price, p.price) AS unit_price,
           c.quantity,
@@ -71,15 +69,9 @@ export async function PUT(req: NextRequest) {
     var userEmail = decoded.email;
 
     const db = getDB();
-    const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
-    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
-
-    let userId: number | string;
-    if (discUser.length > 0) userId = discUser[0].id;
-    else if (regularUser.length > 0) userId = regularUser[0].id;
-    else if (googleUser.length > 0) userId = googleUser[0].id;
-    else return fail("USER_NOT_FOUND", 404);
+    const { rows: userRows } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
+    if (userRows.length === 0) return fail("USER_NOT_FOUND", 404);
+    const userId = userRows[0].id;
 
     var body = await req.json();
     var product_id = Number(body.product_id);
@@ -139,15 +131,9 @@ export async function POST(req: NextRequest) {
 
     var userEmail = decoded.email;
     const db = getDB();
-    const { rows: discUser } = await db.query(`SELECT id FROM discuser WHERE email = $1`, [userEmail]);
-    const { rows: regularUser } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
-    const { rows: googleUser } = await db.query(`SELECT id FROM googleuser WHERE email = $1`, [userEmail]);
-
-    let userId: number | string;
-    if (discUser.length > 0) userId = discUser[0].id;
-    else if (regularUser.length > 0) userId = regularUser[0].id;
-    else if (googleUser.length > 0) userId = googleUser[0].id;
-    else return fail("USER_NOT_FOUND", 404);
+    const { rows: userRows } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
+    if (userRows.length === 0) return fail("USER_NOT_FOUND", 404);
+    const userId = userRows[0].id;
 
     var { cart_item_id, quantity } = await req.json();
     if (!cart_item_id) return fail("MISSING_ITEM_ID", 400);

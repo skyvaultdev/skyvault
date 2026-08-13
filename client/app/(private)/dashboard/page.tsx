@@ -9,6 +9,10 @@ import ProductPreview from "./components/ProductPreview";
 import PermissionGuard from "./components/PermissionGuard";
 import HomePreview from "./components/HomePreview";
 import StaffChatPanel from "./components/StaffChatPanel";
+import OrdersPanel from "./components/OrdersPanel";
+import WalletPanel from "./components/WalletPanel";
+import ShippingCarriersPanel from "./components/ShippingCarriersPanel";
+import PaymentsSettingsPanel from "./components/PaymentsSettingsPanel";
 import "./components/categoryprev.css"
 import CategoryPreview from "./components/CategoryPreview";
 import "@/app/home.css";
@@ -79,6 +83,10 @@ const TAB_PERMISSIONS: Record<DashboardTab, Permission> = {
   estoque: "products.write",
   chat: "chat.access",
   equipe: "team.manage",
+  pedidos: "orders.read",
+  saldo: "wallet.manage",
+  transportadoras: "shipping.manage",
+  pagamentos: "payments.manage",
 };
 
 const roleHierarchy: Record<Role, number> = {
@@ -788,6 +796,22 @@ export default function Dashboard() {
 
     if (selectedTab === "chat") {
       return renderProtected("chat", <StaffChatPanel />);
+    }
+
+    if (selectedTab === "pedidos") {
+      return renderProtected("pedidos", <OrdersPanel canManage={permissions.includes("orders.manage")} />);
+    }
+
+    if (selectedTab === "saldo") {
+      return renderProtected("saldo", <WalletPanel />);
+    }
+
+    if (selectedTab === "transportadoras") {
+      return renderProtected("transportadoras", <ShippingCarriersPanel />);
+    }
+
+    if (selectedTab === "pagamentos") {
+      return renderProtected("pagamentos", <PaymentsSettingsPanel />);
     }
 
     if (selectedTab === "estoque") {

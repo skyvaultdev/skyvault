@@ -2,11 +2,15 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function DELETE(_: Request, { params }: Params) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     var { id } = await params;
     const db = getDB();
     const result = await db.query("DELETE FROM coupons WHERE id=$1 RETURNING id", [Number(id)]);

@@ -1,0 +1,143 @@
+.profilePage {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.profilePage,
+.profilePage * {
+  box-sizing: border-box;
+}
+
+.profileCard {
+  width: 100%;
+  max-width: 560px;
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 12, 14, 0.75);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.profileCard h1 {
+  margin: 0;
+  font-size: clamp(20px, 4vw, 26px);
+}
+
+.profileHint {
+  margin: -6px 0 4px 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+
+.profileSectionTitle {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+}
+
+.profileCard label {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 0;
+}
+
+.profileCard input {
+  height: 46px;
+  min-width: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 18, 20, 0.9);
+  color: #fff;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.profileCard input:focus-visible {
+  outline: none;
+  border-color: var(--secondary, #6400ff);
+}
+
+.profileRow {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profileGrow {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileNumber {
+  flex: 0 0 110px;
+}
+
+.profileState {
+  flex: 0 0 70px;
+}
+
+.profileCepLoading {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.profileSaveBtn {
+  margin-top: 6px;
+  min-height: 48px;
+  border-radius: 14px;
+  border: none;
+  background: var(--secondary, #6400ff);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.profileSaveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profileFeedback {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+@media (max-width: 480px) {
+  .profilePage {
+    padding: 20px 12px;
+  }
+
+  .profileCard {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .profileRow {
+    flex-wrap: wrap;
+  }
+
+  .profileNumber,
+  .profileState {
+    flex: 1 1 90px;
+  }
+}

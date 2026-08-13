@@ -3,6 +3,7 @@
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { slugify } from "@/lib/utils/slugify";
+import { requirePermission } from "@/lib/auth/guard";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,6 +28,9 @@ export async function GET(_: Request, { params }: Params) {
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     var { id } = await params;
     const db = getDB();
     var body = (await req.json()) as { name?: string; slug?: string; imageUrl?: string | null; productIds?: number[] };
@@ -63,6 +67,9 @@ export async function PUT(req: Request, ctx: Params) {
 
 export async function DELETE(_: Request, { params }: Params) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     var { id } = await params;
     const db = getDB();
     await db.query("UPDATE products SET category_id = NULL WHERE category_id = $1", [Number(id)]);

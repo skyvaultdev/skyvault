@@ -3,6 +3,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 type RouteParams = {
   params: Promise<{ id: string; target: string }>;
@@ -12,6 +13,9 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const BANNED_EXTENSIONS = [".exe", ".bat", ".cmd", ".sh", ".php", ".js", ".vbs"];
 
 export async function POST(req: Request, { params }: RouteParams) {
+  const { denied } = await requirePermission("products.write");
+  if (denied) return denied;
+
   var { id, target } = await params;
 
   try {

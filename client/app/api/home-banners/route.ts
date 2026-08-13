@@ -2,6 +2,7 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 export async function GET() {
   try {
@@ -16,6 +17,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const { denied } = await requirePermission("store.customize");
+    if (denied) return denied;
+
     var body = (await req.json()) as {
       title?: string;
       subtitle?: string | null;

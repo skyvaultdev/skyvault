@@ -3,9 +3,13 @@
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { slugify } from "@/lib/utils/slugify";
+import { requirePermission } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     const db = getDB();
     var formData = await req.formData();
 

@@ -19,6 +19,7 @@ type Product = {
   images: ProductImage[];
   stock_count: number;
   is_unlimited: boolean;
+  product_type?: "digital" | "physical";
 };
 
 type Variations = {
@@ -33,8 +34,8 @@ type Variations = {
 
 type Coupon = {
   code: string;
-  active: boolean;
   percent_off: number;
+  min_order_value: number | null;
 };
 
 type Similar = {
@@ -242,10 +243,9 @@ export default function ProductPage() {
     if (!code) return;
 
     try {
-      var res = await fetch("/api/coupons");
+      var res = await fetch(`/api/coupons?code=${encodeURIComponent(code)}`);
       const json = await res.json();
-
-      var coupon = (json.data as Coupon[]).find((c) => c.code === code && c.active);
+      const coupon = res.ok ? (json.data as Coupon) : null;
 
       if (coupon) {
         setFinalPrice(basePrice * (1 - Number(coupon.percent_off) / 100));
@@ -258,22 +258,26 @@ export default function ProductPage() {
     }
   }
 
+  async function addToCart() {
+    var variation_id = selectedVariation ? selectedVariation.id : null;
+    var response = await fetch("/api/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_id: product?.id,
+        variation_id,
+        quantity: 1,
+      }),
+    });
+
+    return { response, data: await response.json() };
+  }
+
   async function handleAddToCart() {
     setLoadingAdd(true);
 
     try {
-      var variation_id = selectedVariation ? selectedVariation.id : null;
-      var response = await fetch("/api/cart", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_id: product?.id,
-          variation_id,
-          quantity: 1,
-        }),
-      });
-
-      const data = await response.json();
+      const { response, data } = await addToCart();
       if (response.ok) {
         router.refresh();
         window.dispatchEvent(new Event("abrirCarrinho"));
@@ -287,6 +291,26 @@ export default function ProductPage() {
     } catch (error) {
       console.error("Erro ao adicionar ao carrinho:", error);
       alert("Erro inesperado ao adicionar ao carrinho.");
+    } finally {
+      setLoadingAdd(false);
+    }
+  }
+
+  async function handleBuyNow() {
+    setLoadingAdd(true);
+
+    try {
+      const { response, data } = await addToCart();
+      if (response.ok) {
+        router.push("/checkout");
+      } else if (data?.error === "UNAUTHORIZED_TOKEN") {
+        router.push("/login");
+      } else {
+        alert("Erro ao comprar: " + (data?.message ?? "Erro desconhecido"));
+      }
+    } catch (error) {
+      console.error("Erro ao comprar agora:", error);
+      alert("Erro inesperado ao iniciar a compra.");
     } finally {
       setLoadingAdd(false);
     }
@@ -370,9 +394,16 @@ export default function ProductPage() {
             </div>
           )}
 
+          {product.product_type === "physical" && (
+            <p className="shippingNotice">
+              📦 Produto físico — frete calculado no checkout
+            </p>
+          )}
+
           <div className="actions">
             <button
               className="btnPrimary"
+              onClick={handleBuyNow}
               disabled={!isAvailable || loadingAdd}
             >
               {isAvailable ? "Comprar agora" : "Produto Esgotado"}

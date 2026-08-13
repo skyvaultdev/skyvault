@@ -24,6 +24,8 @@ type ProductItem = {
   variations: Variation[];
   stock_type?: 'key' | 'file' | 'infinite';
   stock_count?: number;
+  is_unlimited?: boolean;
+  product_type?: 'digital' | 'physical';
   image_url?: string;
 };
 
@@ -143,9 +145,13 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     setOpenVariationId(null);
   }, [currentPage]);
 
-  const handleManageStock = useCallback((slug?: string) => {
-    if (!slug) return;
-    router.push(`/dashboard/stock/manage/${slug}`);
+  const handleManageStock = useCallback((product: ProductItem) => {
+    if (!product.slug) return;
+    if (product.product_type === "physical") {
+      router.push(`/dashboard/products/edit/${product.id}`);
+    } else {
+      router.push(`/dashboard/stock/manage/${product.slug}`);
+    }
   }, [router]);
 
   if (selectedTab === "estoque") {
@@ -192,16 +198,18 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                 <div className="productInfoCell">
                   <strong>{product.name}</strong>
                   <span className="stockQtyInline">
-                    ({product.stock_type === 'infinite' ? '∞' : (product.stock_count ?? 0)})
+                    ({product.is_unlimited || product.stock_type === 'infinite' ? '∞' : (product.stock_count ?? 0)})
                   </span>
                 </div>
 
                 <div className="infoProd">
                   <div className="slug">• {product.slug ?? "sem slug"}</div>
                   <div className="tipo">• {
-                    product.stock_type === 'key' ? 'Keys' :
-                      product.stock_type === 'file' ? 'Arquivo' :
-                        product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
+                    product.product_type === 'physical'
+                      ? '📦 Físico'
+                      : product.stock_type === 'key' ? 'Keys' :
+                        product.stock_type === 'file' ? 'Arquivo' :
+                          product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
                   }</div>
 
                   {product.variations.length > 0 && (
@@ -228,10 +236,10 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                 <div className="cardActions">
                   <button
                     className="btnEditSmall"
-                    onClick={() => handleManageStock(product.slug)}
+                    onClick={() => handleManageStock(product)}
                     disabled={!product.slug}
                   >
-                    ⚙️ Configurar
+                    {product.product_type === 'physical' ? '✏️ Editar estoque' : '⚙️ Configurar'}
                   </button>
                 </div>
               </div>

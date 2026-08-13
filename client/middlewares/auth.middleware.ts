@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJWT, signJWT } from "@/lib/jwt/init";
-import { isPrivateRoute } from "./routeMap";
+import { isPrivateRoute, isStaffOnlyRoute } from "./routeMap";
+import { config } from "@/config/configuration";
 
 export async function authMiddleware(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
@@ -29,7 +30,10 @@ export async function authMiddleware(req: NextRequest) {
     new URL("/api/internal/sync-user", req.url),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": config.jwt.secret,
+      },
       body: JSON.stringify({ email: decrypted.email }),
     }
   );
@@ -54,7 +58,7 @@ export async function authMiddleware(req: NextRequest) {
     });
   }
 
-  if (isPrivate && !permissions.includes("dashboard.access")) {
+  if (isStaffOnlyRoute(pathname) && !permissions.includes("dashboard.access")) {
     const url = req.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

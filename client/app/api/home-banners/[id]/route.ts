@@ -2,6 +2,7 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,6 +15,9 @@ export async function GET(_: Request, { params }: Params) {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
+  const { denied } = await requirePermission("store.customize");
+  if (denied) return denied;
+
   var { id } = await params;
   const body = (await req.json()) as {
     title?: string;
@@ -50,6 +54,9 @@ export async function PUT(req: Request, ctx: Params) {
 }
 
 export async function DELETE(_: Request, { params }: Params) {
+  const { denied } = await requirePermission("store.customize");
+  if (denied) return denied;
+
   var { id } = await params;
   const db = getDB();
   const result = await db.query("DELETE FROM home_banners WHERE id = $1 RETURNING id", [Number(id)]);

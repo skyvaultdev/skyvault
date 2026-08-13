@@ -6,6 +6,7 @@ import { getDB } from "@/lib/database/db";
 import { config } from "@/config/configuration"
 import { signJWT, verifyJWT } from "@/lib/jwt/init";
 import { ROLES } from "@/lib/jwt/permissions"
+import { rateLimit } from "@/lib/security/rateLimit";
 type Role = keyof typeof ROLES
 
 function hashCode(code: string) {
@@ -17,6 +18,10 @@ export async function POST(req: Request) {
 
     if (!email || !code) {
         return NextResponse.json({ error: "INVALID_DATA" }, { status: 400 });
+    }
+
+    if (!rateLimit(`otp-verify:${String(email).toLowerCase()}`, 10, 10 * 60_000)) {
+        return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429 });
     }
 
     var username = email.split("@")[0] as String

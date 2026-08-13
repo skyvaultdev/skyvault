@@ -4,11 +4,17 @@ import { slugify } from "@/lib/utils/slugify";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { requirePermission } from "@/lib/auth/guard";
 
 type Params = { params: Promise<{ id: string }> };
 
+var VALID_PRODUCT_TYPES = ["digital", "physical"];
+
 export async function PUT(req: Request, { params }: Params) {
     try {
+        const { denied } = await requirePermission("products.write");
+        if (denied) return denied;
+
         var { id } = await params;
         var productId = Number(id);
 
@@ -24,28 +30,70 @@ export async function PUT(req: Request, { params }: Params) {
         var categoryId = categoryIdRaw ? Number(categoryIdRaw) : null;
         var active = formData.get("active") === "true";
 
+        var productTypeRaw = String(formData.get("product_type") ?? "digital");
+        var productType = VALID_PRODUCT_TYPES.includes(productTypeRaw) ? productTypeRaw : "digital";
+        var isPhysical = productType === "physical";
+
+        var sku = isPhysical ? String(formData.get("sku") ?? "").trim() || null : null;
+        var weightGrams = isPhysical && formData.get("weight_grams") ? Number(formData.get("weight_grams")) : null;
+        var lengthCm = isPhysical && formData.get("length_cm") ? Number(formData.get("length_cm")) : null;
+        var widthCm = isPhysical && formData.get("width_cm") ? Number(formData.get("width_cm")) : null;
+        var heightCm = isPhysical && formData.get("height_cm") ? Number(formData.get("height_cm")) : null;
+
         if (!name || isNaN(price)) return fail("MISSING_FIELDS", 400);
 
         var slug = slugify(rawSlug || name);
-        const productUpdate = await db.query(
-            `UPDATE products 
-             SET name = $1, slug = $2, description = $3, price = $4, category_id = $5, active = $6 WHERE id = $7
-             RETURNING *`,
-            [name, slug, description, price, categoryId, active, productId]
-        );
+
+        var productUpdate;
+        if (isPhysical) {
+            var stockIsUnlimited = formData.get("stock_is_unlimited") === "true";
+            var stockCount = stockIsUnlimited ? 0 : Number(formData.get("stock_count") ?? 0) || 0;
+
+            productUpdate = await db.query(
+                `UPDATE products
+                 SET name = $1, slug = $2, description = $3, price = $4, category_id = $5, active = $6,
+                     product_type = $7, sku = $8, weight_grams = $9, length_cm = $10, width_cm = $11, height_cm = $12,
+                     stock_count = $13, is_unlimited = $14
+                 WHERE id = $15
+                 RETURNING *`,
+                [
+                    name, slug, description, price, categoryId, active,
+                    productType, sku, weightGrams, lengthCm, widthCm, heightCm,
+                    stockCount, stockIsUnlimited, productId,
+                ]
+            );
+        } else {
+            productUpdate = await db.query(
+                `UPDATE products
+                 SET name = $1, slug = $2, description = $3, price = $4, category_id = $5, active = $6,
+                     product_type = $7, sku = NULL, weight_grams = NULL, length_cm = NULL, width_cm = NULL, height_cm = NULL
+                 WHERE id = $8
+                 RETURNING *`,
+                [name, slug, description, price, categoryId, active, productType, productId]
+            );
+        }
 
         if (productUpdate.rows.length === 0) return fail("NOT_FOUND", 404);
         var variationsRaw = formData.get("variations");
         if (variationsRaw) {
             var variations = JSON.parse(String(variationsRaw));
             await db.query("DELETE FROM product_variations WHERE product_id = $1", [productId]);
-            
+
             for (var v of variations) {
                 if (v.name && !isNaN(Number(v.price))) {
-                    await db.query(
-                        "INSERT INTO product_variations (product_id, name, price) VALUES ($1, $2, $3)",
-                        [productId, v.name, Number(v.price)]
-                    );
+                    if (isPhysical) {
+                        var vIsUnlimited = Boolean(v.isUnlimited);
+                        var vStockCount = vIsUnlimited ? 0 : Number(v.stockCount ?? 0) || 0;
+                        await db.query(
+                            "INSERT INTO product_variations (product_id, name, price, stock_count, is_unlimited) VALUES ($1, $2, $3, $4, $5)",
+                            [productId, v.name, Number(v.price), vStockCount, vIsUnlimited]
+                        );
+                    } else {
+                        await db.query(
+                            "INSERT INTO product_variations (product_id, name, price) VALUES ($1, $2, $3)",
+                            [productId, v.name, Number(v.price)]
+                        );
+                    }
                 }
             }
         }

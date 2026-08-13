@@ -28,10 +28,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const ext = path.extname(file.name) || "";
   const filename = `${randomUUID()}${ext}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "chat");
+  const uploadDir = path.join(process.cwd(), "private", "chat");
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()));
-  const url = `/uploads/chat/${filename}`;
+  const url = `/api/files/chat/${filename}`;
 
   const db = await getDB();
   const { rows } = await db.query(

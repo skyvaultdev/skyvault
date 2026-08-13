@@ -2,6 +2,7 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 async function ensureCouponsSchema() {
   const db = getDB();
@@ -21,11 +22,24 @@ async function ensureCouponsSchema() {
   return db;
 }
 
-export async function GET() {
+// Pública de propósito (usada no checkout pra validar um código), mas só
+// devolve o cupom exato pedido — nunca a tabela inteira, pra não vazar
+// códigos, limites de uso e valor mínimo de outros cupons.
+export async function GET(req: Request) {
   try {
+    var { searchParams } = new URL(req.url);
+    var code = searchParams.get("code")?.trim().toUpperCase();
+    if (!code) return fail("MISSING_CODE", 400);
+
     const db = await ensureCouponsSchema();
-    const result = await db.query("SELECT * FROM coupons ORDER BY created_at DESC");
-    return ok(result.rows);
+    const result = await db.query(
+      `SELECT code, percent_off, min_order_value FROM coupons
+       WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())
+         AND (usage_limit = 0 OR used_count < usage_limit)`,
+      [code]
+    );
+    if (result.rows.length === 0) return fail("COUPON_NOT_FOUND", 404);
+    return ok(result.rows[0]);
   } catch (error) {
     console.error(error);
     return fail("INTERNAL_ERROR", 500);
@@ -34,6 +48,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const { denied } = await requirePermission("products.write");
+    if (denied) return denied;
+
     const db = await ensureCouponsSchema();
     var body = (await req.json()) as {
       code?: string;

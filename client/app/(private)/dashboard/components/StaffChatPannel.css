@@ -3,12 +3,28 @@
   height: min(640px, calc(100vh - 220px));
   min-height: 420px;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.chatLayout,
+.chatLayout * {
+  box-sizing: border-box;
+}
+
+.chatLayout button,
+.chatLayout input {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .chatConversationList {
   width: 250px;
+  min-width: 0;
   flex-shrink: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -17,14 +33,42 @@
   scrollbar-color: color-mix(in srgb, var(--primary), transparent 60%) transparent;
 }
 
+.chatConversationList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatConversationList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatConversationList::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--primary), transparent 60%);
+  border-radius: 4px;
+}
+
+/* Estados sem classe própria (loading/"nenhuma conversa") renderizados
+   direto dentro da lista — sem isso ficam com o parágrafo/div cru do
+   navegador, destoando do resto do painel. */
+.chatConversationList > p,
+.chatConversationList > div:not(.chatConversationListHeader) {
+  margin: 0;
+  padding: 18px 10px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--chat-text-dim);
+}
+
 .chatConversationListHeader {
   display: flex;
   gap: 6px;
   margin-bottom: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chatConversationSearch {
   flex: 1;
+  min-width: 0;
   background: #131316;
   border: 1px solid var(--chat-border);
   border-radius: var(--chat-radius-sm);
@@ -89,6 +133,10 @@
   color: #fff;
 }
 
+.chatConversationItem:active {
+  transform: scale(0.98);
+}
+
 .chatConversationItem.active {
   background: color-mix(in srgb, var(--primary), transparent 88%);
   border-color: color-mix(in srgb, var(--primary), transparent 60%);
@@ -96,11 +144,16 @@
   color: #fff;
 }
 
+.chatNewConversationBtn:active {
+  transform: scale(0.94);
+}
+
 .chatThread {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   position: relative;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--chat-border);
@@ -120,9 +173,21 @@
   white-space: nowrap;
 }
 
+.chatThread > .emptyMsg {
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--chat-text-dim);
+}
+
 .chatMessages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -204,11 +269,24 @@
   padding: 10px 12px;
   border-top: 1px solid var(--chat-border);
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chatComposer .settingsInput {
   flex: 1;
+  min-width: 0;
   border-radius: 999px;
+}
+
+/* .btn é a classe genérica de botão do dashboard (pensada pra telas
+   largas, com padding generoso). Sem um teto próprio aqui, "Enviar"
+   fica largo demais e — junto com o botão de anexo — estoura a largura
+   do card em telas estreitas. */
+.chatComposer .btn {
+  padding: 0 16px;
+  font-size: 13.5px;
+  white-space: nowrap;
 }
 
 .chatDropOverlay {
@@ -249,42 +327,292 @@
   border-color: var(--chat-border);
 }
 
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .chatLayout {
     flex-direction: column;
     height: auto;
+    gap: 12px;
   }
 
+  /* .chatConversationList also wraps .chatConversationListHeader (the search
+     bar + "Nova conversa" button), not just the conversation items — so it
+     must stay a column here. Making it "row" (as the old mobile rules did)
+     drags the search bar into the same horizontal line as the conversations
+     and blows out the width. Instead: keep it a column, just cap its height
+     and let it scroll vertically so the thread below stays reachable. */
   .chatConversationList {
-    width: fit-content;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    max-height: none;
-    padding-bottom: 4px;
+    width: 100%;
+    flex-direction: column;
+    max-height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    padding-bottom: 0;
+    -webkit-overflow-scrolling: touch;
   }
 
   .chatConversationItem {
-    width: auto;
+    width: 100%;
     flex-shrink: 0;
-    white-space: nowrap;
+    white-space: normal;
+    min-height: 44px;
+  }
+
+  .chatNewConversationBtn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
   }
 
   .chatThread {
-    height: 520px;
+    /* .chatThread tem "flex: 1" na regra base, o que define flex-basis: 0%.
+       Com flex-basis diferente de "auto", a propriedade height abaixo é
+       ignorada pelo algoritmo de flexbox para calcular o tamanho do item
+       (fica só valendo pra min/max). Sem isso, a caixa cresce pra caber
+       o conteúdo e perde a altura travada + scroll interno. */
+    flex: 1 1 auto;
+    height: min(70dvh, 560px);
+    min-height: 360px;
+  }
+
+  .chatThreadHeader {
+    padding: 12px 14px;
+  }
+
+  .chatMessages {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .chatMessages .chatBubble.fromStaff,
+  .chatMessages .chatBubble.fromCustomer {
+    max-width: 82%;
+  }
+
+  .chatMessages .chatAttachmentImg {
+    max-width: min(70vw, 260px);
+    max-height: 260px;
+  }
+
+  .chatMessages .chatVideoThumbWrap {
+    max-width: min(70vw, 260px);
+  }
+
+  .chatMessages .chatAttachmentFile {
+    max-width: 100%;
+    word-break: break-word;
+  }
+
+  /* Prévias de link (chatLinkMediaImg/Audio/EmbedChip, vindas do
+     ChatMessageContent quando a mensagem tem uma URL) usam larguras
+     fixas em px no ChatShared.css — sem adaptar pra mobile, isso empurra
+     a linha da mensagem pra fora da tela e arrasta a rolagem horizontal
+     da página inteira. */
+  .chatMessages .chatLinkMediaImg {
+    max-width: min(70vw, 260px);
+    max-height: 260px;
+  }
+
+  .chatMessages .chatLinkMediaAudio {
+    width: min(70vw, 260px);
+  }
+
+  .chatMessages .chatLinkEmbedChip {
+    max-width: min(75vw, 300px);
+  }
+
+  .chatComposer {
+    padding: 8px 10px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    gap: 6px;
+  }
+
+  .chatComposer .settingsInput,
+  .chatComposer input {
+    font-size: 16px;
+  }
+
+  .chatComposer .chatAttachBtn,
+  .chatComposer .btn {
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .chatThread .chatReplyBar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .chatThread .chatReplyBarSnippet {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 70vw;
+  }
+
+  .chatThread .chatStagingOverlay {
+    padding: 10px;
+  }
+
+  .chatThread .chatStagingMain {
+    min-height: 220px;
+  }
+
+  .chatThread .chatStagingMedia {
+    max-height: 42vh;
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  .chatThread .chatStagingThumbs {
+    flex-wrap: wrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chatThread .chatStagingActions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .chatThread .chatStagingActions .btn,
+  .chatThread .chatStagingActions .btnSecondary {
+    width: 100%;
   }
 }
 
 @media (max-width: 480px) {
   .chatThread {
-    height: 460px;
+    flex: 1 1 auto;
+    height: min(72dvh, 500px);
+    min-height: 320px;
   }
 
-  .chatBubble {
+  .chatMessages .chatBubble.fromStaff,
+  .chatMessages .chatBubble.fromCustomer {
     max-width: 88%;
+  }
+
+  .chatAvatar,
+  .chatAvatarPlaceholder {
+    width: 24px;
+    height: 24px;
   }
 
   .chatConversationSearch {
     font-size: 16px;
   }
+
+  .chatConversationList {
+    max-height: 180px;
+  }
+
+  .chatConversationItem {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .chatNewSearchResults {
+    max-height: 45vh;
+  }
+
+  .chatThread .chatStagingThumbWrapper {
+    width: 52px;
+  }
+
+  .chatThread .chatStagingArrow {
+    width: 32px;
+    height: 32px;
+  }
 }
+
+@media (max-width: 360px) {
+  .chatConversationSearch {
+    padding: 8px 10px;
+  }
+
+  .chatNewConversationBtn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .chatThreadHeader {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .chatMessages {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .chatMessages .chatBubble.fromStaff,
+  .chatMessages .chatBubble.fromCustomer {
+    max-width: 92%;
+  }
+
+  .chatConversationItem {
+    padding: 8px 9px;
+    font-size: 12.5px;
+  }
+
+  .chatComposer {
+    gap: 5px;
+    padding: 6px 8px;
+  }
+
+  .chatComposer .chatAttachBtn {
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .chatComposer .btn {
+    padding: 0 12px;
+    font-size: 13px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 900px) and (hover: none) and (pointer: coarse) {
+  .chatConversationItem:hover {
+    background: #131316;
+    color: #ddd;
+  }
+
+  .chatConversationItem.active:hover {
+    background: color-mix(in srgb, var(--primary), transparent 88%);
+    color: #fff;
+  }
+}
+
+/* Celular em paisagem (ou qualquer viewport baixo): a lista de
+   conversas e a thread competem pela pouca altura disponível — encolhe
+   as duas para que o composer continue alcançável sem depender de
+   rolar a página toda. */
+@media (max-width: 900px) and (max-height: 480px) {
+  .chatLayout {
+    gap: 8px;
+  }
+
+  .chatConversationList {
+    max-height: 96px;
+  }
+
+  .chatThread {
+    flex: 1 1 auto;
+    height: min(90dvh, 420px);
+    min-height: 220px;
+  }
+
+  .chatThread .chatStagingMain {
+    min-height: 140px;
+  }
+
+
+}
+

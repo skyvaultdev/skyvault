@@ -8,7 +8,10 @@ export const ROLES = {
     "orders.manage",
     "users.manage",
     "team.manage",
-    "chat.access"
+    "chat.access",
+    "wallet.manage",
+    "shipping.manage",
+    "payments.manage"
   ],
   admin: [
     "dashboard.access",
@@ -16,7 +19,9 @@ export const ROLES = {
     "products.read",
     "products.write",
     "orders.read",
-    "chat.access"
+    "chat.access",
+    "shipping.manage",
+    "payments.manage"
   ],
   editor: [
     "dashboard.access",

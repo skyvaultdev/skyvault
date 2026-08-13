@@ -6,6 +6,7 @@ import { createHash } from "crypto";
 import { getDB } from "@/lib/database/db";
 import { readFile } from "fs/promises";
 import path from "path";
+import { rateLimit } from "@/lib/security/rateLimit";
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -27,7 +28,14 @@ export async function POST(req: Request) {
     );
   }
 
-  
+  if (!rateLimit(`otp-send:${email.toLowerCase()}`, 5, 10 * 60_000)) {
+    return NextResponse.json(
+      { error: "TOO_MANY_REQUESTS" },
+      { status: 429 }
+    );
+  }
+
+
 
   const db = await getDB();
 

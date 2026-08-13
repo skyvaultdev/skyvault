@@ -320,6 +320,42 @@ input[type="number"] {
   display: grid;
 }
 
+.physicalFieldsSection {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 18, 20, 0.55);
+  gap: 12px;
+}
+
+.physicalFieldsSection h3 {
+  margin: 0;
+}
+
+.physicalFieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.checkboxRow {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.checkboxRow input {
+  height: auto;
+  width: auto;
+}
+
+.variationStockHint {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
 .putFile {
   grid-column: 1 / -1;
 

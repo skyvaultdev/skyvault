@@ -165,6 +165,26 @@ export default function StockEditPage() {
 
   if (loading) return <p>Carregando...</p>;
 
+  if (product?.product_type === "physical") {
+    return (
+      <div className="pageHeader">
+        <div>
+          <Link href="/dashboard" className="textBtn">
+            ← Voltar
+          </Link>
+          <h2>📦 {product?.name}</h2>
+        </div>
+        <p>
+          Este é um produto físico — estoque (quantidade), SKU e dimensões são
+          gerenciados diretamente na edição do produto, não aqui.
+        </p>
+        <Link href={`/dashboard/products/edit/${product.id}`} className="btnConfirm2">
+          Ir para edição do produto
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="pageHeader">
       <div>

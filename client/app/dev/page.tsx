@@ -1,32 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import "./dev.css";
 
-type Tab = "efibank" | "saques" | "loja";
+type Tab = "mercadopago" | "melhorenvio" | "loja";
 
-type CredentialsStatus = {
-  clientId: string;
-  hasClientSecret: boolean;
-  hasCert: boolean;
-  certFilename: string | null;
-  hasCertPassword: boolean;
-  pixKey: string;
-  sandbox: boolean;
-  webhookRegisteredAt: string | null;
+type MercadoPagoStatus = {
   configured: boolean;
+  sandbox: boolean;
+  source: "env";
 };
 
-type WithdrawalRequest = {
-  id: number;
-  amount: number;
-  payout_method: string | null;
-  payout_details: string | null;
-  status: string;
-  requested_at: string;
-  requested_by_email: string | null;
-  processed_by_email: string | null;
+type MelhorEnvioStatus = {
+  configured: boolean;
+  sandbox: boolean;
 };
 
 type AdminRow = {
@@ -44,7 +32,7 @@ type StoreStatus = {
 
 export default function DevDashboardPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("efibank");
+  const [tab, setTab] = useState<Tab>("mercadopago");
 
   return (
     <main className="devPage">
@@ -62,44 +50,35 @@ export default function DevDashboardPage() {
 
       <div className="devContent">
         <nav className="devTabs">
-          <button className={tab === "efibank" ? "active" : ""} onClick={() => setTab("efibank")}>EfiBank</button>
-          <button className={tab === "saques" ? "active" : ""} onClick={() => setTab("saques")}>Saques</button>
+          <button className={tab === "mercadopago" ? "active" : ""} onClick={() => setTab("mercadopago")}>Mercado Pago</button>
+          <button className={tab === "melhorenvio" ? "active" : ""} onClick={() => setTab("melhorenvio")}>Melhor Envio</button>
           <button className={tab === "loja" ? "active" : ""} onClick={() => setTab("loja")}>Loja &amp; equipe</button>
         </nav>
 
-        {tab === "efibank" && <EfibankSection />}
-        {tab === "saques" && <WithdrawalsSection />}
+        {tab === "mercadopago" && <MercadoPagoSection />}
+        {tab === "melhorenvio" && <MelhorEnvioSection />}
         {tab === "loja" && <StoreSection />}
       </div>
     </main>
   );
 }
 
-function EfibankSection() {
-  const [status, setStatus] = useState<CredentialsStatus | null>(null);
+// Somente leitura de propósito — quem configura a credencial é o dono da
+// loja, direto no .env do servidor (MERCADO_PAGO_ACCESS_TOKEN/PUBLIC_KEY,
+// é a conta dele que recebe o dinheiro), os devs só conferem se está tudo
+// certo.
+function MercadoPagoSection() {
+  const [status, setStatus] = useState<MercadoPagoStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [registering, setRegistering] = useState(false);
-  const [feedback, setFeedback] = useState("");
-
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [certPassword, setCertPassword] = useState("");
-  const [pixKey, setPixKey] = useState("");
-  const [sandbox, setSandbox] = useState(true);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/dev/efibank-credentials", { cache: "no-store" });
+      const res = await fetch("/api/dev/mercadopago-status", { cache: "no-store" });
       const json = await res.json();
-      if (res.ok) {
-        setStatus(json.data);
-        setClientId(json.data.clientId);
-        setPixKey(json.data.pixKey);
-        setSandbox(json.data.sandbox);
-      }
+      if (res.ok) setStatus(json.data);
     } finally {
       setLoading(false);
     }
@@ -107,50 +86,21 @@ function EfibankSection() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setFeedback("");
+  async function handleTestConnection() {
+    setTesting(true);
+    setTestResult("");
     try {
-      const form = new FormData();
-      form.append("clientId", clientId);
-      form.append("pixKey", pixKey);
-      form.append("sandbox", String(sandbox));
-      if (clientSecret) form.append("clientSecret", clientSecret);
-      if (certPassword) form.append("certPassword", certPassword);
-      if (fileRef.current?.files?.[0]) form.append("cert", fileRef.current.files[0]);
-
-      const res = await fetch("/api/dev/efibank-credentials", { method: "POST", body: form });
-      if (res.ok) {
-        setClientSecret("");
-        setCertPassword("");
-        if (fileRef.current) fileRef.current.value = "";
-        setFeedback("Salvo!");
-        await load();
-      } else {
-        setFeedback("Erro ao salvar.");
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleRegisterWebhook() {
-    setRegistering(true);
-    setFeedback("");
-    try {
-      const res = await fetch("/api/dev/efibank-credentials/register-webhook", { method: "POST" });
+      const res = await fetch("/api/dev/mercadopago-status/test", { method: "POST" });
       const json = await res.json();
       if (res.ok) {
-        setFeedback(`Webhook registrado: ${json.data.webhookUrl}`);
-        await load();
-      } else if (json.error === "WEBHOOK_URL_NOT_PUBLIC") {
-        setFeedback("WEBSITE_URL precisa ser público (não localhost) pra registrar webhook.");
+        setTestResult(`✅ Conectado — conta: ${json.data.accountEmail}`);
+      } else if (json.error === "NOT_CONFIGURED") {
+        setTestResult("⚠️ A loja ainda não configurou as credenciais.");
       } else {
-        setFeedback("Erro ao registrar webhook.");
+        setTestResult(`❌ Falha na conexão (${json.error}).`);
       }
     } finally {
-      setRegistering(false);
+      setTesting(false);
     }
   }
 
@@ -158,91 +108,50 @@ function EfibankSection() {
 
   return (
     <section className="devSection">
-      <h2>Credenciais EfiBank (conta dos devs)</h2>
+      <h2>Mercado Pago da loja</h2>
       <p className="devHelperText">
-        Todo Pix da loja cai aqui — o saldo de cada venda é repassado ao dono da loja via saldo interno,
-        não pela EfiBank diretamente.
+        Credencial configurada pelo dono da loja no .env do servidor (MERCADO_PAGO_ACCESS_TOKEN /
+        MERCADO_PAGO_PUBLIC_KEY) — o dinheiro das vendas cai direto na conta dele, não passa pelos
+        devs. Aqui só dá pra conferir se está configurado e funcionando.
       </p>
 
       {status && (
         <span className={`devStatusBadge ${status.configured ? "ok" : "pending"}`}>
-          {status.configured ? "✅ Configurado" : "⚠️ Incompleto"}
+          {status.configured ? "✅ Configurado" : "⚠️ .env sem credenciais do Mercado Pago"}
         </span>
       )}
 
-      <form className="devForm" onSubmit={handleSubmit}>
-        <label>
-          Client ID
-          <input value={clientId} onChange={(e) => setClientId(e.target.value)} />
-        </label>
-        <label>
-          Client Secret {status?.hasClientSecret && <span className="devTag">já configurado</span>}
-          <input
-            type="password"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            placeholder={status?.hasClientSecret ? "Deixe em branco pra manter" : ""}
-          />
-        </label>
-        <label>
-          Certificado (.p12) {status?.hasCert && <span className="devTag">{status.certFilename}</span>}
-          <input ref={fileRef} type="file" accept=".p12,.pfx" />
-        </label>
-        <label>
-          Senha do certificado {status?.hasCertPassword && <span className="devTag">já configurada</span>}
-          <input
-            type="password"
-            value={certPassword}
-            onChange={(e) => setCertPassword(e.target.value)}
-            placeholder={status?.hasCertPassword ? "Deixe em branco pra manter" : ""}
-          />
-        </label>
-        <label>
-          Chave Pix
-          <input value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
-        </label>
-        <label className="devCheckboxRow">
-          <input type="checkbox" checked={sandbox} onChange={(e) => setSandbox(e.target.checked)} />
-          Ambiente de testes (sandbox)
-        </label>
-        <button type="submit" className="devBtn" disabled={saving}>
-          {saving ? "Salvando..." : "Salvar"}
-        </button>
-      </form>
+      {status?.configured && (
+        <p className="devHelperText">
+          Ambiente: {status.sandbox ? "sandbox (testes)" : "produção"}
+        </p>
+      )}
 
-      <div>
-        <h3>Webhook</h3>
-        {status?.webhookRegisteredAt && (
-          <p className="devHelperText">Registrado em {new Date(status.webhookRegisteredAt).toLocaleString("pt-BR")}</p>
-        )}
-        <button className="devBtnSecondary" onClick={handleRegisterWebhook} disabled={!status?.configured || registering}>
-          {registering ? "Registrando..." : "Registrar webhook"}
-        </button>
-      </div>
-
-      {feedback && <p className="devHelperText">{feedback}</p>}
+      <button className="devBtnSecondary" onClick={handleTestConnection} disabled={!status?.configured || testing}>
+        {testing ? "Testando..." : "Testar conexão"}
+      </button>
+      {testResult && <p className="devHelperText">{testResult}</p>}
     </section>
   );
 }
 
-const WITHDRAWAL_STATUS_LABELS: Record<string, string> = {
-  pending: "Pendente",
-  approved: "Aprovado",
-  paid: "Pago",
-  rejected: "Rejeitado",
-};
-
-function WithdrawalsSection() {
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+// Somente leitura: mostra o retorno bruto da API do Melhor Envio (conta +
+// transportadoras/serviços disponíveis) usando o token que o dono salvou na
+// aba Transportadoras — os devs nunca veem o token, só o que a API do
+// Melhor Envio devolve com ele.
+function MelhorEnvioSection() {
+  const [status, setStatus] = useState<MelhorEnvioStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [fetchingRaw, setFetchingRaw] = useState(false);
+  const [rawData, setRawData] = useState<unknown>(null);
+  const [rawError, setRawError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/dev/withdrawals", { cache: "no-store" });
+      const res = await fetch("/api/dev/melhor-envio-status", { cache: "no-store" });
       const json = await res.json();
-      setWithdrawals(res.ok ? json.data : []);
+      if (res.ok) setStatus(json.data);
     } finally {
       setLoading(false);
     }
@@ -250,56 +159,50 @@ function WithdrawalsSection() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function updateStatus(id: number, status: string) {
-    setBusyId(id);
+  async function handleFetchRaw() {
+    setFetchingRaw(true);
+    setRawError("");
+    setRawData(null);
     try {
-      const res = await fetch(`/api/dev/withdrawals/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        alert(json.error === "INSUFFICIENT_BALANCE" ? "Saldo insuficiente pra pagar esse resgate." : "Erro ao atualizar.");
+      const res = await fetch("/api/dev/melhor-envio-status/raw", { method: "POST" });
+      const json = await res.json();
+      if (res.ok) {
+        setRawData(json.data);
+      } else {
+        setRawError(`❌ Falha ao buscar dados (${json.error}).`);
       }
-      await load();
     } finally {
-      setBusyId(null);
+      setFetchingRaw(false);
     }
   }
 
+  if (loading) return <section className="devSection"><p>Carregando...</p></section>;
+
   return (
     <section className="devSection">
-      <h2>Saques solicitados pela loja</h2>
-      <p className="devHelperText">Aprovar libera pra pagamento; "Marcar como pago" debita o saldo interno de verdade.</p>
+      <h2>Melhor Envio da loja</h2>
+      <p className="devHelperText">
+        Token configurado pelo dono da loja na aba Transportadoras (criptografado no banco). Aqui dá
+        pra conferir se está configurado e puxar os dados brutos que a API do Melhor Envio devolve
+        pra essa conta (dados da conta + transportadoras/serviços disponíveis) — sem nunca expor o
+        token.
+      </p>
 
-      {loading && <p>Carregando...</p>}
-      {!loading && withdrawals.length === 0 && <p className="devHelperText">Nenhum resgate solicitado.</p>}
+      {status && (
+        <span className={`devStatusBadge ${status.configured ? "ok" : "pending"}`}>
+          {status.configured ? "✅ Configurado" : "⚠️ Loja ainda não configurou"}
+        </span>
+      )}
 
-      <div className="devList">
-        {withdrawals.map((w) => (
-          <div key={w.id} className="devRow">
-            <div className="devRowMain">
-              <strong>
-                R$ {Number(w.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                {" · "}{WITHDRAWAL_STATUS_LABELS[w.status] ?? w.status}
-              </strong>
-              <span>
-                {w.payout_method} {w.payout_details ? `— ${w.payout_details}` : ""} · pedido por {w.requested_by_email}
-              </span>
-            </div>
-            {w.status === "pending" && (
-              <>
-                <button className="devBtn" disabled={busyId === w.id} onClick={() => updateStatus(w.id, "approved")}>Aprovar</button>
-                <button className="devBtnDanger" disabled={busyId === w.id} onClick={() => updateStatus(w.id, "rejected")}>Rejeitar</button>
-              </>
-            )}
-            {w.status === "approved" && (
-              <button className="devBtn" disabled={busyId === w.id} onClick={() => updateStatus(w.id, "paid")}>Marcar como pago</button>
-            )}
-          </div>
-        ))}
-      </div>
+      {status?.configured && (
+        <p className="devHelperText">Ambiente: {status.sandbox ? "sandbox (testes)" : "produção"}</p>
+      )}
+
+      <button className="devBtnSecondary" onClick={handleFetchRaw} disabled={!status?.configured || fetchingRaw}>
+        {fetchingRaw ? "Buscando..." : "Ver dados brutos da API"}
+      </button>
+      {rawError && <p className="devHelperText">{rawError}</p>}
+      {(rawData !== null && rawData !== undefined) ? <pre className="devRawJson">{JSON.stringify(rawData, null, 2)}</pre> : null}
     </section>
   );
 }
@@ -371,8 +274,8 @@ function StoreSection() {
           {storeStatus?.suspended ? "🚫 Suspensa" : "✅ Ativa"}
         </span>
         <p className="devHelperText">
-          Suspender bloqueia o acesso à dashboard de TODO o time da loja (owner incluso) até você reativar —
-          útil pra mensalidade em atraso, por exemplo.
+          Suspender bloqueia o acesso à dashboard de TODO o time da loja (owner incluso) e desativa
+          checkout/compras no site — útil pra mensalidade em atraso, por exemplo.
         </p>
         <label className="devSuspendReasonLabel">
           Motivo (opcional, fica salvo pra referência)

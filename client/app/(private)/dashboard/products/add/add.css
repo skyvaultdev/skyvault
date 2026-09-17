@@ -305,7 +305,6 @@ input[type="number"] {
   box-shadow: 0 0 0 2px var(--secondary);
 }
 
-/* Placeholder mais refinado */
 
 .addForm input::placeholder {
   color: rgba(255, 255, 255, 0.35);
@@ -318,24 +317,41 @@ input[type="number"] {
 .full {
   grid-column: 1 / -1;
   display: grid;
+
 }
 
 .physicalFieldsSection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 16px;
+  width: 100%;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(18, 18, 20, 0.55);
   gap: 12px;
+  align-items: start;
 }
 
 .physicalFieldsSection h3 {
   margin: 0;
+  grid-column: 1 / -1;
 }
 
-.physicalFieldsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
+.physicalFieldsSection label {
+  min-width: 0; 
+}
+
+.checkboxRow {
+  grid-column: 1 / -1;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.physicalFieldsSection .full {
+  grid-column: 1 / -1;
 }
 
 .checkboxRow {

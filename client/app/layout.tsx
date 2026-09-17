@@ -18,6 +18,7 @@ import { getSession } from "@/lib/jwt/session";
 
 import { PATTERNS, type Pattern } from "@/lib/pattern/patterns";
 import ChatWidgetGate from "./(components)/chat/ChatWidgetGate";
+import { ModalProvider } from "./(components)/modal/ModalProvider";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -36,8 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
   await initApp();
   const db = await getDB();
 
-  const result = await db.query(`
-SELECT store_name, logo_url FROM store_settings ORDER BY id DESC LIMIT 1`);
+  const result = await db.query(`SELECT store_name, logo_url FROM store_settings ORDER BY id DESC LIMIT 1`);
 
   const storeName = result.rows[0]?.store_name ?? "Minha Loja";
   const logoUrl = result.rows[0]?.logo_url;
@@ -178,31 +178,33 @@ export default async function RootLayout({
           ${geistMono.variable}
         `}
       >
-        <div className="transparency-box" />
+        <ModalProvider>
+          <div className="transparency-box" />
 
-        <div className="page-wrapper">
-          <Header />
+          <div className="page-wrapper">
+            <Header />
 
-          <Suspense fallback={null}>
-            <LoadingHandler />
-          </Suspense>
+            <Suspense fallback={null}>
+              <LoadingHandler />
+            </Suspense>
 
-          <main className="main-content">
-            {children}
-          </main>
+            <main className="main-content">
+              {children}
+            </main>
 
-          <Footer />
-        </div>
+            <Footer storeName={theme.store_name ?? "Minha Loja"} isLoggedIn={!!session} />
+          </div>
 
-        <ChatWidgetGate isLoggedIn={!!session} />
+          <ChatWidgetGate isLoggedIn={!!session} />
 
-        {backgroundCss && (
-          <style
-            dangerouslySetInnerHTML={{
-              __html: backgroundCss,
-            }}
-          />
-        )}
+          {backgroundCss && (
+            <style
+              dangerouslySetInnerHTML={{
+                __html: backgroundCss,
+              }}
+            />
+          )}
+        </ModalProvider>
       </body>
     </html>
   );

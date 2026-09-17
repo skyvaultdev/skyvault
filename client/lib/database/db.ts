@@ -18,10 +18,6 @@ export function getDB(): Pool {
   return global.pgPool;
 }
 
-// Roda `fn` dentro de uma única transação (BEGIN/COMMIT, ROLLBACK em erro).
-// Necessário sempre que múltiplas escritas precisam ser atômicas — ex: ao
-// confirmar um pagamento, marcar o pedido como pago + debitar estoque +
-// creditar o wallet_ledger tem que ser tudo ou nada.
 export async function withTransaction<T>(
   fn: (client: PoolClient) => Promise<T>
 ): Promise<T> {

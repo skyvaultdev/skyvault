@@ -34,6 +34,23 @@
 .statValue { font-size: clamp(22px, 4vw, 34px); font-weight: 800; }
 .statLabel { margin-top: 6px; font-size: 12px; color: #9ca3af; }
 
+.statsChartsToggle {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px dashed #1f1f1f;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.statsChartsToggle:hover {
+  color: #fff;
+  border-color: var(--primary);
+}
+
 .content {
   flex: 1;
   display: grid;
@@ -848,6 +865,10 @@ textarea:focus-visible {
     display: flex;
     flex-direction: column;
     width: 100%;
+  }
+
+  .settingsMenuItemChat {
+    display: none;
   }
 
   .categorySidebar {

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import "./add.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 export default function AddCouponPage() {
   const router = useRouter();
+  const modal = useModal();
 
   const [code, setCode] = useState("");
   const [percentOff, setPercentOff] = useState("");
@@ -19,22 +21,22 @@ export default function AddCouponPage() {
       const percent = Number(percentOff);
       const limit = Number(usageLimit);
       if (percentOff === "") {
-        alert("Informe o percentual de desconto.");
+        await modal.alert("Informe o percentual de desconto.");
         return;
       }
 
       if (usageLimit === "") {
-        alert("Informe o limite de uso.");
+        await modal.alert("Informe o limite de uso.");
         return;
       }
 
       if (percent <= 0 || percent > 100) {
-        alert("O desconto deve estar entre 1% e 100%.");
+        await modal.alert("O desconto deve estar entre 1% e 100%.");
         return;
       }
 
       if (limit < 0) {
-        alert("O limite de uso não pode ser negativo.");
+        await modal.alert("O limite de uso não pode ser negativo.");
         return;
       }
 
@@ -56,11 +58,11 @@ export default function AddCouponPage() {
 
       var text = await response.text();
       if (!response.ok) {
-        alert("Erro ao criar cupom.");
+        await modal.alert("Erro ao criar cupom.");
         console.error(text);
         return;
       }
-      alert("Cupom criado com sucesso!");
+      await modal.alert("Cupom criado com sucesso!");
 
       setCode("");
       setPercentOff("");
@@ -71,7 +73,7 @@ export default function AddCouponPage() {
 
     } catch (error) {
       console.error(error);
-      alert("Erro ao conectar com o servidor.")
+      await modal.alert("Erro ao conectar com o servidor.")
     }
 
   }

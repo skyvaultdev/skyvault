@@ -4,19 +4,17 @@ import { useEffect, useState } from "react";
 import "./PaymentsSettingsPanel.css";
 
 type FormState = {
-  platformFeePercent: string;
-  platformFeeFixed: string;
   shippingMarkupPercent: string;
   shippingMarkupFixed: string;
   acceptsPix: boolean;
   acceptsCreditCard: boolean;
+  acceptsDebitCard: boolean;
   acceptsBoleto: boolean;
 };
 
 const EMPTY_FORM: FormState = {
-  platformFeePercent: "", platformFeeFixed: "",
   shippingMarkupPercent: "", shippingMarkupFixed: "",
-  acceptsPix: true, acceptsCreditCard: false, acceptsBoleto: false,
+  acceptsPix: true, acceptsCreditCard: true, acceptsDebitCard: true, acceptsBoleto: true,
 };
 
 // Aceita apenas dígitos e uma vírgula decimal (formato BR: 12,50)
@@ -46,25 +44,24 @@ export default function PaymentsSettingsPanel() {
     void load();
   }, []);
 
- async function load() {
-  try {
-    const res = await fetch("/api/admin/payment-settings", { cache: "no-store" });
-    const json = await res.json();
-    if (res.ok && json.data) {
-      setForm({
-        platformFeePercent: toDisplayValue(json.data.platform_fee_percent),
-        platformFeeFixed: toDisplayValue(json.data.platform_fee_fixed),
-        shippingMarkupPercent: toDisplayValue(json.data.shipping_markup_percent),
-        shippingMarkupFixed: toDisplayValue(json.data.shipping_markup_fixed),
-        acceptsPix: Boolean(json.data.accepts_pix),
-        acceptsCreditCard: Boolean(json.data.accepts_credit_card),
-        acceptsBoleto: Boolean(json.data.accepts_boleto),
-      });
+  async function load() {
+    try {
+      const res = await fetch("/api/admin/payment-settings", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setForm({
+          shippingMarkupPercent: toDisplayValue(json.data.shipping_markup_percent),
+          shippingMarkupFixed: toDisplayValue(json.data.shipping_markup_fixed),
+          acceptsPix: json.data.accepts_pix !== false,
+          acceptsCreditCard: json.data.accepts_credit_card !== false,
+          acceptsDebitCard: json.data.accepts_debit_card !== false,
+          acceptsBoleto: json.data.accepts_boleto !== false,
+        });
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
   }
-}
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,7 +86,10 @@ export default function PaymentsSettingsPanel() {
     <section className="settingsPanel">
       <div className="tabHeader">
         <h3>Pagamentos</h3>
-        <p className="helperText">Métodos aceitos no checkout e taxas cobradas por venda/frete.</p>
+        <p className="helperText">
+          Métodos aceitos no checkout (processados via Mercado Pago — configure suas credenciais na aba
+          Configurações) e markup sobre o frete.
+        </p>
       </div>
 
       <form className="paymentsForm" onSubmit={handleSubmit}>
@@ -114,42 +114,19 @@ export default function PaymentsSettingsPanel() {
           <label className="paymentsCheckboxRow">
             <input
               type="checkbox"
+              checked={form.acceptsDebitCard}
+              onChange={(e) => setForm({ ...form, acceptsDebitCard: e.target.checked })}
+            />
+            Cartão de débito
+          </label>
+          <label className="paymentsCheckboxRow">
+            <input
+              type="checkbox"
               checked={form.acceptsBoleto}
               onChange={(e) => setForm({ ...form, acceptsBoleto: e.target.checked })}
             />
             Boleto
           </label>
-          <p className="helperText">
-            Hoje só o Pix é processado de fato (via EfiBank, ainda em modo de teste) — os outros métodos ficam
-            preparados pra quando a integração cobrir cartão/boleto.
-          </p>
-        </div>
-
-        <div className="paymentsSection">
-          <h4>Taxa da plataforma (sobre cada venda)</h4>
-          <div className="paymentsFieldRow">
-            <label>
-              Percentual (%)
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={form.platformFeePercent}
-                onChange={(e) => setForm({ ...form, platformFeePercent: sanitizeDecimalInput(e.target.value) })}
-              />
-            </label>
-            <label>
-              Fixo (R$)
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={form.platformFeeFixed}
-                onChange={(e) => setForm({ ...form, platformFeeFixed: sanitizeDecimalInput(e.target.value) })}
-              />
-            </label>
-          </div>
-          <p className="helperText">Descontada do saldo antes de creditar — não aparece no total pago pelo cliente.</p>
         </div>
 
         <div className="paymentsSection">

@@ -2,15 +2,28 @@
 
 import { useEffect, useState, useCallback } from "react";
 import "./ShippingCarriersPanel.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type Carrier = {
   id: number;
   name: string;
   service_code: string | null;
   active: boolean;
+  melhor_envio_service_id: number | null;
 };
 
-export default function ShippingCarriersPanel() {
+type MelhorEnvioStatus = {
+  hasAccessToken: boolean;
+  sandbox: boolean;
+  configured: boolean;
+};
+
+type Props = {
+  canManageCredentials: boolean;
+};
+
+export default function ShippingCarriersPanel({ canManageCredentials }: Props) {
+  const modal = useModal();
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +39,15 @@ export default function ShippingCarriersPanel() {
   const [savingOriginCep, setSavingOriginCep] = useState(false);
   const [originCepFeedback, setOriginCepFeedback] = useState("");
 
+  const [meStatus, setMeStatus] = useState<MelhorEnvioStatus | null>(null);
+  const [meToken, setMeToken] = useState("");
+  const [meSandbox, setMeSandbox] = useState(true);
+  const [meSaving, setMeSaving] = useState(false);
+  const [meFeedback, setMeFeedback] = useState("");
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -40,7 +62,8 @@ export default function ShippingCarriersPanel() {
   useEffect(() => {
     void load();
     void loadOriginCep();
-  }, [load]);
+    if (canManageCredentials) void loadMeStatus();
+  }, [load, canManageCredentials]);
 
   async function loadOriginCep() {
     const res = await fetch("/api/admin/shipping-settings", { cache: "no-store" });
@@ -61,6 +84,58 @@ export default function ShippingCarriersPanel() {
       setOriginCepFeedback(res.ok ? "Salvo!" : "CEP inválido.");
     } finally {
       setSavingOriginCep(false);
+    }
+  }
+
+  async function loadMeStatus() {
+    const res = await fetch("/api/store/melhor-envio-credentials", { cache: "no-store" });
+    const json = await res.json();
+    if (res.ok) {
+      setMeStatus(json.data);
+      setMeSandbox(json.data.sandbox);
+    }
+  }
+
+  async function saveMeCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    setMeSaving(true);
+    setMeFeedback("");
+    try {
+      const res = await fetch("/api/store/melhor-envio-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: meToken, sandbox: meSandbox }),
+      });
+      if (res.ok) {
+        setMeToken("");
+        setMeFeedback("Salvo!");
+        await loadMeStatus();
+      } else {
+        setMeFeedback("Erro ao salvar.");
+      }
+    } finally {
+      setMeSaving(false);
+    }
+  }
+
+  async function syncCarriers() {
+    setSyncing(true);
+    setSyncFeedback("");
+    try {
+      const res = await fetch("/api/carriers/sync", { method: "POST" });
+      const json = await res.json();
+      if (res.ok) {
+        setSyncFeedback(`${json.data.synced} transportadora(s) sincronizada(s). Ative as que quiser usar abaixo.`);
+        await load();
+      } else if (json.error === "MELHOR_ENVIO_NOT_CONFIGURED") {
+        setSyncFeedback("Cadastre o token do Melhor Envio antes de sincronizar.");
+      } else if (json.error === "SHIPPING_ORIGIN_NOT_CONFIGURED") {
+        setSyncFeedback("Cadastre o CEP de origem antes de sincronizar.");
+      } else {
+        setSyncFeedback("Erro ao sincronizar.");
+      }
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -109,7 +184,7 @@ export default function ShippingCarriersPanel() {
   }
 
   async function removeCarrier(id: number) {
-    if (!confirm("Remover essa transportadora?")) return;
+    if (!(await modal.confirm("Remover essa transportadora?"))) return;
     await fetch(`/api/carriers/remove/${id}`, { method: "DELETE" });
     await load();
   }
@@ -119,8 +194,44 @@ export default function ShippingCarriersPanel() {
       <div className="tabHeader">
         <h3>Transportadoras</h3>
         <p className="helperText">
-          Aparecem como opção de frete no checkout (cotação por tabela fixa configurável, por enquanto).
+          Aparecem como opção de frete no checkout. Sincronize com sua conta Melhor Envio pra trazer as
+          transportadoras/serviços disponíveis, ou cadastre manualmente pra usar a tabela fixa.
         </p>
+      </div>
+
+      {canManageCredentials && (
+        <form className="meCredentialsForm" onSubmit={saveMeCredentials}>
+          <strong>Melhor Envio · sua conta</strong>
+          {meStatus && (
+            <div className={`meStatusBadge ${meStatus.configured ? "ok" : "pending"}`}>
+              {meStatus.configured ? "✅ Configurado" : "⚠️ Sem token cadastrado"}
+            </div>
+          )}
+          <label>
+            Token de acesso {meStatus?.hasAccessToken && <span className="meConfiguredTag">já configurado</span>}
+            <input
+              type="password"
+              value={meToken}
+              onChange={(e) => setMeToken(e.target.value)}
+              placeholder={meStatus?.hasAccessToken ? "Deixe em branco pra manter o atual" : "Token da API do Melhor Envio"}
+            />
+          </label>
+          <label className="meCheckboxRow">
+            <input type="checkbox" checked={meSandbox} onChange={(e) => setMeSandbox(e.target.checked)} />
+            Ambiente de testes (sandbox) — desmarque quando for cotar/enviar de verdade
+          </label>
+          <button type="submit" className="btn" disabled={meSaving}>
+            {meSaving ? "Salvando..." : "Salvar token"}
+          </button>
+          {meFeedback && <p className="helperText">{meFeedback}</p>}
+        </form>
+      )}
+
+      <div className="carrierAddForm">
+        <button type="button" className="btnSecondary" onClick={syncCarriers} disabled={syncing}>
+          {syncing ? "Sincronizando..." : "Sincronizar transportadoras (Melhor Envio)"}
+        </button>
+        {syncFeedback && <span className="helperText">{syncFeedback}</span>}
       </div>
 
       <form className="carrierAddForm originCepForm" onSubmit={saveOriginCep}>
@@ -144,7 +255,7 @@ export default function ShippingCarriersPanel() {
 
       {loading && <p>Carregando...</p>}
       {!loading && carriers.length === 0 && (
-        <p className="emptyMsg">Nenhuma transportadora cadastrada — o checkout usa "Frete Padrão" até você cadastrar uma.</p>
+        <p className="emptyMsg">Nenhuma transportadora cadastrada — o checkout usa "Frete Padrão" até você cadastrar ou sincronizar uma.</p>
       )}
 
       <div className="carrierList">
@@ -161,6 +272,9 @@ export default function ShippingCarriersPanel() {
               <>
                 <span className="carrierName">{carrier.name}</span>
                 <span className="helperText">{carrier.service_code || "—"}</span>
+                {carrier.melhor_envio_service_id != null && (
+                  <span className="carrierStatus">Melhor Envio</span>
+                )}
                 <span className={`carrierStatus ${carrier.active ? "active" : ""}`}>
                   {carrier.active ? "Ativa" : "Inativa"}
                 </span>

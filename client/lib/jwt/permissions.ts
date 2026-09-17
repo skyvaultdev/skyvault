@@ -9,8 +9,8 @@ export const ROLES = {
     "users.manage",
     "team.manage",
     "chat.access",
-    "wallet.manage",
     "shipping.manage",
+    "shipping.credentials",
     "payments.manage"
   ],
   admin: [

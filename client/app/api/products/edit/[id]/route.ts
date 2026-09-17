@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { requirePermission } from "@/lib/auth/guard";
+import { logStockMovement } from "@/lib/stock/stockMovements";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,8 +13,9 @@ var VALID_PRODUCT_TYPES = ["digital", "physical"];
 
 export async function PUT(req: Request, { params }: Params) {
     try {
-        const { denied } = await requirePermission("products.write");
+        const { session, denied } = await requirePermission("products.write");
         if (denied) return denied;
+        const staffEmail = session?.email ?? null;
 
         var { id } = await params;
         var productId = Number(id);
@@ -49,6 +51,9 @@ export async function PUT(req: Request, { params }: Params) {
             var stockIsUnlimited = formData.get("stock_is_unlimited") === "true";
             var stockCount = stockIsUnlimited ? 0 : Number(formData.get("stock_count") ?? 0) || 0;
 
+            var beforeRes = await db.query("SELECT stock_count FROM products WHERE id = $1", [productId]);
+            var stockBefore = Number(beforeRes.rows[0]?.stock_count ?? 0);
+
             productUpdate = await db.query(
                 `UPDATE products
                  SET name = $1, slug = $2, description = $3, price = $4, category_id = $5, active = $6,
@@ -62,6 +67,13 @@ export async function PUT(req: Request, { params }: Params) {
                     stockCount, stockIsUnlimited, productId,
                 ]
             );
+
+            if (!stockIsUnlimited && stockCount !== stockBefore) {
+                await logStockMovement(db, {
+                    productId, variationId: null, productName: name, change: stockCount - stockBefore,
+                    reason: "manual_adjustment", staffEmail, note: "Editado no cadastro do produto",
+                });
+            }
         } else {
             productUpdate = await db.query(
                 `UPDATE products
@@ -74,6 +86,7 @@ export async function PUT(req: Request, { params }: Params) {
         }
 
         if (productUpdate.rows.length === 0) return fail("NOT_FOUND", 404);
+
         var variationsRaw = formData.get("variations");
         if (variationsRaw) {
             var variations = JSON.parse(String(variationsRaw));
@@ -84,10 +97,17 @@ export async function PUT(req: Request, { params }: Params) {
                     if (isPhysical) {
                         var vIsUnlimited = Boolean(v.isUnlimited);
                         var vStockCount = vIsUnlimited ? 0 : Number(v.stockCount ?? 0) || 0;
-                        await db.query(
-                            "INSERT INTO product_variations (product_id, name, price, stock_count, is_unlimited) VALUES ($1, $2, $3, $4, $5)",
+                        var variationInsert = await db.query(
+                            "INSERT INTO product_variations (product_id, name, price, stock_count, is_unlimited) VALUES ($1, $2, $3, $4, $5) RETURNING id",
                             [productId, v.name, Number(v.price), vStockCount, vIsUnlimited]
                         );
+                        if (!vIsUnlimited && vStockCount > 0) {
+                            await logStockMovement(db, {
+                                productId, variationId: variationInsert.rows[0].id, productName: name, variationName: v.name,
+                                change: vStockCount, reason: "manual_adjustment", staffEmail,
+                                note: "Variação recriada na edição do produto — valor não reflete um delta real",
+                            });
+                        }
                     } else {
                         await db.query(
                             "INSERT INTO product_variations (product_id, name, price) VALUES ($1, $2, $3)",

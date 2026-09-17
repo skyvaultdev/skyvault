@@ -4,11 +4,13 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import "./stock.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type StockType = "key" | "file" | "infinite";
 
 export default function StockEditPage() {
   const params = useParams();
+  const modal = useModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const slug = params.slug as any;
 
@@ -110,7 +112,7 @@ export default function StockEditPage() {
     const isBase = selectedVariationId === null;
     const targetId = isBase ? product?.id : selectedVariationId;
 
-    if (!targetId) return alert("Erro: ID do alvo não encontrado.");
+    if (!targetId) return modal.alert("Erro: ID do alvo não encontrado.");
 
     const formData = new FormData();
     formData.append("type", stockType);
@@ -153,7 +155,7 @@ export default function StockEditPage() {
       );
 
       if (res.ok) {
-        alert("Salvo com sucesso");
+        await modal.alert("Salvo com sucesso");
         handleLoadStock(targetId!, isBase ? "product" : "variation");
       }
     } catch (err) {

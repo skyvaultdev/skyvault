@@ -1,0 +1,44 @@
+.shippingQuoteList {
+  display: grid;
+  gap: 8px;
+}
+
+.shippingQuoteItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.shippingQuoteItem.readOnly {
+  cursor: default;
+}
+
+.shippingQuoteItem.active {
+  border-color: var(--secondary, #6400ff);
+  background: color-mix(in srgb, var(--secondary, #6400ff), transparent 88%);
+}
+
+.shippingQuoteInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.shippingQuoteInfo span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.shippingQuotePrice {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 14px;
+}

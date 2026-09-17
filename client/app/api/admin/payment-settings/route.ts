@@ -4,10 +4,6 @@ import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/guard";
 
-// Mesmas colunas de store_settings usadas pelo checkout/fixedTableProvider
-// (platform_fee_*, shipping_markup_*, accepts_*) — CREATE TABLE IF NOT
-// EXISTS não adiciona coluna em tabela já existente, então reforça aqui
-// (mesma lição do bug de orders.user_id).
 // O form manda número no formato BR (vírgula decimal, ex: "12,50") —
 // Number() nativo não entende vírgula e viraria NaN silenciosamente.
 function parseDecimal(value: unknown): number {
@@ -21,13 +17,12 @@ async function ensureSchema() {
   const db = getDB();
   await db.query(`
     ALTER TABLE store_settings
-      ADD COLUMN IF NOT EXISTS platform_fee_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS platform_fee_fixed NUMERIC(10,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS shipping_markup_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS shipping_markup_fixed NUMERIC(10,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS accepts_pix BOOLEAN NOT NULL DEFAULT TRUE,
-      ADD COLUMN IF NOT EXISTS accepts_credit_card BOOLEAN NOT NULL DEFAULT FALSE,
-      ADD COLUMN IF NOT EXISTS accepts_boleto BOOLEAN NOT NULL DEFAULT FALSE
+      ADD COLUMN IF NOT EXISTS accepts_credit_card BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS accepts_debit_card BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS accepts_boleto BOOLEAN NOT NULL DEFAULT TRUE
   `);
   return db;
 }
@@ -39,8 +34,8 @@ export async function GET() {
 
     const db = await ensureSchema();
     const result = await db.query(
-      `SELECT platform_fee_percent, platform_fee_fixed, shipping_markup_percent, shipping_markup_fixed,
-              accepts_pix, accepts_credit_card, accepts_boleto
+      `SELECT shipping_markup_percent, shipping_markup_fixed,
+              accepts_pix, accepts_credit_card, accepts_debit_card, accepts_boleto
        FROM store_settings ORDER BY id DESC LIMIT 1`
     );
 
@@ -64,20 +59,18 @@ export async function POST(req: Request) {
 
     const result = await db.query(
       `UPDATE store_settings
-       SET platform_fee_percent = $1, platform_fee_fixed = $2,
-           shipping_markup_percent = $3, shipping_markup_fixed = $4,
-           accepts_pix = $5, accepts_credit_card = $6, accepts_boleto = $7,
+       SET shipping_markup_percent = $1, shipping_markup_fixed = $2,
+           accepts_pix = $3, accepts_credit_card = $4, accepts_debit_card = $5, accepts_boleto = $6,
            updated_at = NOW()
-       WHERE id = $8
-       RETURNING platform_fee_percent, platform_fee_fixed, shipping_markup_percent, shipping_markup_fixed,
-                 accepts_pix, accepts_credit_card, accepts_boleto`,
+       WHERE id = $7
+       RETURNING shipping_markup_percent, shipping_markup_fixed,
+                 accepts_pix, accepts_credit_card, accepts_debit_card, accepts_boleto`,
       [
-        parseDecimal(body.platformFeePercent),
-        parseDecimal(body.platformFeeFixed),
         parseDecimal(body.shippingMarkupPercent),
         parseDecimal(body.shippingMarkupFixed),
         Boolean(body.acceptsPix),
         Boolean(body.acceptsCreditCard),
+        Boolean(body.acceptsDebitCard),
         Boolean(body.acceptsBoleto),
         current.rows[0].id,
       ]

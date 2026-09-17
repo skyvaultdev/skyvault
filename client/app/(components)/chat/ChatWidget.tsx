@@ -111,6 +111,14 @@ export default function ChatWidget() {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
 
   useEffect(() => {
+    function handleAbrirChat() {
+      setIsOpen(true);
+    }
+    window.addEventListener("abrirChat", handleAbrirChat);
+    return () => window.removeEventListener("abrirChat", handleAbrirChat);
+  }, []);
+
+  useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }

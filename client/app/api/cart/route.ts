@@ -69,6 +69,10 @@ export async function PUT(req: NextRequest) {
     var userEmail = decoded.email;
 
     const db = getDB();
+
+    const storeStatusRes = await db.query(`SELECT suspended FROM store_settings ORDER BY id DESC LIMIT 1`);
+    if (storeStatusRes.rows[0]?.suspended) return fail("STORE_SUSPENDED", 503);
+
     const { rows: userRows } = await db.query(`SELECT id FROM users WHERE email = $1`, [userEmail]);
     if (userRows.length === 0) return fail("USER_NOT_FOUND", 404);
     const userId = userRows[0].id;

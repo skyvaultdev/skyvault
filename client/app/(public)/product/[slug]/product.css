@@ -136,6 +136,63 @@ html {
   opacity: 0.75;
 }
 
+.freightCalc {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.freightCalcLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.freightCalcRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.freightCalcInput {
+  flex: 1;
+  min-width: 120px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 18, 20, 0.9);
+  color: #fff;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+
+.freightCalcBtn {
+  flex-shrink: 0;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.freightCalcBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.freightCalcError {
+  margin: 0;
+  font-size: 12.5px;
+  color: #ffb4b4;
+}
+
 .productDesc {
   margin: 0;
   opacity: var(--text-body);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import "./category.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type Product = {
   id: number;
@@ -10,6 +11,7 @@ type Product = {
 };
 
 export default function AddCategoryPage() {
+  const modal = useModal();
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -48,7 +50,7 @@ export default function AddCategoryPage() {
   }
 
   async function submit() {
-    if (!name.trim()) return alert("Digite um nome");
+    if (!name.trim()) return modal.alert("Digite um nome");
 
     setLoading(true);
 
@@ -64,7 +66,7 @@ export default function AddCategoryPage() {
     setLoading(false);
 
     if (!res.ok) {
-      alert(json.error || "Erro ao criar categoria");
+      await modal.alert(json.error || "Erro ao criar categoria");
       return;
     }
 

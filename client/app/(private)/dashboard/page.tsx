@@ -10,9 +10,11 @@ import PermissionGuard from "./components/PermissionGuard";
 import HomePreview from "./components/HomePreview";
 import StaffChatPanel from "./components/StaffChatPanel";
 import OrdersPanel from "./components/OrdersPanel";
-import WalletPanel from "./components/WalletPanel";
 import ShippingCarriersPanel from "./components/ShippingCarriersPanel";
 import PaymentsSettingsPanel from "./components/PaymentsSettingsPanel";
+import GeneralSettingsPanel from "./components/GeneralSettingsPanel";
+import StockMovementsPanel from "./components/StockMovementsPanel";
+import StatsPanel from "./components/StatsPanel";
 import "./components/categoryprev.css"
 import CategoryPreview from "./components/CategoryPreview";
 import "@/app/home.css";
@@ -21,6 +23,7 @@ import "./modal.css";
 import "./components/homeprev.css";
 import { Role, ROLES } from "@/lib/jwt/permissions";
 import { PATTERNS, type Pattern } from "@/lib/pattern/patterns";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type TypeKey = "products" | "categories" | "coupon";
 
@@ -81,12 +84,13 @@ const TAB_PERMISSIONS: Record<DashboardTab, Permission> = {
   background: "store.customize",
   posicao: "products.write",
   estoque: "products.write",
+  registrosEstoque: "products.write",
   chat: "chat.access",
   equipe: "team.manage",
   pedidos: "orders.read",
-  saldo: "wallet.manage",
   transportadoras: "shipping.manage",
   pagamentos: "payments.manage",
+  geral: "store.customize",
 };
 
 const roleHierarchy: Record<Role, number> = {
@@ -97,11 +101,13 @@ const roleHierarchy: Record<Role, number> = {
 
 export default function Dashboard() {
   const router = useRouter();
+  const modal = useModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
   const [itemType, setItemType] = useState<TypeKey>("products");
   const [selectedTab, setSelectedTab] = useState<DashboardTab>("inicio");
+  const [showStatsCharts, setShowStatsCharts] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -614,10 +620,10 @@ export default function Dashboard() {
         closeDeleteModal();
         void loadItems(search);
       } else {
-        alert("Erro ao deletar.");
+        await modal.alert("Erro ao deletar.");
       }
     } catch {
-      alert("Erro de rede.");
+      await modal.alert("Erro de rede.");
     } finally {
       setIsDeleting(false);
     }
@@ -625,7 +631,7 @@ export default function Dashboard() {
 
   async function saveStoreName() {
     if (!storeName.trim()) {
-      alert("O nome da loja não pode ser vazio.");
+      await modal.alert("O nome da loja não pode ser vazio.");
       return;
     }
     const formData = new FormData();
@@ -643,7 +649,7 @@ export default function Dashboard() {
       setStoreName("");
       openSalvarModal("Nome da loja salvo com sucesso! ", true);
     } else {
-      alert(json?.error || "Erro ao salvar o nome da loja.");
+      await modal.alert(json?.error || "Erro ao salvar o nome da loja.");
     }
   }
 
@@ -664,7 +670,7 @@ export default function Dashboard() {
       setLogoFile(null);
       openSalvarModal("Logo salva com sucesso! ", true);
     } else {
-      alert(json?.error || "Erro ao salvar a logo.");
+      await modal.alert(json?.error || "Erro ao salvar a logo.");
     }
   }
 
@@ -685,7 +691,7 @@ export default function Dashboard() {
       await loadStoreSettings();
       openSalvarModal("Cores salvas com sucesso! ");
     } else {
-      alert("Erro ao salvar as cores.");
+      await modal.alert("Erro ao salvar as cores.");
     }
   }
 
@@ -714,7 +720,7 @@ export default function Dashboard() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       openSalvarModal("Background salvo com sucesso!", true);
     } else {
-      alert("Erro ao salvar o background.");
+      await modal.alert("Erro ao salvar o background.");
     }
   }
 
@@ -748,7 +754,7 @@ export default function Dashboard() {
       await loadItems();
       openSalvarModal("Posições salvas com sucesso!");
     } else {
-      alert("Erro ao salvar as posições.");
+      await modal.alert("Erro ao salvar as posições.");
     }
   }
   const deleteLabel = itemType === "products" ? "produto" : itemType === "categories" ? "categoria" : "cupom";
@@ -802,16 +808,23 @@ export default function Dashboard() {
       return renderProtected("pedidos", <OrdersPanel canManage={permissions.includes("orders.manage")} />);
     }
 
-    if (selectedTab === "saldo") {
-      return renderProtected("saldo", <WalletPanel />);
-    }
-
     if (selectedTab === "transportadoras") {
-      return renderProtected("transportadoras", <ShippingCarriersPanel />);
+      return renderProtected(
+        "transportadoras",
+        <ShippingCarriersPanel canManageCredentials={permissions.includes("shipping.credentials")} />
+      );
     }
 
     if (selectedTab === "pagamentos") {
       return renderProtected("pagamentos", <PaymentsSettingsPanel />);
+    }
+
+    if (selectedTab === "geral") {
+      return renderProtected("geral", <GeneralSettingsPanel />);
+    }
+
+    if (selectedTab === "registrosEstoque") {
+      return renderProtected("registrosEstoque", <StockMovementsPanel />);
     }
 
     if (selectedTab === "estoque") {
@@ -917,36 +930,36 @@ export default function Dashboard() {
                           className="inputlogoHidden"
                           type="file"
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
 
                             if (!file) return;
 
                             if (file.size > 5 * 1024 * 1024) {
-                              alert("O arquivo deve ser menor que 5MB.");
+                              await modal.alert("O arquivo deve ser menor que 5MB.");
                               return;
                             }
 
                             const img = new Image();
                             const objectUrl = URL.createObjectURL(file);
 
-                            img.onload = () => {
+                            img.onload = async () => {
                               const width = img.width;
                               const height = img.height;
 
                               URL.revokeObjectURL(objectUrl);
 
                               if (width > 1024 || height > 1024) {
-                                alert("A imagem deve ter no máximo 1024x1024 pixels.");
+                                await modal.alert("A imagem deve ter no máximo 1024x1024 pixels.");
                                 return;
                               }
 
                               setLogoFile(file);
                             };
 
-                            img.onerror = () => {
+                            img.onerror = async () => {
                               URL.revokeObjectURL(objectUrl);
-                              alert("Não foi possível ler a imagem selecionada.");
+                              await modal.alert("Não foi possível ler a imagem selecionada.");
                             };
 
                             img.src = objectUrl;
@@ -1359,7 +1372,16 @@ export default function Dashboard() {
             <div className="statValue">R$ {stats.arrecadados.toLocaleString("pt-BR")}</div>
             <div className="statLabel">ARRECADADOS</div>
           </div>
+          <button
+            type="button"
+            className="statsChartsToggle"
+            onClick={() => setShowStatsCharts((prev) => !prev)}
+          >
+            {showStatsCharts ? "Ocultar gráficos ▴" : "Ver gráficos ▾"}
+          </button>
         </div>
+
+        {showStatsCharts && <StatsPanel />}
       </header>
 
       <main className="content">

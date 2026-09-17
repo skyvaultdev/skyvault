@@ -1,5 +1,5 @@
-import { createTransport } from "nodemailer";
 import { getDB } from "@/lib/database/db";
+import { getMailTransporter } from "@/lib/mail/transporter";
 
 export type DeliveredDigitalItem = {
   productName: string;
@@ -8,25 +8,13 @@ export type DeliveredDigitalItem = {
   content: string; // key content, download path, or a display message
 };
 
-// Mesma configuração de transporte usada em app/api/auth/email/route.ts
-// (login por código) — extraída aqui pra reuso na entrega digital pós-pagamento.
-function getTransporter() {
-  return createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER!,
-      pass: process.env.EMAIL_PASS!,
-    },
-  });
-}
-
 export async function sendOrderDeliveryEmail(params: {
   to: string;
   orderId: number;
+  orderNumber?: string | null;
   items: DeliveredDigitalItem[];
 }) {
+  const orderRef = params.orderNumber || `#${params.orderId}`;
   const db = getDB();
   const storeResult = await db.query(
     `SELECT store_name, primary_color, secondary_color FROM store_settings ORDER BY id DESC LIMIT 1`
@@ -53,11 +41,11 @@ export async function sendOrderDeliveryEmail(params: {
     })
     .join("");
 
-  const transporter = getTransporter();
+  const transporter = getMailTransporter();
   await transporter.sendMail({
     from: process.env.EMAIL_USER,
     to: params.to,
-    subject: `Seu pedido #${params.orderId} foi confirmado • ${storeName}`,
+    subject: `Seu pedido ${orderRef} foi confirmado • ${storeName}`,
     html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -69,7 +57,7 @@ export async function sendOrderDeliveryEmail(params: {
         <tr><td style="height:5px;background-color:${primaryColor};font-size:0;">&nbsp;</td></tr>
         <tr><td style="padding:30px 32px 10px 32px;text-align:center;">
           <h1 style="margin:0;color:#fff;font-size:22px;">${storeName}</h1>
-          <p style="margin:8px 0 0 0;color:#a1a1aa;font-size:13px;">Pedido #${params.orderId} confirmado</p>
+          <p style="margin:8px 0 0 0;color:#a1a1aa;font-size:13px;">Pedido ${orderRef} confirmado</p>
         </td></tr>
         <tr><td style="padding:20px 32px 32px 32px;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">

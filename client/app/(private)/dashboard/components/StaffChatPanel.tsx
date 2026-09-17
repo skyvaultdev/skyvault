@@ -15,6 +15,8 @@ type Conversation = {
   status: "open" | "closed";
   last_message_at: string | null;
   unread_count: number;
+  order_id: number | null;
+  is_ticket: boolean;
 };
 
 type Message = {
@@ -94,11 +96,18 @@ function uploadAttachmentWithProgress(
 }
 
 export default function StaffChatPanel() {
+  const [view, setView] = useState<"chats" | "tickets">("chats");
+  const [ticketStatus, setTicketStatus] = useState<"open" | "closed">("open");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const conversationsRef = useRef<Conversation[]>([]);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
   const [initialLoadingConversations, setInitialLoadingConversations] = useState(true);
   const [refreshingConversations, setRefreshingConversations] = useState(false);
   const [conversationSearch, setConversationSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [closingTicket, setClosingTicket] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [refreshingMessages, setRefreshingMessages] = useState(false);
   const [readIds, setReadIds] = useState<Set<number>>(new Set());
@@ -127,6 +136,26 @@ export default function StaffChatPanel() {
   const [newChatSearching, setNewChatSearching] = useState(false);
   const [newChatStarting, setNewChatStarting] = useState(false);
 
+  // Contagem separada por aba — antes uma mensagem nova de ticket inflava
+  // a bolinha de "Chats" (e vice-versa) sem indicar de onde vinha.
+  const [unreadByView, setUnreadByView] = useState({ chats: 0, tickets: 0 });
+
+  useEffect(() => {
+    async function loadUnread() {
+      try {
+        const res = await fetch("/api/chat/unread-count", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        setUnreadByView({ chats: Number(json.chats) || 0, tickets: Number(json.tickets) || 0 });
+      } catch {
+        // ignora erro pontual
+      }
+    }
+    void loadUnread();
+    const interval = setInterval(loadUnread, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -151,7 +180,12 @@ export default function StaffChatPanel() {
     if (!background) setInitialLoadingConversations(true);
     else setRefreshingConversations(true);
     try {
-      const res = await fetch("/api/chat/conversations", { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (view === "tickets") {
+        params.set("ticket", "true");
+        params.set("status", ticketStatus);
+      }
+      const res = await fetch(`/api/chat/conversations?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       setConversations(Array.isArray(json.data) ? json.data : []);
@@ -159,13 +193,31 @@ export default function StaffChatPanel() {
       setInitialLoadingConversations(false);
       setRefreshingConversations(false);
     }
-  }, []);
+  }, [view, ticketStatus]);
 
   useEffect(() => {
+    setSelectedId(null);
     void loadConversations(false);
     const interval = setInterval(() => void loadConversations(true), 10000);
     return () => clearInterval(interval);
   }, [loadConversations]);
+
+  async function toggleTicketStatus() {
+    if (!selectedConversation) return;
+    setClosingTicket(true);
+    try {
+      const nextStatus = selectedConversation.status === "open" ? "closed" : "open";
+      await fetch(`/api/chat/conversations/${selectedConversation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      await loadConversations(false);
+      if (nextStatus === "closed") setSelectedId(null);
+    } finally {
+      setClosingTicket(false);
+    }
+  }
 
   const filteredConversations = useMemo(() => {
     const q = conversationSearch.trim().toLowerCase();
@@ -219,7 +271,9 @@ export default function StaffChatPanel() {
           return next;
         });
         if (msg.sender_type === "customer" && document.hidden && "Notification" in window && Notification.permission === "granted") {
-          new Notification("Nova mensagem", { body: msg.body || "Enviou um anexo", icon: "/favicon.ico" });
+          const conv = conversationsRef.current.find((c) => c.id === selectedId);
+          const title = conv?.is_ticket ? `Ticket — Pedido #${conv.order_id ?? "?"}` : "Nova mensagem no chat";
+          new Notification(title, { body: msg.body || "Enviou um anexo", icon: "/favicon.ico" });
         }
       } catch {
         // ignora erro de parse
@@ -538,6 +592,25 @@ export default function StaffChatPanel() {
         {refreshingConversations && <span className="chatSubtleIndicator">atualizando...</span>}
       </div>
 
+      <div className="chatViewSwitch">
+        <button className={view === "chats" ? "active" : ""} onClick={() => setView("chats")}>
+          Chats
+          {unreadByView.chats > 0 && <span className="chatViewSwitchBadge">{unreadByView.chats}</span>}
+        </button>
+        <button className={view === "tickets" ? "active" : ""} onClick={() => setView("tickets")}>
+          Tickets
+          {unreadByView.tickets > 0 && <span className="chatViewSwitchBadge">{unreadByView.tickets}</span>}
+        </button>
+
+        {view === "tickets" && (
+          <>
+            <span className="chatViewSwitchDivider" />
+            <button className={`chatTicketStatusBtn ${ticketStatus === "open" ? "active" : ""}`} onClick={() => setTicketStatus("open")}>Abertos</button>
+            <button className={`chatTicketStatusBtn ${ticketStatus === "closed" ? "active" : ""}`} onClick={() => setTicketStatus("closed")}>Encerrados</button>
+          </>
+        )}
+      </div>
+
       <div className="chatLayout">
         <aside className="chatConversationList">
           <div className="chatConversationListHeader">
@@ -562,6 +635,7 @@ export default function StaffChatPanel() {
               onClick={() => setSelectedId(c.id)}
             >
               <strong>{c.customer_name || c.customer_email}</strong>
+              {c.order_id && <span className="chatTicketOrderBadge">Pedido #{c.order_id}</span>}
               {c.unread_count > 0 && <span className="chatUnreadBadge">{c.unread_count}</span>}
             </button>
           ))}
@@ -586,6 +660,21 @@ export default function StaffChatPanel() {
 
               <div className="chatThreadHeader">
                 <strong>{selectedConversation?.customer_name || selectedConversation?.customer_email}</strong>
+                {selectedConversation?.order_id && (
+                  <span className="chatTicketOrderBadge">Pedido #{selectedConversation.order_id}</span>
+                )}
+                {selectedConversation?.is_ticket && (
+                  <button
+                    type="button"
+                    className="btnSecondary chatCloseTicketBtn"
+                    onClick={toggleTicketStatus}
+                    disabled={closingTicket}
+                  >
+                    {closingTicket
+                      ? "Salvando..."
+                      : selectedConversation.status === "open" ? "Encerrar ticket" : "Reabrir ticket"}
+                  </button>
+                )}
               </div>
 
               <div className="chatMessages">

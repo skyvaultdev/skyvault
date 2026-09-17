@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import "./edit.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type Coupon = {
   code: string;
@@ -17,6 +18,7 @@ type Coupon = {
 
 export default function EditCouponPage() {
 const router = useRouter();
+const modal = useModal();
 
   const params = useParams<{ id: string }>();
   const [code, setCode] = useState("");
@@ -47,22 +49,22 @@ const router = useRouter();
     const percent = Number(percentOff);
     const limit = Number(usageLimit);
     if (percentOff === "") {
-      alert("Informe o percentual de desconto.");
+      await modal.alert("Informe o percentual de desconto.");
       return;
     }
 
     if (usageLimit === "") {
-      alert("Informe o limite de uso.");
+      await modal.alert("Informe o limite de uso.");
       return;
     }
 
     if (percent <= 0 || percent > 100) {
-      alert("O desconto deve estar entre 1% e 100%.");
+      await modal.alert("O desconto deve estar entre 1% e 100%.");
       return;
     }
 
     if (limit < 0) {
-      alert("O limite de uso não pode ser negativo.");
+      await modal.alert("O limite de uso não pode ser negativo.");
       return;
     }
 

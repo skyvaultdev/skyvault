@@ -1,0 +1,42 @@
+.brazilMap {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.brazilMapSvg {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+}
+
+.brazilMapOutline {
+  fill: rgba(100, 0, 255, 0.12);
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 1.5;
+}
+
+.brazilMapDot {
+  fill: var(--secondary, #6400ff);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.brazilMapPulse {
+  fill: var(--secondary, #6400ff);
+  opacity: 0.35;
+  animation: brazilMapPulse 1.8s ease-out infinite;
+  transform-origin: center;
+}
+
+@keyframes brazilMapPulse {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.brazilMapLabel {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+}

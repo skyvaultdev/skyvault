@@ -1,4 +1,5 @@
-import { config } from "@/config/configuration";
+import { getDB } from "@/lib/database/db";
+import { loadMelhorEnvioCredentials } from "./melhorEnvioCredentials";
 import type { ShippingProvider, QuoteRequest, ShippingQuote } from "./ShippingProvider";
 import { applyShippingMarkup } from "./markup";
 
@@ -17,15 +18,15 @@ type MelhorEnvioQuote = {
 
 // Integração real com o Melhor Envio — escrita a partir da documentação
 // pública da API v2 (calculadora de frete), mas NUNCA testada contra uma
-// conta de verdade (não temos token ainda). Quando vocês tiverem o token
-// sandbox, é bem provável que precise de um ajuste fino aqui (nome exato
-// de algum campo, etc.) — não é algo que dê pra validar sem credencial.
+// conta de verdade. Quando o dono cadastrar o token sandbox, é bem
+// provável que precise de um ajuste fino aqui (nome exato de algum campo,
+// etc.) — não é algo que dê pra validar sem credencial.
 export class MelhorEnvioShippingProvider implements ShippingProvider {
   async quote(req: QuoteRequest): Promise<ShippingQuote[]> {
-    const { token, sandbox, userAgent } = config.shipping.melhorEnvio;
-    if (!token) {
+    const credentials = await loadMelhorEnvioCredentials();
+    if (!credentials) {
       throw new Error(
-        "Melhor Envio não configurado (falta MELHOR_ENVIO_TOKEN). Use SHIPPING_PROVIDER=fixed_table enquanto isso."
+        "Melhor Envio não configurado — cadastre o token na aba Transportadoras."
       );
     }
     if (!req.originCep) {
@@ -47,15 +48,15 @@ export class MelhorEnvioShippingProvider implements ShippingProvider {
       100
     );
 
-    const baseUrl = sandbox ? SANDBOX_URL : PRODUCTION_URL;
+    const baseUrl = credentials.sandbox ? SANDBOX_URL : PRODUCTION_URL;
 
     const res = await fetch(`${baseUrl}/api/v2/me/shipment/calculate`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${credentials.accessToken}`,
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": userAgent,
+        "User-Agent": "SkyVault (contato@skyvault.local)",
       },
       body: JSON.stringify({
         from: { postal_code: req.originCep },
@@ -76,9 +77,25 @@ export class MelhorEnvioShippingProvider implements ShippingProvider {
     const data: MelhorEnvioQuote[] = await res.json();
     const validQuotes = data.filter((item) => !item.error && item.price);
 
+    // Só entram no checkout as transportadoras/serviços que o dono
+    // sincronizou e deixou ativos (carriers.active) — antes disso a API
+    // devolvia TODAS as opções da conta sem filtro nenhum. Também é aqui
+    // que traduzimos o id de serviço do Melhor Envio pro id local da
+    // tabela carriers: shipping_quotes.carrier_id/shipments.carrier_id são
+    // FK pra carriers(id), não pro id bruto da API — usar o id da API
+    // direto quebraria essa referência.
+    const db = getDB();
+    const activeRes = await db.query<{ id: number; melhor_envio_service_id: number }>(
+      `SELECT id, melhor_envio_service_id FROM carriers
+       WHERE active = true AND melhor_envio_service_id IS NOT NULL`
+    );
+    const activeByServiceId = new Map(activeRes.rows.map((row) => [row.melhor_envio_service_id, row.id]));
+
+    const activeQuotes = validQuotes.filter((item) => activeByServiceId.has(item.id));
+
     return Promise.all(
-      validQuotes.map(async (item) => ({
-        carrierId: item.company?.id ?? item.id,
+      activeQuotes.map(async (item) => ({
+        carrierId: activeByServiceId.get(item.id) ?? null,
         carrierName: item.company?.name ?? "Transportadora",
         serviceName: item.name,
         price: await applyShippingMarkup(Number(item.price)),

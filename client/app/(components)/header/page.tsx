@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import "./header.css";
 import { FaUserCircle, FaPlus, FaMinus, FaTrash } from "react-icons/fa";
-import { FiShoppingCart, FiX, FiLogOut, FiPackage } from "react-icons/fi";
+import { FiShoppingCart, FiX, FiLogOut, FiPackage, FiUser } from "react-icons/fi";
 import { useRouter } from "next/navigation";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type CartItem = {
   cart_item_id: number;
@@ -29,6 +30,7 @@ export default function Header() {
   const [dropAberto, setDropAberto] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
+  const modal = useModal();
 
   async function loadStoreSettings() {
     try {
@@ -101,7 +103,7 @@ export default function Header() {
         }
       } else {
         if (data.message === "INSUFFICIENT_STOCK") {
-          alert("Quantidade máxima em estoque atingida.");
+          await modal.alert("Quantidade máxima em estoque atingida.");
         } else {
           console.error("Erro ao atualizar carrinho:", data.message);
         }
@@ -253,6 +255,18 @@ export default function Header() {
                     />
 
                     <div className="userDropdown">
+
+                      { }
+                      <Link
+                        href="/profile"
+                        className="userDropdownItem"
+                        onClick={() => setDropAberto(false)}
+                      >
+                        <FiUser />
+                        Meu perfil
+                      </Link>
+
+                      <hr className="dropdownDivider" />
 
                       { }
                       {isAdmin && (

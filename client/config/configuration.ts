@@ -26,37 +26,21 @@ export const config = {
         webhookUrl: process.env.WEBHOOK_URL!,
         scopes: process.env.DISCORD_SCOPES!,
     },
-
+    
     payments: {
-        // Credenciais reais da EfiBank não vêm mais de env var — ficam no
-        // banco (tabela efibank_credentials), criptografadas, cadastradas
-        // pelos DEVS na dashboard exclusiva (/dev). Isso aqui só permite
-        // forçar mock mesmo com credenciais salvas (dev local).
-        provider: process.env.PAYMENT_PROVIDER || "mock",
+        provider: process.env.PAYMENT_PROVIDER || "auto",
+        mercadoPago: {
+            accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+            publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY,
+            webhookSecret: process.env.MERCADO_PAGO_WEBHOOK_SECRET,
+            sandbox: process.env.MERCADO_PAGO_SANDBOX === "true",
+        },
     },
-
     devAuth: {
-        // Auth da dashboard de devs é isolada da auth da loja de propósito
-        // (cookie e segredo de assinatura separados) — mesmo que alguém
-        // arranje um jeito de forjar/roubar um token de admin da loja, ele
-        // não serve pra dashboard de dev. Defina DEV_JWT_SECRET em produção;
-        // sem ele, cai num fallback derivado do JWT_SECRET só pra dev local.
         secret: process.env.DEV_JWT_SECRET || `dev::${process.env.JWT_SECRET}`,
         expiresIn: process.env.DEV_JWT_EXPIRES_IN || "12h",
     },
-
     shipping: {
-        // "fixed_table" (tabela de peso configurável, sem depender de API
-        // externa) até vocês terem o token do Melhor Envio — aí troca pra
-        // "melhor_envio" e a cotação passa a ser real, com múltiplas
-        // transportadoras de verdade.
-        provider: process.env.SHIPPING_PROVIDER || "fixed_table",
-        melhorEnvio: {
-            token: process.env.MELHOR_ENVIO_TOKEN,
-            sandbox: process.env.MELHOR_ENVIO_SANDBOX !== "false",
-            // Exigido pela Melhor Envio em todo request (identifica a
-            // aplicação + contato) — formato: "NomeDaApp (email@contato.com)".
-            userAgent: process.env.MELHOR_ENVIO_USER_AGENT || "SkyVault (contato@skyvault.local)",
-        },
+        provider: process.env.SHIPPING_PROVIDER || "auto",
     },
 };

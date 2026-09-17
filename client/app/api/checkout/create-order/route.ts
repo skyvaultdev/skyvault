@@ -1,10 +1,12 @@
 "use server";
 
-import crypto from "crypto";
 import { getDB, withTransaction } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requireCustomer } from "@/lib/auth/customer";
-import { getPaymentProvider } from "@/lib/payments";
+import { config } from "@/config/configuration";
+import { getDiscountAmount, qualifiesForFreeShipping } from "@/lib/pricing/cartDiscount";
+import { loadPromotionSettings } from "@/lib/pricing/promotionSettings";
+import { ensureOrderNumberColumn, generateUniqueOrderNumber } from "@/lib/orders/orderNumber";
 
 type ShippingChoice = {
   recipientName: string;
@@ -22,12 +24,23 @@ type ShippingChoice = {
   etaDays: number;
 };
 
+// Só monta o pedido — NÃO cobra ainda. A cobrança de verdade acontece em
+// /api/checkout/pay/[orderId], depois que o cliente escolhe o método no
+// Payment Brick (Pix/cartão/boleto). Separar os dois passos evita ter que
+// decidir o método de pagamento antes de sequer mostrar o resumo pro
+// cliente, e casa com como o Brick funciona (ele só sabe o método depois
+// que o cliente interage com o formulário).
 export async function POST(req: Request) {
   try {
-    const { email, userId, denied } = await requireCustomer();
+    const { userId, denied } = await requireCustomer();
     if (denied) return denied;
 
     const db = getDB();
+
+    const storeStatusRes = await db.query(`SELECT suspended FROM store_settings ORDER BY id DESC LIMIT 1`);
+    if (storeStatusRes.rows[0]?.suspended) {
+      return fail("STORE_SUSPENDED", 503);
+    }
 
     const cartRes = await db.query(
       `SELECT
@@ -52,11 +65,15 @@ export async function POST(req: Request) {
       }
     }
 
+    // Lido uma vez só, funciona pra pedido físico (endereço) e digital
+    // (só cupom) — antes só era lido dentro do bloco de físico, então
+    // cupom nunca chegava a ser considerado num carrinho 100% digital.
+    const body = await req.json().catch(() => ({}));
+
     const hasPhysical = cartRes.rows.some((row) => row.product_type === "physical");
     let shipping: ShippingChoice | null = null;
 
     if (hasPhysical) {
-      const body = await req.json().catch(() => ({}));
       const s = body?.shipping ?? {};
       shipping = {
         recipientName: String(s.recipientName ?? "").trim(),
@@ -82,24 +99,47 @@ export async function POST(req: Request) {
     }
 
     const subtotal = cartRes.rows.reduce((sum, row) => sum + Number(row.unit_price) * row.quantity, 0);
+    const promotionSettings = await loadPromotionSettings();
 
-    const settingsRes = await db.query(
-      `SELECT platform_fee_percent, platform_fee_fixed FROM store_settings ORDER BY id DESC LIMIT 1`
-    );
-    const settings = settingsRes.rows[0] ?? { platform_fee_percent: 0, platform_fee_fixed: 0 };
-    const platformFee = Math.round((subtotal * (Number(settings.platform_fee_percent) / 100) + Number(settings.platform_fee_fixed)) * 100) / 100;
+    if (subtotal < promotionSettings.minOrderValue) {
+      return fail(`MIN_ORDER_VALUE:${promotionSettings.minOrderValue}`, 400);
+    }
 
-    const discount = 0;
-    const shippingFee = shipping ? shipping.price : 0;
+    // Cupom é revalidado aqui inteiro, nunca a partir do que o client
+    // calculou — mesmo princípio do desconto progressivo. Cupom e degrau
+    // automático não se empilham: usa o que for melhor pro cliente, pra
+    // não ter desconto somado sem limite nenhum.
+    let coupon: { id: number; code: string; percentOff: number } | null = null;
+    const couponCode = String(body?.couponCode ?? "").trim().toUpperCase();
+    if (couponCode) {
+      const couponRes = await db.query(
+        `SELECT id, code, percent_off, min_order_value FROM coupons
+         WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())
+           AND (usage_limit = 0 OR used_count < usage_limit)`,
+        [couponCode]
+      );
+      const row = couponRes.rows[0];
+      if (!row) return fail("INVALID_COUPON", 400);
+      if (row.min_order_value && subtotal < Number(row.min_order_value)) {
+        return fail(`COUPON_MIN_ORDER_VALUE:${row.min_order_value}`, 400);
+      }
+      coupon = { id: row.id, code: row.code, percentOff: Number(row.percent_off) };
+    }
+
+    const tierDiscount = getDiscountAmount(subtotal, promotionSettings.discountTiers);
+    const couponDiscount = coupon ? Math.round(subtotal * (coupon.percentOff / 100) * 100) / 100 : 0;
+    const usingCoupon = coupon !== null && couponDiscount > tierDiscount;
+    const discount = usingCoupon ? couponDiscount : tierDiscount;
+    const appliedCouponId = usingCoupon ? coupon!.id : null;
+
+    const rawShippingFee = shipping ? shipping.price : 0;
+    const shippingFee = shipping && qualifiesForFreeShipping(subtotal, promotionSettings) ? 0 : rawShippingFee;
     const total = Math.round((subtotal - discount + shippingFee) * 100) / 100;
-    const idempotencyKey = crypto.randomUUID();
 
-    // Resolvido antes da transação: quem vai processar o pagamento decide
-    // qual "provider" grava no payment_transactions, e a chamada real pra
-    // fora (createCharge) não deve rodar com uma transação de banco aberta.
-    const paymentProvider = await getPaymentProvider();
+    await ensureOrderNumberColumn();
 
-    const { orderId, paymentTransactionId } = await withTransaction(async (client) => {
+    const { orderId, orderNumber: newOrderNumber } = await withTransaction(async (client) => {
+      const orderNumber = await generateUniqueOrderNumber(client);
       let shippingAddressId: number | null = null;
 
       if (shipping) {
@@ -117,10 +157,10 @@ export async function POST(req: Request) {
       }
 
       const orderRes = await client.query(
-        `INSERT INTO orders (user_id, status, total, subtotal, platform_fee, discount, shipping_fee, shipping_address_id)
-         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7)
+        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number)
+         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
-        [userId, total, subtotal, platformFee, discount, shippingFee, shippingAddressId]
+        [userId, total, subtotal, discount, shippingFee, shippingAddressId, appliedCouponId, orderNumber]
       );
       const newOrderId = orderRes.rows[0].id;
 
@@ -144,35 +184,21 @@ export async function POST(req: Request) {
         );
       }
 
+      if (appliedCouponId) {
+        await client.query(`UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`, [appliedCouponId]);
+      }
+
       await client.query(`DELETE FROM cart_items WHERE user_id = $1`, [userId]);
 
-      const txRes = await client.query(
-        `INSERT INTO payment_transactions (order_id, provider, method, status, amount, idempotency_key)
-         VALUES ($1, $2, 'pix', 'created', $3, $4)
-         RETURNING id`,
-        [newOrderId, paymentProvider.name, total, idempotencyKey]
-      );
-
-      return { orderId: newOrderId, paymentTransactionId: txRes.rows[0].id };
+      return { orderId: newOrderId, orderNumber };
     });
-
-    const charge = await paymentProvider.createCharge({
-      orderId,
-      amount: total,
-      method: "pix",
-      idempotencyKey,
-      customerEmail: email!,
-    });
-
-    await db.query(
-      `UPDATE payment_transactions
-       SET provider_txid = $1, status = $2, raw_payload = $3, updated_at = NOW()
-       WHERE id = $4`,
-      [charge.providerTxid, charge.status, JSON.stringify(charge.raw), paymentTransactionId]
-    );
 
     return ok(
-      { orderId, total, status: charge.status, pixCopyPaste: charge.pixCopyPaste, provider: paymentProvider.name },
+      {
+        orderId, orderNumber: newOrderNumber, total,
+        appliedCoupon: usingCoupon ? coupon!.code : null,
+        mercadoPagoPublicKey: config.payments.mercadoPago.publicKey ?? null,
+      },
       201
     );
   } catch (error) {

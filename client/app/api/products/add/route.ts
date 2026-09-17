@@ -8,6 +8,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { requirePermission } from "@/lib/auth/guard";
+import { logStockMovement } from "@/lib/stock/stockMovements";
 
 type Variation = {
   name: string;
@@ -41,7 +42,7 @@ async function ensureProductSchema() {
 
 export async function POST(req: Request) {
   try {
-    const { denied } = await requirePermission("products.write");
+    const { session, denied } = await requirePermission("products.write");
     if (denied) return denied;
 
     const db = getDB();
@@ -90,6 +91,14 @@ export async function POST(req: Request) {
     );
 
     const productId = productResult.rows[0].id;
+
+    if (isPhysical && !stockIsUnlimited && stockCount > 0) {
+      await logStockMovement(db, {
+        productId, variationId: null, productName: name, change: stockCount,
+        reason: "product_created", staffEmail: session?.email ?? null,
+      });
+    }
+
     var variationsRaw = formData.get("variations");
     if (variationsRaw) {
       const variations = JSON.parse(String(variationsRaw));
@@ -99,11 +108,17 @@ export async function POST(req: Request) {
           if (isPhysical) {
             var vIsUnlimited = Boolean(v.isUnlimited);
             var vStockCount = vIsUnlimited ? 0 : Number(v.stockCount ?? 0) || 0;
-            await db.query(
+            const variationResult = await db.query(
               `INSERT INTO product_variations (product_id, name, price, stock_count, is_unlimited)
-               VALUES ($1, $2, $3, $4, $5)`,
+               VALUES ($1, $2, $3, $4, $5) RETURNING id`,
               [productId, v.name, vPrice, vStockCount, vIsUnlimited]
             );
+            if (!vIsUnlimited && vStockCount > 0) {
+              await logStockMovement(db, {
+                productId, variationId: variationResult.rows[0].id, productName: name, variationName: v.name,
+                change: vStockCount, reason: "product_created", staffEmail: session?.email ?? null,
+              });
+            }
           } else {
             await db.query(
               `INSERT INTO product_variations (product_id, name, price)

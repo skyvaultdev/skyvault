@@ -97,3 +97,37 @@ body::before {
     color: inherit;
     text-decoration: none;
 }
+
+/* Modal padrão do site inteiro — várias telas (Pedidos, Orders, chat)
+   redefinem isso localmente com pequenas variações; isso aqui é o
+   fallback global, usado por qualquer página que não tenha seu próprio
+   CSS de modal (ex: catálogo, produto), como o ModalProvider global. */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modalContent {
+  max-width: 420px;
+  width: 92vw;
+  display: grid;
+  gap: 14px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  border-radius: 18px;
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+}
+
+.modalContent h4 {
+  margin: 0;
+}

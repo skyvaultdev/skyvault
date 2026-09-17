@@ -1,12 +1,12 @@
 "use server";
 
-import { createTransport } from "nodemailer";
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { getDB } from "@/lib/database/db";
 import { readFile } from "fs/promises";
 import path from "path";
 import { rateLimit } from "@/lib/security/rateLimit";
+import { getMailTransporter } from "@/lib/mail/transporter";
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -17,7 +17,7 @@ function hashCode(code: string) {
 }
 
 export async function POST(req: Request) {
- 
+
 
   const { email } = await req.json();
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
   const db = await getDB();
 
-  
+
   const storeResult = await db.query(`
     SELECT
       store_name,
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     );
   }
 
-  
+
 
   const storeName = store.store_name || "Minha Loja";
 
@@ -68,14 +68,14 @@ export async function POST(req: Request) {
 
   const secondaryColor = store.secondary_color || "#ffffff";
 
-  
+
 
   let logoAttachment = undefined;
   let logoHtml = "";
 
   if (store.logo_url) {
     try {
-      
+
 
       const logoPath = path.join(
         process.cwd(),
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
         store.logo_url.replace(/^\/+/, "")
       );
 
-     
+
       const logoBuffer = await readFile(logoPath);
 
 
@@ -113,23 +113,14 @@ export async function POST(req: Request) {
         >
       `;
     } catch (error) {
-      
+
 
       console.error("Erro ao carregar logo da loja:", error);
     }
   }
 
 
-  const transporter = createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-
-    auth: {
-      user: process.env.EMAIL_USER!,
-      pass: process.env.EMAIL_PASS!,
-    },
-  });
+  const transporter = getMailTransporter();
 
   const code = generateCode();
 
@@ -139,14 +130,14 @@ export async function POST(req: Request) {
     Date.now() + 10 * 60 * 1000
   );
 
-  
+
 
   await db.query(
     `DELETE FROM email_verification WHERE email = $1`,
     [email]
   );
 
- 
+
 
   await transporter.sendMail({
     from: process.env.EMAIL_USER,

@@ -1,5 +1,14 @@
 import { withTransaction } from "@/lib/database/db";
 import type { DeliveredDigitalItem } from "@/lib/mail/sendOrderDeliveryEmail";
+import { logStockMovement } from "@/lib/stock/stockMovements";
+
+export type StockShortage = {
+  productName: string;
+  variationName: string | null;
+  requested: number;
+  delivered: number;
+  shortage: number;
+};
 
 export type ConfirmOrderPaymentResult = {
   alreadyProcessed: boolean;
@@ -7,12 +16,14 @@ export type ConfirmOrderPaymentResult = {
   customerEmail: string | null;
   deliveredItems: DeliveredDigitalItem[];
   hasPhysical: boolean;
+  stockShortages: StockShortage[];
 };
 
 // Núcleo atômico da confirmação de pagamento — chamado tanto pelo endpoint
-// de teste (mock-confirm-payment) quanto pelo webhook real da EfiBank (fase 5).
-// Idempotente: se o pedido já está pago, não repete o débito de estoque nem
-// o crédito no saldo (a EfiBank pode reenviar o mesmo webhook mais de uma vez).
+// de teste (mock-confirm-payment) quanto pelo webhook real do Mercado Pago
+// e por /api/checkout/pay (cartão, que confirma na hora). Idempotente: se
+// o pedido já está pago, não repete o débito de estoque (o Mercado Pago
+// pode reenviar o mesmo webhook mais de uma vez).
 export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrderPaymentResult> {
   return withTransaction(async (client) => {
     const orderRes = await client.query(`SELECT * FROM orders WHERE id = $1 FOR UPDATE`, [orderId]);
@@ -25,7 +36,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
     const customerEmail = emailRes.rows[0]?.email ?? null;
 
     if (order.status === "paid" || order.status === "delivered") {
-      return { alreadyProcessed: true, order, customerEmail, deliveredItems: [], hasPhysical: false };
+      return { alreadyProcessed: true, order, customerEmail, deliveredItems: [], hasPhysical: false, stockShortages: [] };
     }
 
     await client.query(
@@ -38,6 +49,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
     const itemsRes = await client.query(`SELECT * FROM order_items WHERE order_id = $1`, [orderId]);
 
     const deliveredItems: DeliveredDigitalItem[] = [];
+    const stockShortages: StockShortage[] = [];
     let hasPhysical = false;
 
     for (const item of itemsRes.rows) {
@@ -46,8 +58,13 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       const targetId = isVariation ? item.variation_id : item.product_id;
       if (!targetId) continue; // produto/variação removido depois da compra
 
+      // FOR UPDATE trava a linha até essa transação terminar — se duas
+      // confirmações concorrentes disputarem o mesmo produto, a segunda
+      // fica bloqueada aqui até a primeira commitar, e enxerga o
+      // stock_count JÁ atualizado. É isso que evita overselling por race
+      // condition, não a lógica abaixo.
       const infoRes = await client.query(
-        `SELECT stock_type, stock_content, is_unlimited FROM ${table} WHERE id = $1 FOR UPDATE`,
+        `SELECT stock_type, stock_content, stock_count, is_unlimited FROM ${table} WHERE id = $1 FOR UPDATE`,
         [targetId]
       );
       if (infoRes.rows.length === 0) continue;
@@ -56,10 +73,31 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       if (item.product_type === "physical") {
         hasPhysical = true;
         if (!info.is_unlimited) {
+          const available = Number(info.stock_count ?? 0);
+          const actualDecrement = Math.min(item.quantity, available);
+          const shortage = item.quantity - actualDecrement;
+
           await client.query(
             `UPDATE ${table} SET stock_count = GREATEST(stock_count - $1, 0) WHERE id = $2`,
             [item.quantity, targetId]
           );
+          await logStockMovement(client, {
+            productId: item.product_id, variationId: item.variation_id,
+            productName: item.product_name, variationName: item.variation_name,
+            change: -actualDecrement, reason: "sale", orderId,
+            note: shortage > 0 ? `Estoque insuficiente: pedidas ${item.quantity}, disponíveis ${available} — faltaram ${shortage}` : null,
+          });
+
+          if (shortage > 0) {
+            console.error(
+              `[confirmOrderPayment] pedido #${orderId}: estoque insuficiente para "${item.product_name}"` +
+              `${item.variation_name ? ` (${item.variation_name})` : ""} — pedidas ${item.quantity}, disponíveis ${available}, faltaram ${shortage}.`
+            );
+            stockShortages.push({
+              productName: item.product_name, variationName: item.variation_name,
+              requested: item.quantity, delivered: actualDecrement, shortage,
+            });
+          }
         }
         continue;
       }
@@ -68,14 +106,36 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       // file/infinite aqui — key tem sua própria contagem (linhas em
       // stock_keys) e é decrementada junto da reserva, abaixo.
       if (!info.is_unlimited && info.stock_type !== "key") {
+        const available = Number(info.stock_count ?? 0);
+        const actualDecrement = Math.min(item.quantity, available);
+        const shortage = item.quantity - actualDecrement;
+
         await client.query(
           `UPDATE ${table} SET stock_count = GREATEST(stock_count - $1, 0) WHERE id = $2`,
           [item.quantity, targetId]
         );
+        await logStockMovement(client, {
+          productId: item.product_id, variationId: item.variation_id,
+          productName: item.product_name, variationName: item.variation_name,
+          change: -actualDecrement, reason: "sale", orderId,
+          note: shortage > 0 ? `Estoque insuficiente: pedidas ${item.quantity}, disponíveis ${available} — faltaram ${shortage}` : null,
+        });
+
+        // Diferente de físico/key, arquivo/infinito ainda são entregues
+        // mesmo com stock_count zerado (não são um limite real de
+        // fulfillment) — só registra a divergência pra o staff revisar o
+        // cadastro, não bloqueia a entrega.
+        if (shortage > 0) {
+          console.warn(
+            `[confirmOrderPayment] pedido #${orderId}: stock_count insuficiente para "${item.product_name}"` +
+            `${item.variation_name ? ` (${item.variation_name})` : ""} (tipo ${info.stock_type}) — pedidas ${item.quantity}, disponíveis ${available}. Entregue normalmente.`
+          );
+        }
       }
 
       if (info.stock_type === "key") {
         const keyColumn = isVariation ? "variation_id" : "product_id";
+        let keysDelivered = 0;
         for (let i = 0; i < item.quantity; i++) {
           const keyRes = await client.query(
             `UPDATE stock_keys
@@ -89,6 +149,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
             [orderId, targetId]
           );
           if (keyRes.rows.length > 0) {
+            keysDelivered++;
             deliveredItems.push({
               productName: item.product_name,
               variationName: item.variation_name,
@@ -97,11 +158,33 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
             });
           }
         }
-        if (!info.is_unlimited) {
+
+        const keyShortage = item.quantity - keysDelivered;
+        if (keyShortage > 0) {
+          console.error(
+            `[confirmOrderPayment] pedido #${orderId}: estoque de chaves insuficiente para "${item.product_name}"` +
+            `${item.variation_name ? ` (${item.variation_name})` : ""} — pedidas ${item.quantity}, entregues ${keysDelivered}, faltaram ${keyShortage}.`
+          );
+          stockShortages.push({
+            productName: item.product_name, variationName: item.variation_name,
+            requested: item.quantity, delivered: keysDelivered, shortage: keyShortage,
+          });
+        }
+
+        // Decrementa pela quantidade REALMENTE entregue, não pela pedida —
+        // decrementar pela pedida quando faltou chave subtrairia estoque
+        // que nunca existiu, distorcendo a contagem pra sempre.
+        if (!info.is_unlimited && keysDelivered > 0) {
           await client.query(
             `UPDATE ${table} SET stock_count = GREATEST(stock_count - $1, 0) WHERE id = $2`,
-            [item.quantity, targetId]
+            [keysDelivered, targetId]
           );
+          await logStockMovement(client, {
+            productId: item.product_id, variationId: item.variation_id,
+            productName: item.product_name, variationName: item.variation_name,
+            change: -keysDelivered, reason: "sale", orderId,
+            note: keyShortage > 0 ? `Estoque de chaves insuficiente: pedidas ${item.quantity}, entregues ${keysDelivered} — faltaram ${keyShortage}` : null,
+          });
         }
       } else if (info.stock_type === "file") {
         deliveredItems.push({
@@ -122,29 +205,22 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       await client.query(`UPDATE order_items SET delivered_at = NOW() WHERE id = $1`, [item.id]);
     }
 
-    // Saldo único da loja: lock consultivo serializa crédito/resgate
-    // concorrentes sem travar a tabela inteira.
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext('wallet'))`);
-    const balanceRes = await client.query(`SELECT COALESCE(SUM(amount), 0) AS balance FROM wallet_ledger`);
-    const currentBalance = Number(balanceRes.rows[0].balance);
-    const credit = Number(order.subtotal) + Number(order.shipping_fee) - Number(order.platform_fee);
-    const newBalance = currentBalance + credit;
-
-    await client.query(
-      `INSERT INTO wallet_ledger (order_id, type, amount, balance_after, note)
-       VALUES ($1, 'sale_credit', $2, $3, $4)`,
-      [orderId, credit, newBalance, `Venda do pedido #${orderId}`]
-    );
-
+    // Sem passo de saldo interno: o pagamento já cai direto na conta
+    // Mercado Pago do dono da loja (credencial dele) — não tem dinheiro
+    // pra "creditar" por dentro do nosso sistema.
     if (hasPhysical) {
       const quoteRes = await client.query(
         `SELECT carrier_id, price FROM shipping_quotes WHERE order_id = $1 AND selected = true LIMIT 1`,
         [orderId]
       );
       const quote = quoteRes.rows[0];
-      await client.query(
-        `INSERT INTO shipments (order_id, carrier_id, shipping_cost, status) VALUES ($1, $2, $3, 'preparing')`,
+      const shipmentRes = await client.query(
+        `INSERT INTO shipments (order_id, carrier_id, shipping_cost, status) VALUES ($1, $2, $3, 'preparing') RETURNING id`,
         [orderId, quote?.carrier_id ?? null, quote?.price ?? null]
+      );
+      await client.query(
+        `INSERT INTO shipment_events (shipment_id, status, description) VALUES ($1, 'preparing', 'Pedido pago — preparando envio')`,
+        [shipmentRes.rows[0].id]
       );
     }
 
@@ -156,6 +232,6 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       [orderId, finalStatus]
     );
 
-    return { alreadyProcessed: false, order: finalRes.rows[0], customerEmail, deliveredItems, hasPhysical };
+    return { alreadyProcessed: false, order: finalRes.rows[0], customerEmail, deliveredItems, hasPhysical, stockShortages };
   });
 }

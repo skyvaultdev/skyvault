@@ -9,16 +9,15 @@ export type DashboardTab = "inicio"
   | "background"
   | "posicao"
   | "estoque"
+  | "registrosEstoque"
   | "chat"
   | "equipe"
   | "pedidos"
-  | "saldo"
   | "transportadoras"
-  | "pagamentos";
+  | "pagamentos"
+  | "geral";
 
-// Keeping this as a literal union (instead of a bare `string`) means a typo
-// like "dashbord.access" fails at compile time instead of silently locking
-// a tab forever.
+
 export type Permission =
   | "dashboard.access"
   | "store.customize"
@@ -27,8 +26,8 @@ export type Permission =
   | "team.manage"
   | "orders.read"
   | "orders.manage"
-  | "wallet.manage"
   | "shipping.manage"
+  | "shipping.credentials"
   | "payments.manage";
 
 type SidebarProps = {
@@ -52,11 +51,12 @@ const MENU_ITEMS: Array<{ key: DashboardTab; label: string; permission: Permissi
   { key: "background", label: "Background", permission: "store.customize" },
   { key: "posicao", label: "Posição Categorias", permission: "products.write" },
   { key: "estoque", label: "Estoque", permission: "products.write" },
+  { key: "registrosEstoque", label: "Registros Estoque", permission: "products.write" },
   { key: "chat", label: "Chat", permission: "chat.access" },
   { key: "pedidos", label: "Pedidos", permission: "orders.read" },
-  { key: "saldo", label: "Saldo", permission: "wallet.manage" },
   { key: "transportadoras", label: "Transportadoras", permission: "shipping.manage" },
   { key: "pagamentos", label: "Pagamentos", permission: "payments.manage" },
+  { key: "geral", label: "Geral", permission: "store.customize" },
   { key: "equipe", label: "Equipe", permission: "team.manage" },
 ];
 
@@ -115,6 +115,7 @@ export default function Sidebar({
 
         const className = [
           "settingsMenuItem",
+          item.key === "chat" && "settingsMenuItemChat",
           isActive && "active",
           !allowed && "disabled",
         ].filter(Boolean).join(" ");

@@ -4,6 +4,7 @@ import { existsSync } from "fs";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/guard";
+import { logStockMovement } from "@/lib/stock/stockMovements";
 
 type RouteParams = {
   params: Promise<{ id: string; target: string }>;
@@ -13,7 +14,7 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const BANNED_EXTENSIONS = [".exe", ".bat", ".cmd", ".sh", ".php", ".js", ".vbs"];
 
 export async function POST(req: Request, { params }: RouteParams) {
-  const { denied } = await requirePermission("products.write");
+  const { session, denied } = await requirePermission("products.write");
   if (denied) return denied;
 
   var { id, target } = await params;
@@ -57,15 +58,43 @@ export async function POST(req: Request, { params }: RouteParams) {
     
     const db = getDB();
     var table = target === "variation" ? "product_variations" : "products";
+
+    const beforeRes = await db.query(`SELECT stock_count, name FROM ${table} WHERE id = $1`, [id]);
+    const before = beforeRes.rows[0];
+
     await db.query(
-      `UPDATE ${table} 
-       SET stock_type = $1, 
-           stock_content = $2, 
+      `UPDATE ${table}
+       SET stock_type = $1,
+           stock_content = $2,
            stock_count = $3,
            is_unlimited = $5
        WHERE id = $4`,
       [type, content, count, id, isUnlimited]
     );
+
+    if (before) {
+      const delta = count - Number(before.stock_count ?? 0);
+      let productId: number | null = null;
+      let variationId: number | null = null;
+      let productName = before.name;
+      let variationName: string | null = null;
+      if (target === "variation") {
+        variationId = Number(id);
+        const parentRes = await db.query(
+          `SELECT p.name FROM product_variations v JOIN products p ON p.id = v.product_id WHERE v.id = $1`,
+          [id]
+        );
+        productName = parentRes.rows[0]?.name ?? before.name;
+        variationName = before.name;
+      } else {
+        productId = Number(id);
+      }
+      await logStockMovement(db, {
+        productId, variationId, productName, variationName,
+        change: delta, reason: "manual_adjustment", staffEmail: session?.email ?? null,
+        note: "Configuração de estoque digital",
+      });
+    }
 
     return ok({ message: "UPDATED", count, fileName: content }, 200);
 

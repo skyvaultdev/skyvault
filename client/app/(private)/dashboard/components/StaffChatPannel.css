@@ -1,7 +1,7 @@
 .chatLayout {
   display: flex;
-  height: min(640px, calc(100vh - 220px));
-  min-height: 420px;
+  height: min(640px, calc(100vh - 270px));
+  min-height: 380px;
   gap: 16px;
   width: 100%;
   max-width: 100%;
@@ -162,6 +162,9 @@
 }
 
 .chatThreadHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--chat-border);
   color: #fff;
@@ -169,8 +172,88 @@
   font-weight: 700;
   flex-shrink: 0;
   overflow: hidden;
+}
+
+.chatThreadHeader strong {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.chatCloseTicketBtn {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  min-height: 0;
+  height: auto;
+}
+
+.chatViewSwitch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.chatViewSwitch button {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chatViewSwitch button.active {
+  background: color-mix(in srgb, var(--primary), transparent 80%);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.chatViewSwitchDivider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 2px 2px;
+}
+
+.chatTicketStatusBtn {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  opacity: 0.75;
+}
+
+.chatTicketStatusBtn.active {
+  opacity: 1;
+}
+
+.chatViewSwitchBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ff4d4d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chatTicketOrderBadge {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary), transparent 82%);
+  color: #fff;
 }
 
 .chatThread > .emptyMsg {

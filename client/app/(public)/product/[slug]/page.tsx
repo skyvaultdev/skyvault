@@ -6,6 +6,8 @@ import "./product.css";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiLock, FiX, FiMaximize2 } from "react-icons/fi";
+import ShippingQuoteList, { type ShippingQuote } from "@/app/(components)/shipping/ShippingQuoteList";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type ProductImage = { id: number; url: string; position: number };
 
@@ -57,6 +59,7 @@ function getSimilarity(a: string, b: string) {
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
+  const modal = useModal();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<Variations[]>([]);
@@ -72,6 +75,11 @@ export default function ProductPage() {
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
 
   const [loadingAdd, setLoadingAdd] = useState(false);
+
+  const [freightCep, setFreightCep] = useState("");
+  const [freightQuotes, setFreightQuotes] = useState<ShippingQuote[]>([]);
+  const [freightQuoting, setFreightQuoting] = useState(false);
+  const [freightError, setFreightError] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 3;
@@ -236,6 +244,56 @@ export default function ProductPage() {
     return target.is_unlimited || target.stock_count > 0;
   }, [product, selectedVariation]);
 
+  useEffect(() => {
+    async function prefillCep() {
+      try {
+        const res = await fetch("/api/profile", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.data?.cep) setFreightCep(json.data.cep);
+      } catch {
+        // sem login ou sem CEP salvo — o campo fica em branco, usuário digita na hora
+      }
+    }
+    void prefillCep();
+  }, []);
+
+  useEffect(() => {
+    setFreightQuotes([]);
+    setFreightError("");
+  }, [selectedVariationPos]);
+
+  async function calculateFreight() {
+    if (!product) return;
+    const digits = freightCep.replace(/\D/g, "");
+    if (digits.length !== 8) {
+      setFreightError("CEP inválido.");
+      return;
+    }
+
+    setFreightQuoting(true);
+    setFreightError("");
+    setFreightQuotes([]);
+
+    try {
+      const res = await fetch(`/api/products/${product.id}/quote-shipping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cep: digits, variationId: selectedVariation?.id }),
+      });
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.data) && json.data.length > 0) {
+        setFreightQuotes(json.data);
+      } else {
+        setFreightError("Não foi possível calcular o frete pra esse CEP.");
+      }
+    } catch {
+      setFreightError("Erro ao calcular o frete.");
+    } finally {
+      setFreightQuoting(false);
+    }
+  }
+
   async function applyCoupon() {
     if (!product) return;
 
@@ -285,12 +343,12 @@ export default function ProductPage() {
         if (data?.error === "UNAUTHORIZED_TOKEN") {
           router.push("/login");
         } else {
-          alert("Erro ao adicionar: " + (data?.message ?? "Erro desconhecido"));
+          await modal.alert("Erro ao adicionar: " + (data?.message ?? "Erro desconhecido"));
         }
       }
     } catch (error) {
       console.error("Erro ao adicionar ao carrinho:", error);
-      alert("Erro inesperado ao adicionar ao carrinho.");
+      await modal.alert("Erro inesperado ao adicionar ao carrinho.");
     } finally {
       setLoadingAdd(false);
     }
@@ -306,11 +364,11 @@ export default function ProductPage() {
       } else if (data?.error === "UNAUTHORIZED_TOKEN") {
         router.push("/login");
       } else {
-        alert("Erro ao comprar: " + (data?.message ?? "Erro desconhecido"));
+        await modal.alert("Erro ao comprar: " + (data?.message ?? "Erro desconhecido"));
       }
     } catch (error) {
       console.error("Erro ao comprar agora:", error);
-      alert("Erro inesperado ao iniciar a compra.");
+      await modal.alert("Erro inesperado ao iniciar a compra.");
     } finally {
       setLoadingAdd(false);
     }
@@ -395,9 +453,23 @@ export default function ProductPage() {
           )}
 
           {product.product_type === "physical" && (
-            <p className="shippingNotice">
-              📦 Produto físico — frete calculado no checkout
-            </p>
+            <div className="freightCalc">
+              <p className="freightCalcLabel">📦 Calcular frete e prazo de entrega</p>
+              <div className="freightCalcRow">
+                <input
+                  className="freightCalcInput"
+                  placeholder="Seu CEP"
+                  value={freightCep}
+                  onChange={(e) => setFreightCep(e.target.value.replace(/[^\d-]/g, ""))}
+                  maxLength={9}
+                />
+                <button className="freightCalcBtn" onClick={calculateFreight} disabled={freightQuoting}>
+                  {freightQuoting ? "Calculando..." : "Calcular"}
+                </button>
+              </div>
+              {freightError && <p className="freightCalcError">{freightError}</p>}
+              <ShippingQuoteList quotes={freightQuotes} />
+            </div>
           )}
 
           <div className="actions">

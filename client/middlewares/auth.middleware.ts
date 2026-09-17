@@ -27,7 +27,7 @@ export async function authMiddleware(req: NextRequest) {
 
   let response = NextResponse.next();
   const syncRes = await fetch(
-    new URL("/api/internal/sync-user", req.url),
+    new URL("/api/internal/sync-user", config.WEBSITE_URL),
     {
       method: "POST",
       headers: {

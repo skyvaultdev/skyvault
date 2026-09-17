@@ -1,0 +1,210 @@
+.stockMovFilterRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stockMovFilterRow .searchInput {
+  flex: 1;
+  min-width: 180px;
+}
+
+.searchInput {
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  padding: 0 14px;
+  font-size: 13.5px;
+}
+
+.searchInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.quickFilterChips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0 4px;
+}
+
+.quickFilterChip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.quickFilterChip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.quickFilterChip.active {
+  background: color-mix(in srgb, var(--primary), transparent 78%);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.loadingMsg,
+.emptyMsg {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  padding: 8px 2px;
+}
+
+.stockMovList {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.stockMovRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 0;
+}
+
+.stockMovThumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stockMovInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.stockMovProductName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stockMovMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.stockMovReasonBadge {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.stockMovReasonBadge.reason-sale {
+  background: rgba(120, 130, 255, 0.18);
+  color: #a3adff;
+}
+
+.stockMovReasonBadge.reason-cancel_restock {
+  background: rgba(240, 180, 41, 0.18);
+  color: #f0b429;
+}
+
+.stockMovReasonBadge.reason-manual_adjustment {
+  background: rgba(0, 200, 90, 0.16);
+  color: #6bffb0;
+}
+
+.stockMovReasonBadge.reason-product_created {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.stockMovOrderRef,
+.stockMovStaff {
+  white-space: nowrap;
+}
+
+.stockMovNote {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.stockMovRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.stockMovChange {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stockMovChange.in {
+  color: #6bffb0;
+}
+
+.stockMovChange.out {
+  color: #ff8484;
+}
+
+.stockMovDate {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+
+.ordersPagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 8px 0;
+}
+
+.ordersPaginationInfo {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .stockMovRow {
+    flex-wrap: wrap;
+  }
+
+  .stockMovRight {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-left: 52px;
+  }
+}

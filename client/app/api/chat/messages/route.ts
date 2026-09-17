@@ -4,16 +4,20 @@ import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { getSession } from "@/lib/jwt/session";
 
+// is_ticket = false garante que isso nunca reaproveita (nem cria em cima
+// de) uma conversa de ticket aberta pro mesmo cliente — chat geral e
+// tickets de pedido específico coexistem sem se misturar (ver
+// app/api/chat/tickets/route.ts).
 async function getOrCreateConversation(email: string) {
   const db = await getDB();
   const existing = await db.query(
-    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' ORDER BY id DESC LIMIT 1`,
+    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND is_ticket = false AND status = 'open' ORDER BY id DESC LIMIT 1`,
     [email]
   );
   if (existing.rows[0]) return existing.rows[0].id as number;
 
   const created = await db.query(
-    `INSERT INTO chat_conversations (customer_email, status, last_message_at) VALUES ($1, 'open', now()) RETURNING id`,
+    `INSERT INTO chat_conversations (customer_email, status, last_message_at, is_ticket) VALUES ($1, 'open', now(), false) RETURNING id`,
     [email]
   );
   return created.rows[0].id as number;

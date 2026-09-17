@@ -6,12 +6,12 @@ import { requireCustomer } from "@/lib/auth/customer";
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
 import { sendOrderDeliveryEmail } from "@/lib/mail/sendOrderDeliveryEmail";
 
-// Endpoint de teste — simula o webhook que a EfiBank mandaria quando o
-// pagamento de verdade cai. O cliente só pode "confirmar" o próprio
-// pedido, e só se esse pedido específico foi criado no modo mock — um
-// pedido que já foi cobrado de verdade (payment_transactions.provider =
-// 'efibank') nunca pode ser "confirmado" por aqui, senão dava pra
-// desbloquear uma compra sem pagar.
+// Endpoint de teste — simula o webhook que o Mercado Pago mandaria quando
+// um Pix/boleto pendente é pago (cartão já confirma na hora, em
+// /api/checkout/pay). O cliente só pode "confirmar" o próprio pedido, e só
+// se esse pedido específico foi criado no modo mock — um pedido cobrado de
+// verdade (payment_transactions.provider = 'mercadopago') nunca pode ser
+// "confirmado" por aqui, senão dava pra desbloquear uma compra sem pagar.
 export async function POST(req: Request) {
   try {
     const { userId, denied } = await requireCustomer();
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       [orderIdNum, userId]
     );
     if (ownerCheck.rows.length === 0) return fail("ORDER_NOT_FOUND", 404);
-    if (ownerCheck.rows[0].provider === "efibank") {
+    if (ownerCheck.rows[0].provider === "mercadopago") {
       return fail("MOCK_DISABLED_FOR_REAL_PAYMENT", 403);
     }
 
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
         await sendOrderDeliveryEmail({
           to: result.customerEmail,
           orderId: orderIdNum,
+          orderNumber: result.order?.order_number,
           items: result.deliveredItems,
         });
       } catch (mailError) {

@@ -42,7 +42,8 @@ export async function POST(req: Request) {
     const originRes = await db.query(`SELECT origin_cep FROM store_settings ORDER BY id DESC LIMIT 1`);
     const originCep = originRes.rows[0]?.origin_cep ?? "";
 
-    const quotes = await getShippingProvider().quote({ originCep, destinationCep: cepDigits, packages });
+    const provider = await getShippingProvider();
+    const quotes = await provider.quote({ originCep, destinationCep: cepDigits, packages });
     return ok(quotes);
   } catch (error) {
     if (error instanceof Error && error.message === "SHIPPING_ORIGIN_NOT_CONFIGURED") {

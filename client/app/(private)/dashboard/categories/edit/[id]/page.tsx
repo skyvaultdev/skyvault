@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import "./category.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type Product = {
   id: number;
@@ -15,6 +16,7 @@ type Product = {
 export default function EditCategoryPage() {
   const params = useParams();
   const categoryId = params.id; // Pode ser ID ou Slug
+  const modal = useModal();
 
   const [name, setName] = useState("");
   const [currentId, setCurrentId] = useState<number | null>(null);
@@ -64,7 +66,7 @@ export default function EditCategoryPage() {
   }
 
   async function submit() {
-    if (!name.trim()) return alert("Digite um nome");
+    if (!name.trim()) return modal.alert("Digite um nome");
 
     setSaving(true);
     var form = new FormData();
@@ -87,7 +89,7 @@ export default function EditCategoryPage() {
     setSaving(false);
 
     if (!res.ok) {
-      alert(json.error || "Erro ao editar categoria");
+      await modal.alert(json.error || "Erro ao editar categoria");
       return;
     }
 

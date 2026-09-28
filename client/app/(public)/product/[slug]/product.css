@@ -212,9 +212,16 @@ html {
 
 .variationList {
   display: grid;
-  width:350px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   gap: 10px;
   margin-top: 10px;
+}
+
+.variationBlock {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .variationItem {
@@ -227,6 +234,9 @@ html {
   padding: 16px;
   cursor: pointer;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  gap: 12px;
   text-align: left;
   color: white;
   transition: all 0.2s;
@@ -269,6 +279,8 @@ html {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 
 .variationName {
@@ -276,6 +288,7 @@ html {
   font-size: 16px;
   color: white;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .variationStock {
@@ -285,6 +298,8 @@ html {
 }
 
 .variationPrice {
+  flex-shrink: 0;
+  white-space: nowrap;
   color: var(--primary);
   font-weight: bold;
   font-size: 18px;
@@ -340,21 +355,21 @@ html {
 
 .btncartadd:hover {
   transform: translateY(-1px);
-  border-color: blue;
-  background-color: blue;
+  border-color: var(--secondary);
+  background-color: color-mix(in srgb, var(--secondary), transparent 75%);
 }
 
 .variationItem.outOfStock {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
-  background-color: #bdbdbd;
-  border-color: #747474;
-  pointer-events: none; 
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
 }
 
 .variationItem.outOfStock .variationName,
 .variationItem.outOfStock .variationPrice {
-  color: #505050;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .btnPrimary:disabled, 
@@ -425,25 +440,32 @@ html {
 .similarSection {
   display: grid;
   gap: 12px;
-  justify-content: center;
+  width: 100%;
+  max-width: 1100px;
+  margin: 28px auto 0;
+  padding: 0 4px;
+  box-sizing: border-box;
 }
 
 .similarTitle {
-  display: flex;
-  justify-content: start;
-  margin-left: -245px;
+  margin: 0;
+  font-size: 20px;
+  text-align: left;
 }
 
 .similarGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
-  padding: 20px 0;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 8px 0 20px;
 }
 
 .similarCard {
+  cursor: pointer;
+  padding: 0;
+  gap: 0;
   background: var(--bg-card);
-  border-radius: 12px;
+  border-radius: 14px;
   text-decoration: none;
   color: var(--text-primary);
   display: flex;
@@ -690,12 +712,12 @@ html {
   }
 
   .similarSection h2 {
-    margin: auto;
+    margin: 0;
   }
 
   .similarGrid {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
     padding: 10px 0;
   }
 
@@ -747,4 +769,26 @@ html {
     top: 14px;
     right: 14px;
   }
+}
+.paymentMethodList {
+  list-style: none;
+  margin: 8px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.paymentMethodList li {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.paymentMethodHint {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.55;
 }

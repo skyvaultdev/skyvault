@@ -2,6 +2,7 @@
 
 import "./BrazilMap.css";
 
+import Icon from "@/components/icons/Icon";
 // Silhueta simplificada do Brasil (não é geodata oficial, é um contorno
 // aproximado desenhado à mão em coordenadas lon/lat) + centróide aproximado
 // de cada UF. "Aproximado" de propósito: não temos rastreio GPS em tempo
@@ -57,7 +58,7 @@ export default function BrazilMap({ state, city }: Props) {
       </svg>
       <p className="brazilMapLabel">
         {coords
-          ? <>📍 {city ? `${city} — ` : ""}{uf}</>
+          ? <><Icon name="pin" /> {city ? `${city} — ` : ""}{uf}</>
           : "Localização ainda não informada"}
       </p>
     </div>

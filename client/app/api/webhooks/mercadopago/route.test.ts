@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import crypto from "crypto";
 
 // Simula o webhook do Mercado Pago sem bater no banco/API real — só a
 // LÓGICA do handler é testada aqui (roteamento de decisões, idempotência,
@@ -33,12 +34,46 @@ vi.mock("@/lib/mail/sendOrderDeliveryEmail", () => ({
   sendOrderDeliveryEmail: (args: unknown) => sendOrderDeliveryEmailMock(args),
 }));
 
+// Sem isso os testes competiriam pelo mesmo Map em memória do rate limiter
+// de verdade (chave "unknown", já que a Request de teste não tem
+// x-forwarded-for) — mocka pra manter os testes isolados uns dos outros.
+vi.mock("@/lib/security/rateLimit", () => ({
+  rateLimit: () => true,
+}));
+
 const { POST } = await import("./route");
 
 function webhookRequest(dataId: string | null) {
   return new Request("https://example.com/api/webhooks/mercadopago", {
     method: "POST",
     body: JSON.stringify(dataId ? { type: "payment", data: { id: dataId } } : {}),
+  });
+}
+
+// Confirmado ao vivo: o Mercado Pago também manda o id como query string,
+// não só no corpo — formato novo (?data.id=X&type=payment) e formato
+// antigo/IPN (?id=X&topic=payment), quase sempre com o corpo vazio.
+function webhookQueryRequest(query: string) {
+  return new Request(`https://example.com/api/webhooks/mercadopago?${query}`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+// Reproduz o formato de assinatura documentado pelo Mercado Pago, pra
+// testar o caminho bloqueante de verdade (não só com webhookSecret null).
+function signedWebhookRequest(dataId: string, secret: string, options?: { tamperSignature?: boolean }) {
+  const ts = String(Math.floor(Date.now() / 1000));
+  const requestId = "req-abc-123";
+  const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+  const hash = options?.tamperSignature
+    ? "0".repeat(64)
+    : crypto.createHmac("sha256", secret).update(manifest).digest("hex");
+
+  return new Request("https://example.com/api/webhooks/mercadopago", {
+    method: "POST",
+    headers: { "x-signature": `ts=${ts},v1=${hash}`, "x-request-id": requestId },
+    body: JSON.stringify({ type: "payment", data: { id: dataId } }),
   });
 }
 
@@ -115,6 +150,46 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(json.data.received).toBe(true);
   });
 
+  it("lê o id da query string no formato novo (?data.id=X&type=payment), não só do corpo", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
+    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    confirmOrderPaymentMock.mockResolvedValue({
+      alreadyProcessed: false,
+      order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
+      customerEmail: "cliente@teste.com",
+      deliveredItems: [],
+      hasPhysical: false,
+      stockShortages: [],
+    });
+
+    const res = await POST(webhookQueryRequest(`data.id=${TXID}&type=payment`));
+    const json = await res.json();
+
+    expect(getMercadoPagoPaymentStatusMock).toHaveBeenCalledWith(TXID);
+    expect(confirmOrderPaymentMock).toHaveBeenCalledWith(ORDER_ID);
+    expect(json.data.received).toBe(true);
+  });
+
+  it("lê o id da query string no formato antigo/IPN (?id=X&topic=payment)", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
+    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    confirmOrderPaymentMock.mockResolvedValue({
+      alreadyProcessed: false,
+      order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
+      customerEmail: "cliente@teste.com",
+      deliveredItems: [],
+      hasPhysical: false,
+      stockShortages: [],
+    });
+
+    const res = await POST(webhookQueryRequest(`id=${TXID}&topic=payment`));
+    const json = await res.json();
+
+    expect(getMercadoPagoPaymentStatusMock).toHaveBeenCalledWith(TXID);
+    expect(confirmOrderPaymentMock).toHaveBeenCalledWith(ORDER_ID);
+    expect(json.data.received).toBe(true);
+  });
+
   it("ignora um txid que não corresponde a nenhuma transação nossa", async () => {
     queryMock.mockResolvedValueOnce({ rows: [] });
 
@@ -138,5 +213,50 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(json.ok).toBe(false);
     expect(json.error).toBe("DELIVERY_FAILED");
     expect(sendOrderDeliveryEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("processa mesmo se a assinatura não confere — nunca pode bloquear um pagamento real (só loga um aviso)", async () => {
+    // Confirmado ao vivo em produção: bloquear por assinatura rejeitou
+    // notificações LEGÍTIMAS do Mercado Pago (401 em payload real). A
+    // segurança de verdade vem do provider_txid bater com uma transação
+    // nossa + da confirmação via GET autenticado abaixo, não da assinatura.
+    loadMercadoPagoCredentialsMock.mockResolvedValue({ webhookSecret: "shhh-secret" });
+    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
+    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    confirmOrderPaymentMock.mockResolvedValue({
+      alreadyProcessed: false,
+      order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
+      customerEmail: "cliente@teste.com",
+      deliveredItems: [],
+      hasPhysical: false,
+      stockShortages: [],
+    });
+
+    const res = await POST(signedWebhookRequest(TXID, "shhh-secret", { tamperSignature: true }));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(confirmOrderPaymentMock).toHaveBeenCalledWith(ORDER_ID);
+    expect(json.data.received).toBe(true);
+  });
+
+  it("processa normalmente quando a assinatura do webhook confere", async () => {
+    loadMercadoPagoCredentialsMock.mockResolvedValue({ webhookSecret: "shhh-secret" });
+    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
+    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    confirmOrderPaymentMock.mockResolvedValue({
+      alreadyProcessed: false,
+      order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
+      customerEmail: "cliente@teste.com",
+      deliveredItems: [],
+      hasPhysical: false,
+      stockShortages: [],
+    });
+
+    const res = await POST(signedWebhookRequest(TXID, "shhh-secret"));
+    const json = await res.json();
+
+    expect(confirmOrderPaymentMock).toHaveBeenCalledWith(ORDER_ID);
+    expect(json.data.received).toBe(true);
   });
 });

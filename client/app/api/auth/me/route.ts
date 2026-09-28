@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyJWT } from "@/lib/jwt/init";
+import { verifyJWTForStore } from "@/lib/jwt/storeAware";
 import { getDB } from "@/lib/database/db";
 
 export async function GET() {
@@ -13,7 +13,7 @@ export async function GET() {
 
   try {
 
-    var payload = (await verifyJWT(token)) as { role?: string, email?: string };
+    var payload = (await verifyJWTForStore(token)) as { role?: string, email?: string };
     var email = payload.email;
     const db = getDB();
 

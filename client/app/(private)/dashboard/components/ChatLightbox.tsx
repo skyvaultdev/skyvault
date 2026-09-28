@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import Icon from "@/components/icons/Icon";
 type MediaItem = {
   id: number | string;
   url: string;
@@ -33,7 +34,7 @@ export default function ChatLightbox({ items, index, onClose, onIndexChange }: C
 
   return (
     <div className="chatLightboxOverlay" onClick={onClose}>
-      <button className="chatLightboxClose" onClick={onClose}>✕</button>
+      <button className="chatLightboxClose" onClick={onClose}><Icon name="x" /></button>
 
       {index > 0 && (
         <button

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useRef } from "react";
+import Icon from "@/components/icons/Icon";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import "./edit.css";
@@ -30,6 +31,13 @@ type FormState = {
   id?: number; name: string; description: string; price: string; categoryId: string; active: boolean;
   productType: ProductType; sku: string; weightGrams: string; lengthCm: string; widthCm: string; heightCm: string;
   stockCount: string; stockIsUnlimited: boolean;
+};
+
+const PHYSICAL_MESSAGES: Record<string, string> = {
+  PHYSICAL_DIMENSIONS_REQUIRED: "Produto físico precisa de peso e medidas (comprimento, largura e altura) — sem isso o frete é calculado errado.",
+  PHYSICAL_DIMENSIONS_INVALID: "Peso e medidas precisam ser números maiores que zero.",
+  PHYSICAL_DIMENSIONS_TOO_LARGE: "Peso (máx. 50 kg) ou medidas (máx. 200 cm) acima do limite de envio.",
+  INVALID_STOCK_COUNT: "O estoque precisa ser um número inteiro, zero ou maior.",
 };
 
 export default function EditProductPage() {
@@ -214,7 +222,7 @@ export default function EditProductPage() {
             setFeedback("");
             setShowSuccessModal(true);
         } else {
-            setFeedback("Erro ao atualizar produto.");
+            setFeedback(PHYSICAL_MESSAGES[json.error] ?? "Erro ao atualizar produto.");
         }
     } catch (err) {
         setFeedback("Erro de conexão.");
@@ -228,7 +236,7 @@ export default function EditProductPage() {
       {showSuccessModal && (
         <div className="modalOverlay">
           <div className="modalContent">
-            <div className="modalIcon">✓</div>
+            <div className="modalIcon"><Icon name="check" /></div>
             <h2>Produto Atualizado!</h2>
             <p>As alterações em <strong>{form.name}</strong> foram salvas com sucesso.</p>
             <div className="modalButtons">
@@ -355,7 +363,7 @@ export default function EditProductPage() {
                       {" "}({v.isUnlimited ? "ilimitado" : `${v.stockCount || 0} em estoque`})
                     </span>
                   )}
-                  <button type="button" onClick={() => setVariations(variations.filter(x => x.id !== v.id))}>✕</button>
+                  <button type="button" onClick={() => setVariations(variations.filter(x => x.id !== v.id))}><Icon name="x" /></button>
                 </div>
               ))}
             </div>
@@ -385,7 +393,7 @@ export default function EditProductPage() {
 
       <aside className="livePreview">
         <h2>Preview</h2>
-        <img src={previews[0] || "/file.svg"} alt="preview" />
+        <img src={previews[0] || "/placeholders/product.svg"} alt="preview" />
         <h3>{form.name || "Nome do produto"}</h3>
         {variations.length > 0 && (
           <select value={selectedVariationId} onChange={(e) => setSelectedVariationId(e.target.value)} className="select2">

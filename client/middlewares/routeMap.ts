@@ -4,6 +4,7 @@ const PRIVATE_ROUTES = [
   "/dashboard",
   "/profile",
   "/checkout",
+  "/reseller",
 ];
 
 // Subconjunto de PRIVATE_ROUTES que além de exigir login exige a

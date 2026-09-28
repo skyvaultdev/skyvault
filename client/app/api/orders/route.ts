@@ -14,7 +14,8 @@ export async function GET(req: Request) {
     if (denied) return denied;
 
     const { searchParams } = new URL(req.url);
-    const page = Math.max(1, Number(searchParams.get("page")) || 1);
+    const rawPage = Number(searchParams.get("page"));
+    const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 100000) : 1;
     const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize")) || 10));
 
     const db = getDB();
@@ -27,6 +28,9 @@ export async function GET(req: Request) {
       `SELECT
          o.id, o.order_number, o.status, o.total, o.created_at, o.paid_at,
          (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count,
+         (SELECT oi3.product_name || CASE WHEN oi3.variation_name IS NOT NULL THEN ' — ' || oi3.variation_name ELSE '' END
+            FROM order_items oi3 WHERE oi3.order_id = o.id ORDER BY oi3.id ASC LIMIT 1) AS first_product_name,
+         (SELECT oi4.product_id FROM order_items oi4 WHERE oi4.order_id = o.id ORDER BY oi4.id ASC LIMIT 1) AS first_product_id,
          (SELECT bool_or(oi.product_type = 'physical') FROM order_items oi WHERE oi.order_id = o.id) AS has_physical,
          (SELECT (SELECT url FROM product_images pi WHERE pi.product_id = oi2.product_id ORDER BY pi.position ASC LIMIT 1)
             FROM order_items oi2 WHERE oi2.order_id = o.id ORDER BY oi2.id ASC LIMIT 1) AS thumbnail_url,

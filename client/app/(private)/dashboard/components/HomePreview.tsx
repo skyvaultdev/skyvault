@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Icon from "@/components/icons/Icon";
 import { useState } from "react";
 
 import HighlightsCarousel from "@/app/(private)/dashboard/components/HighlightsCarousel";
@@ -46,7 +47,7 @@ export default function HomePreview({
   const [isSaving, setIsSaving] = useState(false);
   const [draggedItem, setDraggedItem] = useState<{ slug: string; fromIndex: number } | null>(null);
   const [isSalvarOpen, setIsSalvarOpen] = useState(false);
-  const [modalMessage, setModalMessage] = useState("Ordem dos produtos foi alterada com sucesso! ✅");
+  const [modalMessage, setModalMessage] = useState("Ordem dos produtos foi alterada com sucesso!");
 
   const handleDragStart = (e: React.DragEvent, slug: string, index: number) => {
     if (!isPreview) return;
@@ -110,11 +111,11 @@ export default function HomePreview({
         setIsSalvarOpen(true);
 
       } else {
-        setModalMessage("❌ Erro ao salvar.");
+        setModalMessage("Erro ao salvar.");
         setIsSalvarOpen(true);
       }
     } catch (error) {
-      setModalMessage("❌ Erro na requisição.");
+      setModalMessage("Erro na requisição.");
       setIsSalvarOpen(true);
     } finally {
       setIsSaving(false);
@@ -139,7 +140,7 @@ export default function HomePreview({
             className="modalContent"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="modalIcon">✓</div>
+            <div className="modalIcon"><Icon name="check" /></div>
             <p className="modaltxt">{modalMessage}</p>
 
             <button
@@ -155,9 +156,9 @@ export default function HomePreview({
         {isPreview && (
           <div className="savebtnord">
             <button onClick={saveHomeOrder} disabled={isSaving}>
-              {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
+              {isSaving ? "Salvando..." : <><Icon name="save" /> Salvar Ordem</>}
             </button>
-            <span>🖱️ Arraste os produtos para reordenar</span>
+            <span><Icon name="pointer" /> Arraste os produtos para reordenar</span>
           </div>
         )}
 
@@ -181,7 +182,7 @@ export default function HomePreview({
           <section className="highlights">
             <div className="highlightsTop">
               <div className="highlightsTitle">
-                <span className="badgeStar">★</span>
+                <span className="badgeStar"><Icon name="star" fill /></span>
                 <div>
                   <h2>Destaques da Loja</h2>
                   <p>Os produtos selecionados pra elevar seu nível.</p>
@@ -222,7 +223,7 @@ export default function HomePreview({
                   }}
                 >
                   <img
-                    src={product.image_url || "/file.svg"}
+                    src={product.image_url || "/placeholders/product.svg"}
                     alt={product.name}
                     className="productThumb"
                   />

@@ -38,19 +38,24 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
   const [selectedVariationPos, setSelectedVariationPos] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadData() {
       setLoading(true);
+      setErrorDetail(null);
 
       try {
         const res = await fetch(`/api/products/${encodeURIComponent(slug)}`);
         const json = await res.json();
 
         if (!json.ok || !json.data) {
-          if (!cancelled) setProduct(null);
+          if (!cancelled) {
+            setProduct(null);
+            setErrorDetail(`Resposta ${res.status}: ${json.error ?? "sem dados do produto"} (slug "${slug}")`);
+          }
           return;
         }
 
@@ -89,6 +94,7 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
       } catch (err) {
         console.error("Erro no preview:", err);
         if (!cancelled) {
+          setErrorDetail(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
           setProduct(null);
           setVariations([]);
           setSelectedVariationPos(null);
@@ -107,8 +113,8 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
 
 
   const currentImage = useMemo(() => {
-    if (!product?.images?.length) return "/file.svg";
-    return product.images[selectedImage]?.url || "/file.svg";
+    if (!product?.images?.length) return "/placeholders/product.svg";
+    return product.images[selectedImage]?.url || "/placeholders/product.svg";
   }, [product, selectedImage]);
 
 
@@ -132,7 +138,11 @@ export default function PreviewPanel({ slug, onBack }: PreviewPanelProps) {
   if (!product)
     return (
       <div className="previewContainer">
-        <div className="productPage">Produto não encontrado.</div>
+        <div className="productPage">
+          <p>Não foi possível abrir a prévia deste produto.</p>
+          {errorDetail && <p style={{ opacity: 0.6, fontSize: 12 }}>Detalhe técnico: {errorDetail}</p>}
+          <button type="button" className="previewBackBtn" onClick={onBack}>Voltar ao Painel</button>
+        </div>
       </div>
     );
 

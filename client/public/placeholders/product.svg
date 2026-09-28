@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#17131f"/>
+      <stop offset="1" stop-color="#0b0b0f"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="120" y1="110" x2="280" y2="290" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b58cff"/>
+      <stop offset="1" stop-color="#6d4bd8"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" stroke="#ffffff" stroke-opacity=".035"/>
+    </pattern>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <rect width="400" height="400" fill="url(#grid)"/>
+  <circle cx="200" cy="200" r="118" fill="#8a5cff" fill-opacity=".07"/>
+  <g stroke="url(#stroke)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200 112l78 42v92l-78 42-78-42v-92l78-42z"/>
+    <path d="M122 154l78 42 78-42M200 196v92"/>
+  </g>
+  <text x="200" y="334" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" letter-spacing="3" fill="#ffffff" fill-opacity=".38">SEM IMAGEM</text>
+</svg>

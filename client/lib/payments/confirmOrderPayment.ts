@@ -1,6 +1,13 @@
+import fs from "fs";
+import path from "path";
 import { withTransaction } from "@/lib/database/db";
 import type { DeliveredDigitalItem } from "@/lib/mail/sendOrderDeliveryEmail";
-import { logStockMovement } from "@/lib/stock/stockMovements";
+import { ensureStockMovementsTable, logStockMovement } from "@/lib/stock/stockMovements";
+import { ensureOrderItemDeliverySnapshotColumns, ensureOrderAttentionColumn } from "@/lib/orders/deliverySnapshot";
+import { ensureResellerTables } from "@/lib/resellers/ensureResellerTables";
+import { creditResellerCommissions } from "@/lib/resellers/creditCommissions";
+import { ensureNotificationsTable } from "@/lib/notifications/ensureNotificationsTable";
+import { createNotification } from "@/lib/notifications/createNotification";
 
 export type StockShortage = {
   productName: string;
@@ -8,6 +15,13 @@ export type StockShortage = {
   requested: number;
   delivered: number;
   shortage: number;
+  // true = o cliente pagou por N unidades e recebeu menos que isso de
+  // verdade (físico, ou chave sem estoque suficiente) — nesse caso o
+  // pedido NÃO pode virar "delivered" sozinho. false = arquivo/infinito,
+  // que continuam sendo entregues por completo mesmo com stock_count
+  // zerado (a contagem é só informativa nesses tipos, não um limite real
+  // de fulfillment).
+  blocksDelivery: boolean;
 };
 
 export type ConfirmOrderPaymentResult = {
@@ -25,6 +39,11 @@ export type ConfirmOrderPaymentResult = {
 // o pedido já está pago, não repete o débito de estoque (o Mercado Pago
 // pode reenviar o mesmo webhook mais de uma vez).
 export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrderPaymentResult> {
+  await ensureStockMovementsTable();
+  await ensureOrderItemDeliverySnapshotColumns();
+  await ensureOrderAttentionColumn();
+  await ensureResellerTables();
+  await ensureNotificationsTable();
   return withTransaction(async (client) => {
     const orderRes = await client.query(`SELECT * FROM orders WHERE id = $1 FOR UPDATE`, [orderId]);
     if (orderRes.rows.length === 0) {
@@ -95,7 +114,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
             );
             stockShortages.push({
               productName: item.product_name, variationName: item.variation_name,
-              requested: item.quantity, delivered: actualDecrement, shortage,
+              requested: item.quantity, delivered: actualDecrement, shortage, blocksDelivery: true,
             });
           }
         }
@@ -133,6 +152,15 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
         }
       }
 
+      let itemDeliveredSuccessfully = true;
+      // Snapshot do que foi entregue NESTE pedido — key não precisa (já é
+      // amarrada por stock_keys.order_id, permanente); arquivo/infinito
+      // gravam aqui porque o produto pode ser editado/trocado depois, e sem
+      // isso o pedido passaria a mostrar o conteúdo NOVO do produto, não o
+      // que o cliente realmente recebeu (ver migração 2026-09-22).
+      let deliveredContentSnapshot: string | null = null;
+      let deliveredFileSize: number | null = null;
+
       if (info.stock_type === "key") {
         const keyColumn = isVariation ? "variation_id" : "product_id";
         let keysDelivered = 0;
@@ -167,8 +195,12 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
           );
           stockShortages.push({
             productName: item.product_name, variationName: item.variation_name,
-            requested: item.quantity, delivered: keysDelivered, shortage: keyShortage,
+            requested: item.quantity, delivered: keysDelivered, shortage: keyShortage, blocksDelivery: true,
           });
+          // Nenhuma chave saiu pra esse item — não marca como entregue
+          // (order_items.delivered_at abaixo), senão a tela do cliente e o
+          // e-mail mostrariam "recebido" pra algo que não recebeu nada.
+          if (keysDelivered === 0) itemDeliveredSuccessfully = false;
         }
 
         // Decrementa pela quantidade REALMENTE entregue, não pela pedida —
@@ -187,22 +219,51 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
           });
         }
       } else if (info.stock_type === "file") {
+        // Grava o caminho completo (com prefixo), não só o nome do
+        // arquivo — é assim que o snapshot se distingue de uma mensagem
+        // "infinite" ao ser relido depois (mesma convenção do
+        // FILE_DOWNLOAD_PREFIX em sendOrderDeliveryEmail.ts).
+        deliveredContentSnapshot = `/api/files/products/uploads/${info.stock_content}`;
+        try {
+          const filePath = path.join(process.cwd(), "stock", "products", "uploads", info.stock_content);
+          deliveredFileSize = fs.statSync(filePath).size;
+        } catch {
+          // Arquivo sumiu do disco de algum jeito — entrega ainda registra
+          // o nome (pro staff investigar), só sem o tamanho.
+          deliveredFileSize = null;
+        }
         deliveredItems.push({
           productName: item.product_name,
           variationName: item.variation_name,
           type: "file",
-          content: `/api/files/products/uploads/${info.stock_content}`,
+          content: deliveredContentSnapshot,
+          fileSize: deliveredFileSize,
         });
       } else {
+        const infiniteMessage: string = info.stock_content || "Entrega automática ativada";
+        deliveredContentSnapshot = infiniteMessage;
         deliveredItems.push({
           productName: item.product_name,
           variationName: item.variation_name,
           type: "infinite",
-          content: info.stock_content || "Entrega automática ativada",
+          content: infiniteMessage,
         });
       }
 
-      await client.query(`UPDATE order_items SET delivered_at = NOW() WHERE id = $1`, [item.id]);
+      if (itemDeliveredSuccessfully) {
+        await client.query(
+          `UPDATE order_items SET delivered_at = NOW(), delivered_content = COALESCE($2, delivered_content), delivered_file_size = $3 WHERE id = $1`,
+          [item.id, deliveredContentSnapshot, deliveredFileSize]
+        );
+      }
+    }
+
+    // Comissão de revendedor só é gravada aqui — no momento em que o
+    // pagamento REALMENTE confirma (nunca antes, nunca por fora dessa
+    // transação) — pra nunca existir comissão de um pedido que não chegou
+    // a pagar. Só credita se o pedido veio de um link de revendedor.
+    if (order.reseller_id) {
+      await creditResellerCommissions(client, orderId, order.reseller_id, itemsRes.rows);
     }
 
     // Sem passo de saldo interno: o pagamento já cai direto na conta
@@ -224,14 +285,42 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       );
     }
 
-    // Pedido 100% digital: tudo já foi entregue nesta mesma transação.
-    // Pedido com item físico fica em "paid" até a equipe despachar (fase 4/dashboard).
-    const finalStatus = hasPhysical ? "paid" : "delivered";
+    // Pedido 100% digital: tudo já foi entregue nesta mesma transação —
+    // MAS só marca como "delivered" se realmente entregou tudo. Um pedido
+    // de chave sem estoque suficiente não pode virar "entregue" com o
+    // cliente de mãos vazias; fica "paid" (como um físico não despachado)
+    // até o staff resolver manualmente e reconciliar.
+    const hasBlockingShortage = stockShortages.some((s) => s.blocksDelivery);
+    const finalStatus = hasPhysical || hasBlockingShortage ? "paid" : "delivered";
     const finalRes = await client.query(
       `UPDATE orders SET status = $2 WHERE id = $1 RETURNING *`,
       [orderId, finalStatus]
     );
+    const finalOrder = finalRes.rows[0];
 
-    return { alreadyProcessed: false, order: finalRes.rows[0], customerEmail, deliveredItems, hasPhysical, stockShortages };
+    if (stockShortages.length > 0) {
+      const note = stockShortages
+        .map((s) => `${s.productName}${s.variationName ? ` (${s.variationName})` : ""}: pedidos ${s.requested}, atendidos ${s.delivered}, faltaram ${s.shortage}`)
+        .join(" | ");
+      await client.query(`UPDATE orders SET attention_note = $2 WHERE id = $1`, [orderId, `Estoque insuficiente — ${note}`]);
+      finalOrder.attention_note = note;
+    }
+
+    // Notificação in-app de "pagamento confirmado" — complementa o email
+    // de entrega (que os 4 call sites já enviam), nunca substitui. Mesma
+    // tabela usada por convites de revendedor e avisos da loja. O corpo
+    // lista os produtos pelo NOME — só o número do pedido não diz pro
+    // cliente o que ele comprou; o ID continua no título, pra quem quiser
+    // mencionar o pedido específico.
+    const productNames = itemsRes.rows.map((item) => item.product_name).join(", ");
+    await createNotification(client, {
+      userId: finalOrder.user_id,
+      type: "order_update",
+      title: `Pagamento confirmado — pedido ${finalOrder.order_number || `#${orderId}`}`,
+      body: `${productNames} — ${finalStatus === "delivered" ? "entregue." : "já estamos preparando tudo."}`,
+      data: { orderId },
+    });
+
+    return { alreadyProcessed: false, order: finalOrder, customerEmail, deliveredItems, hasPhysical, stockShortages };
   });
 }

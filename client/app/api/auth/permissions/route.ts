@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyJWT } from "@/lib/jwt/init";
+import { verifyJWTForStore } from "@/lib/jwt/storeAware";
 
 export async function GET() {
     try {
@@ -14,7 +14,7 @@ export async function GET() {
             });
         }
 
-        var payload = await verifyJWT(token);
+        var payload = await verifyJWTForStore(token);
         return NextResponse.json({
             ok: true,
             role: payload.role ?? null,

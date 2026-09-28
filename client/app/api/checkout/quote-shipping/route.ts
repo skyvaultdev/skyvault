@@ -4,11 +4,13 @@ import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requireCustomer } from "@/lib/auth/customer";
 import { getShippingProvider, type PackageInfo } from "@/lib/shipping";
+import { rateLimit } from "@/lib/security/rateLimit";
 
 export async function POST(req: Request) {
   try {
     const { userId, denied } = await requireCustomer();
     if (denied) return denied;
+    if (!rateLimit(`checkout-quote:${userId}`, 30, 5 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
 
     const { cep } = await req.json();
     const cepDigits = String(cep ?? "").replace(/\D/g, "");

@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { requireCustomer } from "@/lib/auth/customer";
+import { encryptChatBody, decryptChatRows } from "@/lib/chat/messageCrypto";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -39,7 +40,7 @@ export async function GET(_req: Request, { params }: Params) {
     [conversationId]
   );
 
-  return NextResponse.json({ data: rows, status: ticket.status });
+  return NextResponse.json({ data: await decryptChatRows(rows), status: ticket.status });
 }
 
 export async function POST(req: Request, { params }: Params) {
@@ -64,7 +65,7 @@ export async function POST(req: Request, { params }: Params) {
      VALUES ($1, 'customer', $2, $3, true)
      RETURNING id, conversation_id, sender_type, sender_email, body,
                attachment_url, attachment_type, attachment_name, created_at`,
-    [conversationId, email, text]
+    [conversationId, email, await encryptChatBody(text)]
   );
 
   await db.query(
@@ -72,5 +73,7 @@ export async function POST(req: Request, { params }: Params) {
     [conversationId]
   );
 
-  return NextResponse.json({ data: rows[0] });
+  // Devolve o texto puro que já temos em mãos, em vez de decifrar de novo
+  // o que acabou de voltar do INSERT.
+  return NextResponse.json({ data: { ...rows[0], body: text } });
 }

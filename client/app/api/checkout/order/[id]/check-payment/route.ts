@@ -6,6 +6,8 @@ import { requireCustomer } from "@/lib/auth/customer";
 import { getMercadoPagoPaymentStatus } from "@/lib/payments/mercadoPagoProvider";
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
 import { sendOrderDeliveryEmail } from "@/lib/mail/sendOrderDeliveryEmail";
+import { logDeliveryFailure } from "@/lib/payments/deliveryFailures";
+import { rateLimit } from "@/lib/security/rateLimit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +28,13 @@ export async function POST(_req: Request, { params }: Params) {
   const { id } = await params;
   const orderId = Number(id);
   if (!orderId) return NextResponse.json({ error: "INVALID_ORDER_ID" }, { status: 400 });
+
+  // A tela de espera chama isso sozinha a cada 4s — limite generoso o
+  // suficiente pra cobrir esse polling normal (até uns 20min de espera
+  // contínua) sem travar o cliente legítimo, só contendo abuso de verdade.
+  if (!rateLimit(`check-payment:${userId}:${orderId}`, 100, 5 * 60_000)) {
+    return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
+  }
 
   const db = getDB();
   const orderRes = await db.query(`SELECT id, status FROM orders WHERE id = $1 AND user_id = $2`, [orderId, userId]);
@@ -53,8 +62,8 @@ export async function POST(_req: Request, { params }: Params) {
   console.log(`[check-payment] pedido #${orderId}: ${txRes.rows.length} transação(ões) pendente(s) encontrada(s)`, txRes.rows);
   if (txRes.rows.length === 0) return NextResponse.json({ data: { status: order.status } });
 
+  let paidTxid: string | null = null;
   try {
-    let paidTxid: string | null = null;
     for (const tx of txRes.rows) {
       const mpStatus = await getMercadoPagoPaymentStatus(tx.provider_txid);
       const rawStatus = (mpStatus.raw as { status?: string } | null)?.status;
@@ -64,11 +73,19 @@ export async function POST(_req: Request, { params }: Params) {
         break;
       }
     }
+  } catch (mpError) {
+    // Falha ao CONSULTAR o Mercado Pago (rede, credencial, etc.) — não
+    // significa que o pagamento falhou, só que não deu pra confirmar agora.
+    // Transitório: o próximo poll (4s depois) tenta de novo sozinho.
+    console.error(`[check-payment] pedido #${orderId}: erro ao consultar Mercado Pago —`, mpError);
+    return NextResponse.json({ data: { status: order.status } });
+  }
 
-    if (!paidTxid) {
-      return NextResponse.json({ data: { status: order.status } });
-    }
+  if (!paidTxid) {
+    return NextResponse.json({ data: { status: order.status } });
+  }
 
+  try {
     const result = await confirmOrderPayment(orderId);
     console.log(`[check-payment] pedido #${orderId}: confirmOrderPayment concluído, status final =`, result.order.status, "alreadyProcessed =", result.alreadyProcessed);
     if (result.stockShortages.length > 0) {
@@ -83,8 +100,15 @@ export async function POST(_req: Request, { params }: Params) {
     }
 
     return NextResponse.json({ data: { status: result.order.status } });
-  } catch (error) {
-    console.error(`[check-payment] pedido #${orderId}: erro ao checar/confirmar pagamento:`, error);
-    return NextResponse.json({ data: { status: order.status } });
+  } catch (deliveryError) {
+    // Diferente do catch acima: aqui o Mercado Pago JÁ confirmou o
+    // pagamento (paidTxid existe) — é confirmOrderPayment que falhou depois
+    // disso. Isso não pode voltar como "ainda pendente" silenciosamente
+    // (o cliente ficaria preso pra sempre na tela de espera sem saber que
+    // algo deu errado do nosso lado) — registra pra reconciliação manual e
+    // sinaliza deliveryFailed pro front parar de tratar isso como "só
+    // aguardando" e mostrar um aviso claro.
+    await logDeliveryFailure(orderId, "check_payment", deliveryError);
+    return NextResponse.json({ data: { status: order.status, deliveryFailed: true } });
   }
 }

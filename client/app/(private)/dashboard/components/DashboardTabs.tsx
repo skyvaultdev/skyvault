@@ -1,6 +1,7 @@
 "use client";
 
 import "./components.css";
+import Icon from "@/components/icons/Icon";
 import "./stocktabs.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ type StoreSettings = {
   backgroundType: BackgroundType;
   backgroundCss: string;
   backgroundImageUrl: string;
+  backgroundSolidColor?: string;
 };
 
 type DashboardTabsProps = {
@@ -182,14 +184,14 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                   {product.slug ? (
                     <Link href={`/product/${product.slug}`}>
                       <img
-                        src={product.image_url || "/file.svg"}
+                        src={product.image_url || "/placeholders/product.svg"}
                         alt={product.name}
                         className="stockProductImg"
                       />
                     </Link>
                   ) : (
                     <img
-                      src={product.image_url || "/file.svg"}
+                      src={product.image_url || "/placeholders/product.svg"}
                       alt={product.name}
                       className="stockProductImg"
                     />
@@ -206,7 +208,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                   <div className="slug">• {product.slug ?? "sem slug"}</div>
                   <div className="tipo">• {
                     product.product_type === 'physical'
-                      ? '📦 Físico'
+                      ? <><Icon name="box" /> Físico</>
                       : product.stock_type === 'key' ? 'Keys' :
                         product.stock_type === 'file' ? 'Arquivo' :
                           product.stock_type === 'infinite' ? 'Ilimitado' : 'Sem estoque'
@@ -239,7 +241,7 @@ export default function DashboardTabs(props: DashboardTabsProps) {
                     onClick={() => handleManageStock(product)}
                     disabled={!product.slug}
                   >
-                    {product.product_type === 'physical' ? '✏️ Editar estoque' : '⚙️ Configurar'}
+                    {product.product_type === 'physical' ? <><Icon name="edit" /> Editar estoque</> : <><Icon name="settings" /> Configurar</>}
                   </button>
                 </div>
               </div>

@@ -3,20 +3,24 @@
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/guard";
+import { ensureStockMovementsTable } from "@/lib/stock/stockMovements";
+
 // Lista o ledger de estoque (aba "Registros Estoque") — busca por produto,
 // filtro por motivo (venda/estorno/ajuste manual) e paginação, mesmo
-// padrão usado em /api/admin/orders. Requer a migração
-// db/migrations/2026-09-17_stock_movements.sql já aplicada no banco.
+// padrão usado em /api/admin/orders.
 export async function GET(req: Request) {
   try {
     const { denied } = await requirePermission("products.write");
     if (denied) return denied;
 
+    await ensureStockMovementsTable();
+
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim();
     const reason = searchParams.get("reason")?.trim();
     const direction = searchParams.get("direction")?.trim(); // "in" | "out"
-    const page = Math.max(1, Number(searchParams.get("page")) || 1);
+    const rawPage = Number(searchParams.get("page"));
+    const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 100000) : 1;
     const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize")) || 25));
 
     const db = getDB();

@@ -64,7 +64,7 @@ export default function SearchPage() {
                     {products.map((product) => (
                         <div key={product.id} className="productCard">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={product.image_url || "/file.svg"} alt={product.name} />
+                            <img src={product.image_url || "/placeholders/product.svg"} alt={product.name} />
                             {product.category_name ? (
                                 <span className="productCategory">{product.category_name}</span>
                             ) : null}

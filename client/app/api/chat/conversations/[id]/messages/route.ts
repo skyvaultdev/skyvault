@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { getSession } from "@/lib/jwt/session";
+import { encryptChatBody, decryptChatRows } from "@/lib/chat/messageCrypto";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -28,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     [conversationId]
   );
 
-  return NextResponse.json({ data: rows });
+  return NextResponse.json({ data: await decryptChatRows(rows) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -52,7 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
      VALUES ($1, 'staff', $2, $3, true)
      RETURNING id, conversation_id, sender_type, sender_email, body,
                attachment_url, attachment_type, attachment_name, created_at`,
-    [conversationId, session.email, text]
+    [conversationId, session.email, await encryptChatBody(text)]
   );
 
   await db.query(
@@ -60,5 +61,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     [conversationId, session.email]
   );
 
-  return NextResponse.json({ data: rows[0] });
+  return NextResponse.json({ data: { ...rows[0], body: text } });
 }

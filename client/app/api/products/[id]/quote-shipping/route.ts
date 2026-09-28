@@ -3,6 +3,7 @@
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { getShippingProvider } from "@/lib/shipping";
+import { rateLimit } from "@/lib/security/rateLimit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,6 +14,11 @@ type Params = { params: Promise<{ id: string }> };
 // direto em vez de somar os itens do carrinho.
 export async function POST(req: Request, { params }: Params) {
   try {
+    // Rota pública que dispara cotação real (Melhor Envio) — sem limite,
+    // dava pra esgotar a cota da API da loja só chamando em loop.
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+    if (!rateLimit(`quote-shipping:${ip}`, 20, 5 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
+
     const { id } = await params;
     const isNumeric = /^\d+$/.test(id);
 

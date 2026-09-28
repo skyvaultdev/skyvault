@@ -1,7 +1,9 @@
 "use server";
 
 import { getDB } from "@/lib/database/db";
+import { getCurrentStoreId, runWithStore } from "@/lib/tenant/tenantContext";
 import { getSession } from "@/lib/jwt/session";
+import { decryptChatBody } from "@/lib/chat/messageCrypto";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -12,6 +14,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   const conversationId = Number(id);
   const db = await getDB();
+  const storeId = await getCurrentStoreId();
   const encoder = new TextEncoder();
 
   let lastMessageId = 0;
@@ -26,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
-      const interval = setInterval(async () => {
+      const interval = setInterval(() => runWithStore(storeId, async () => {
         try {
           const { rows: newMessages } = await db.query(
             `SELECT id, conversation_id, sender_type, sender_email, body, attachment_url, attachment_type, attachment_name, created_at
@@ -35,7 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           );
           for (const row of newMessages) {
             lastMessageId = row.id;
-            send("message", row);
+            send("message", { ...row, body: await decryptChatBody(row.body) });
           }
 
           const { rows: readRows } = await db.query(
@@ -63,7 +66,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         } catch {
           // tenta de novo no próximo tick
         }
-      }, 1500);
+      }), 1500);
 
       req.signal.addEventListener("abort", () => {
         closed = true;

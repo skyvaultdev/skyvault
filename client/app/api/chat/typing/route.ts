@@ -11,7 +11,7 @@ export async function POST() {
   const db = await getDB();
 
   const existing = await db.query(
-    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' ORDER BY id DESC LIMIT 1`,
+    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' AND is_ticket = false ORDER BY id DESC LIMIT 1`,
     [session.email]
   );
   if (!existing.rows[0]) return NextResponse.json({ ok: true });

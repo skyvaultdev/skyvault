@@ -11,7 +11,8 @@ export const ROLES = {
     "chat.access",
     "shipping.manage",
     "shipping.credentials",
-    "payments.manage"
+    "payments.manage",
+    "resellers.manage"
   ],
   admin: [
     "dashboard.access",
@@ -21,7 +22,8 @@ export const ROLES = {
     "orders.read",
     "chat.access",
     "shipping.manage",
-    "payments.manage"
+    "payments.manage",
+    "resellers.manage"
   ],
   editor: [
     "dashboard.access",

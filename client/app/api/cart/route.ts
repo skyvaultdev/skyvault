@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
-import { verifyJWT } from "@/lib/jwt/init";
+import { verifyJWTForStore } from "@/lib/jwt/storeAware";
 import { cookies } from "next/headers";
 
 
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
 
-    var decoded = await verifyJWT(token);
+    var decoded = await verifyJWTForStore(token);
     if (!decoded || !decoded.email) {
       return fail("UNAUTHORIZED_TOKEN", 401);
     }
@@ -63,7 +63,7 @@ export async function PUT(req: NextRequest) {
     var token = cookieStore.get("auth_token")?.value;
 
     if (!token) return fail("UNAUTHORIZED_TOKEN", 401);
-    var decoded = await verifyJWT(token);
+    var decoded = await verifyJWTForStore(token);
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
     var userEmail = decoded.email;
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     var token = cookieStore.get("auth_token")?.value;
 
     if (!token) return fail("UNAUTHORIZED_TOKEN", 401);
-    var decoded = await verifyJWT(token);
+    var decoded = await verifyJWTForStore(token);
     if (!decoded || !decoded.email) return fail("UNAUTHORIZED_TOKEN", 401);
 
     var userEmail = decoded.email;

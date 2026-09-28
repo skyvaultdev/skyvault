@@ -7,6 +7,7 @@ import { FaUserCircle, FaPlus, FaMinus, FaTrash } from "react-icons/fa";
 import { FiShoppingCart, FiX, FiLogOut, FiPackage, FiUser } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
+import NotificationsBell from "./NotificationsBell";
 
 type CartItem = {
   cart_item_id: number;
@@ -24,6 +25,7 @@ export default function Header() {
   const [menuAberto, setMenuAberto] = useState(false);
   const [isLogged, setIsLogged] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isReseller, setIsReseller] = useState(false);
   const [search, setSearch] = useState("");
   const [cartAberto, setCartAberto] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -51,6 +53,14 @@ export default function Header() {
       setIsLogged(Boolean(authData.logged));
       setIsAdmin(authData.admin === true);
 
+      if (authData.logged) {
+        fetch("/api/reseller/me", { cache: "no-store" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((json) => setIsReseller(json?.data?.reseller?.status === "approved"))
+          .catch(() => setIsReseller(false));
+      } else {
+        setIsReseller(false);
+      }
 
       var cartRes = await fetch("/api/cart");
       var cartData = await cartRes.json();
@@ -75,6 +85,7 @@ export default function Header() {
     window.addEventListener("abrirCarrinho", handleUpdate);
     return () => window.removeEventListener("abrirCarrinho", handleUpdate);
   }, []);
+
 
   function searchSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -133,7 +144,7 @@ export default function Header() {
             return (
               <div key={item.cart_item_id} className="cartItemContainer">
                 <div className="cartItemMain">
-                  <img src={item.image_url || "/file.svg"} alt={item.product_name} className="cartItemImg" />
+                  <img src={item.image_url || "/placeholders/product.svg"} alt={item.product_name} className="cartItemImg" />
                   <div className="cartItemTitle"><h4>{item.product_name}</h4></div>
                 </div>
                 <div className="cartItemSub">
@@ -235,6 +246,8 @@ export default function Header() {
           )}
         </div>
 
+        {isLogged && <NotificationsBell />}
+
         <ul className="userNavList">
           <li>
             {isLogged ? (
@@ -278,6 +291,22 @@ export default function Header() {
                           >
                             <FaUserCircle />
                             Dashboard
+                          </Link>
+
+                          <hr className="dropdownDivider" />
+                        </>
+                      )}
+
+                      { }
+                      {isReseller && (
+                        <>
+                          <Link
+                            href="/reseller"
+                            className="userDropdownItem"
+                            onClick={() => setDropAberto(false)}
+                          >
+                            <FaUserCircle />
+                            Revendedor
                           </Link>
 
                           <hr className="dropdownDivider" />

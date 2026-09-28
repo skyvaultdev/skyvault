@@ -7,19 +7,20 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
+import { sniffFile } from "@/lib/files/sniffFile";
 const MAX_SIZE = 15 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf", "video/mp4"];
 
 async function getOrCreateConversation(email: string) {
   const db = await getDB();
   const existing = await db.query(
-    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' ORDER BY id DESC LIMIT 1`,
+    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' AND is_ticket = false ORDER BY id DESC LIMIT 1`,
     [email]
   );
   if (existing.rows[0]) return existing.rows[0].id as number;
 
   const created = await db.query(
-    `INSERT INTO chat_conversations (customer_email, status, last_message_at) VALUES ($1, 'open', now()) RETURNING id`,
+    `INSERT INTO chat_conversations (customer_email, status, last_message_at, is_ticket) VALUES ($1, 'open', now(), false) RETURNING id`,
     [email]
   );
   return created.rows[0].id as number;
@@ -35,11 +36,15 @@ export async function POST(req: Request) {
   if (file.size > MAX_SIZE) return NextResponse.json({ error: "Arquivo muito grande (máx 15MB)." }, { status: 400 });
   if (!ALLOWED_TYPES.includes(file.type)) return NextResponse.json({ error: "Tipo de arquivo não permitido." }, { status: 400 });
 
-  const ext = path.extname(file.name) || "";
-  const filename = `${randomUUID()}${ext}`;
+  const fileBytes = Buffer.from(await file.arrayBuffer());
+  const sniffed = sniffFile(fileBytes);
+  if (!sniffed || !ALLOWED_TYPES.includes(sniffed.mime)) {
+    return NextResponse.json({ error: "Tipo de arquivo não permitido." }, { status: 400 });
+  }
+  const filename = `${randomUUID()}${sniffed.ext}`;
   const uploadDir = path.join(process.cwd(), "private", "chat");
   await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()));
+  await writeFile(path.join(uploadDir, filename), fileBytes);
   const url = `/api/files/chat/${filename}`;
 
   const conversationId = await getOrCreateConversation(session.email);

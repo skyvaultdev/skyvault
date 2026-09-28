@@ -7,7 +7,12 @@ import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/guard";
 import { getMailTransporter } from "@/lib/mail/transporter";
 import { loadStoreBranding, buildBrandedEmailHtml, emailParagraph, emailItemsList, trackingCodeBox } from "@/lib/mail/emailTemplate";
-import { logStockMovement } from "@/lib/stock/stockMovements";
+import { ensureStockMovementsTable, logStockMovement } from "@/lib/stock/stockMovements";
+import { resolveDeliveredContent } from "@/lib/orders/resolveDeliveredContent";
+import { ensureOrderAttentionColumn } from "@/lib/orders/deliverySnapshot";
+import { cancelResellerCommissionsForOrder } from "@/lib/resellers/creditCommissions";
+import { createNotification } from "@/lib/notifications/createNotification";
+import { ensureNotificationsTable } from "@/lib/notifications/ensureNotificationsTable";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,6 +28,7 @@ export async function GET(_req: Request, { params }: Params) {
     if (!orderId) return fail("INVALID_ORDER_ID", 400);
 
     const db = getDB();
+    await ensureOrderAttentionColumn();
     const orderRes = await db.query(
       `SELECT o.*, u.email AS customer_email
        FROM orders o
@@ -69,9 +75,18 @@ export async function GET(_req: Request, { params }: Params) {
       ? await db.query(`SELECT * FROM shipment_events WHERE shipment_id = $1 ORDER BY created_at ASC`, [shipment.id])
       : { rows: [] };
 
+    // Mesma resolução de "o que foi entregue de fato" usada na tela do
+    // cliente (app/api/checkout/order/[id]/route.ts) — staff precisa ver o
+    // conteúdo real vendido em cada pedido, não só nome/quantidade/preço.
+    const items = [];
+    for (const item of itemsRes.rows) {
+      const { deliveredContent, deliveredFileSize } = await resolveDeliveredContent(db, orderId, item);
+      items.push({ ...item, deliveredContent, deliveredFileSize });
+    }
+
     return ok({
       ...order,
-      items: itemsRes.rows,
+      items,
       shippingAddress: addressRes.rows[0] ?? null,
       paymentTransactions: txRes.rows,
       shipment,
@@ -131,6 +146,7 @@ type OrderEmailContext = {
   order_number: string | null;
   total: number | string;
   customer_email: string | null;
+  user_id: number | null;
   tracking_code: string | null;
   items: Array<{ name: string; quantity: number }>;
   reason?: string | null;
@@ -235,7 +251,34 @@ function getStatusEmailContent(
   }
 }
 
+// Notificação in-app é independente do email (não depende de branding nem
+// de SMTP configurado) — complementa, nunca bloqueia o email nem é
+// bloqueada por ele. Usa o mesmo texto já escolhido por evento
+// (getStatusEmailContent) pra não duplicar o vocabulário de mensagens.
+async function createOrderNotification(order: OrderEmailContext, event: NotificationEvent) {
+  if (!order.user_id) return;
+  const content = getStatusEmailContent(event, order, "", "");
+  if (!content) return;
+  try {
+    const db = getDB();
+    // Nome dos produtos no corpo, não só o número do pedido — o cliente
+    // não sabe o que comprou só olhando um ID; o pedido continua
+    // identificável pelo número no título.
+    const productNames = order.items.map((item) => item.name).join(", ");
+    await createNotification(db, {
+      userId: order.user_id,
+      type: "order_update",
+      title: content.title,
+      body: productNames ? `${productNames} — ${content.headerSubtitle}` : content.headerSubtitle,
+      data: { orderId: order.id },
+    });
+  } catch (error) {
+    console.error(`Erro ao criar notificação de pedido (${event}) para pedido ${order.order_number || `#${order.id}`}:`, error);
+  }
+}
+
 async function sendOrderStatusEmail(order: OrderEmailContext, event: NotificationEvent): Promise<boolean> {
+  await createOrderNotification(order, event);
   if (!order.customer_email) return false;
 
   const branding = await loadStoreBranding();
@@ -301,8 +344,17 @@ export async function PATCH(req: Request, { params }: Params) {
 
     const body = await req.json();
     const db = getDB();
+    await ensureStockMovementsTable();
+    await ensureNotificationsTable();
     const notifyEmail = body.notifyEmail !== false;
     const reason = body.reason ? String(body.reason).trim().slice(0, 500) || null : null;
+
+    // Ação 0: equipe deu ciência do alerta de estoque insuficiente.
+    if (body.action === "clear_attention") {
+      await ensureOrderAttentionColumn();
+      await db.query(`UPDATE orders SET attention_note = NULL WHERE id = $1`, [orderId]);
+      return ok({ updated: true });
+    }
 
     // Ação 1: atualizar o envio (transportadora/rastreio/etapa) de um
     // pedido físico. Único ponto que grava shipment_events e sincroniza
@@ -313,17 +365,30 @@ export async function PATCH(req: Request, { params }: Params) {
       if (!SHIPMENT_STATUSES.includes(newStatus)) return fail("INVALID_SHIPMENT_STATUS", 400);
 
       const orderRes = await db.query(
-        `SELECT o.status, o.total, o.order_number, u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
+        `SELECT o.status, o.total, o.order_number, o.user_id, u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
         [orderId]
       );
       if (orderRes.rows.length === 0) return fail("ORDER_NOT_FOUND", 404);
       const orderRow = orderRes.rows[0];
       if (orderRow.status === "cancelled") return fail("ORDER_CANCELLED", 409);
 
+      // Cancelar um envio que já saiu restocaria item que não está na
+      // prateleira — só "devolvido" (mercadoria voltou) restoca.
+      const curShip = await db.query(`SELECT status FROM shipments WHERE order_id = $1`, [orderId]);
+      if (newStatus === "cancelled" && ["posted", "in_transit", "delivered"].includes(curShip.rows[0]?.status)) {
+        return fail("SHIPMENT_ALREADY_SENT", 409);
+      }
+
       const eventCity = body.eventCity ? String(body.eventCity).trim() || null : null;
       const eventState = body.eventState ? String(body.eventState).trim().toUpperCase().slice(0, 2) || null : null;
       const eventDescription = body.eventDescription ? String(body.eventDescription).trim() || null : null;
       let trackingCode = body.trackingCode ? String(body.trackingCode).trim() || null : null;
+
+      await db.query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS tracking_generated BOOLEAN NOT NULL DEFAULT FALSE`);
+      // true = código criado pela loja (não vem de transportadora) — o
+      // cliente é avisado disso na tela do pedido.
+      let trackingGenerated: boolean | null = null;
+      if (trackingCode) trackingGenerated = false;
 
       const result = await withTransaction(async (client) => {
         const shipRes = await client.query(`SELECT * FROM shipments WHERE order_id = $1 FOR UPDATE`, [orderId]);
@@ -339,6 +404,7 @@ export async function PATCH(req: Request, { params }: Params) {
         // Fornece o código de rastreio sozinho ao postar, se ninguém digitou um.
         if (newStatus === "posted" && !trackingCode && !shipment.tracking_code) {
           trackingCode = generateTrackingCode(orderId);
+          trackingGenerated = true;
         }
 
         const statusChanged = newStatus !== shipment.status;
@@ -352,12 +418,13 @@ export async function PATCH(req: Request, { params }: Params) {
 
         await client.query(
           `UPDATE shipments
-           SET status = $1,
+           SET status = $1::shipment_status,
                tracking_code = COALESCE($2, tracking_code),
-               shipped_at = CASE WHEN $1 = 'posted' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
-               delivered_at = CASE WHEN $1 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END
+               tracking_generated = COALESCE($4, tracking_generated),
+               shipped_at = CASE WHEN $1::shipment_status = 'posted' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
+               delivered_at = CASE WHEN $1::shipment_status = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END
            WHERE id = $3`,
-          [newStatus, trackingCode, shipment.id]
+          [newStatus, trackingCode, shipment.id, trackingGenerated]
         );
 
         if (statusChanged || hasLocationNote) {
@@ -373,6 +440,7 @@ export async function PATCH(req: Request, { params }: Params) {
           orderStatusSynced = "delivered";
         } else if (statusChanged && (newStatus === "cancelled" || newStatus === "returned")) {
           await restockPhysicalItems(client, orderId, staffEmail);
+          await cancelResellerCommissionsForOrder(client, orderId);
           await client.query(`UPDATE orders SET status = 'cancelled' WHERE id = $1`, [orderId]);
           orderStatusSynced = "cancelled";
         }
@@ -395,7 +463,7 @@ export async function PATCH(req: Request, { params }: Params) {
           emailSent = await sendOrderStatusEmail(
             {
               id: orderId, order_number: orderRow.order_number, total: orderRow.total, customer_email: orderRow.customer_email,
-              tracking_code: result.finalTrackingCode, items, reason: eventDescription ?? reason,
+              user_id: orderRow.user_id, tracking_code: result.finalTrackingCode, items, reason: eventDescription ?? reason,
             },
             event
           );
@@ -411,17 +479,27 @@ export async function PATCH(req: Request, { params }: Params) {
     // perdido pra sempre.
     if (body.action === "cancel_order") {
       const orderRes = await db.query(
-        `SELECT o.status, o.total, o.order_number, u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
+        `SELECT o.status, o.total, o.order_number, o.user_id, u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
         [orderId]
       );
       if (orderRes.rows.length === 0) return fail("ORDER_NOT_FOUND", 404);
       const current = orderRes.rows[0];
       if (current.status === "cancelled") return ok({ updated: false, reason: "ALREADY_CANCELLED" });
 
+      // Pacote já postado/em trânsito/entregue NÃO pode ser "cancelado" —
+      // cancelar devolve o item físico ao estoque, mas o produto já saiu
+      // (estoque fantasma). O caminho certo é marcar o envio como
+      // "devolvido" quando a mercadoria voltar (isso sim restoca).
+      const shipCheck = await db.query(`SELECT status FROM shipments WHERE order_id = $1`, [orderId]);
+      if (["posted", "in_transit", "delivered"].includes(shipCheck.rows[0]?.status)) {
+        return fail("SHIPMENT_ALREADY_SENT", 409);
+      }
+
       await withTransaction(async (client) => {
         // pending_payment nunca debitou estoque nem foi cobrado — só fecha.
         if (current.status !== "pending_payment") {
           await restockPhysicalItems(client, orderId, staffEmail);
+          await cancelResellerCommissionsForOrder(client, orderId);
         }
         await client.query(`UPDATE orders SET status = 'cancelled' WHERE id = $1`, [orderId]);
 
@@ -437,7 +515,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
       const emailSent = notifyEmail
         ? await sendOrderStatusEmail(
-            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
+            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
             "order_cancelled"
           )
         : false;
@@ -456,7 +534,7 @@ export async function PATCH(req: Request, { params }: Params) {
       if (!allowed.includes(newStatus)) return fail("INVALID_STATUS", 400);
 
       const orderRes = await db.query(
-        `SELECT o.status, o.total, o.order_number, u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
+        `SELECT o.status, o.total, o.order_number, o.user_id, u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
         [orderId]
       );
       if (orderRes.rows.length === 0) return fail("ORDER_NOT_FOUND", 404);
@@ -465,10 +543,13 @@ export async function PATCH(req: Request, { params }: Params) {
       if (current.status === "cancelled") return fail("ORDER_CANCELLED", 409);
 
       await db.query(`UPDATE orders SET status = $1 WHERE id = $2`, [newStatus, orderId]);
+      if (newStatus === "refunded") {
+        await cancelResellerCommissionsForOrder(db, orderId);
+      }
 
       const emailSent = notifyEmail
         ? await sendOrderStatusEmail(
-            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
+            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
             newStatus as NotificationEvent
           )
         : false;

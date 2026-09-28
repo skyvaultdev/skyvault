@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Icon, { type IconName } from "@/components/icons/Icon";
 import { useRouter } from "next/navigation";
 import "./orders.css";
 import BrazilMap from "@/app/(components)/shipping/BrazilMap";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
+import { downloadFile, extractDownloadFilename } from "@/lib/files/downloadFile";
+import ReviewForm from "./ReviewForm";
+import "./review-form.css";
 
 type OrderRow = {
+  first_product_name?: string | null;
+  first_product_id?: number | null;
   id: number;
   order_number: string | null;
   status: string;
@@ -29,6 +35,7 @@ function displayOrderNumber(order: { order_number?: string | null; id: number })
 
 type OrderItem = {
   id: number;
+  product_id?: number | null;
   product_name: string;
   variation_name: string | null;
   quantity: number;
@@ -67,7 +74,7 @@ type OrderDetail = {
     recipient_name: string; street: string; number: string; complement: string | null;
     neighborhood: string; city: string; state: string; cep: string;
   } | null;
-  shipment: { id: number; status: string; tracking_code: string | null; carrier_name: string | null } | null;
+  shipment: { id: number; status: string; tracking_code: string | null; tracking_generated?: boolean; carrier_name: string | null } | null;
   shipmentEvents: ShipmentEvent[];
 };
 
@@ -80,10 +87,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const SHIPMENT_STEPS = [
-  { value: "preparing", label: "Preparando", icon: "📦" },
-  { value: "posted", label: "Postado", icon: "🚚" },
-  { value: "in_transit", label: "Em trânsito", icon: "🛣️" },
-  { value: "delivered", label: "Entregue", icon: "🏠" },
+  { value: "preparing", label: "Preparando", icon: "box" },
+  { value: "posted", label: "Postado", icon: "truck" },
+  { value: "in_transit", label: "Em trânsito", icon: "route" },
+  { value: "delivered", label: "Entregue", icon: "home" },
 ];
 
 const SHIPMENT_STATUS_LABELS: Record<string, string> = {
@@ -117,6 +124,13 @@ export default function OrdersPage() {
   const [ticketError, setTicketError] = useState("");
   const [ticketDraft, setTicketDraft] = useState("");
   const [ticketSending, setTicketSending] = useState(false);
+
+  // Clicar num item abre uma escolha rápida (suporte ou avaliação) em vez de
+  // cair direto na área de ticket.
+  const [choiceItem, setChoiceItem] = useState<OrderItem | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [reviewItem, setReviewItem] = useState<OrderItem | null>(null);
+  const [reviewedIds, setReviewedIds] = useState<number[]>([]);
 
   const loadOrders = useCallback(async (page = 1) => {
     setLoading(true);
@@ -155,11 +169,14 @@ export default function OrdersPage() {
     setTicketStatusValue(null);
     setTicketError("");
     setTicketDraft("");
+    setSupportOpen(false);
+    setChoiceItem(null);
     try {
       const res = await fetch(`/api/checkout/order/${id}`, { cache: "no-store" });
       const json = await res.json();
       if (res.ok) {
         setSelectedOrder(json.data);
+        void loadReviewed(json.data);
         // Se já existe um ticket (aberto ou encerrado) pra esse pedido, o
         // chat carrega sozinho — antes só aparecia o botão "abrir ticket"
         // de novo, mesmo já tendo uma conversa (e clicar nele criaria um
@@ -172,6 +189,18 @@ export default function OrdersPage() {
       setDetailError("Não foi possível carregar esse pedido. Tente novamente.");
     } finally {
       setLoadingDetail(false);
+    }
+  }
+
+  async function loadReviewed(order: OrderDetail) {
+    const ids = Array.from(new Set(order.items.map((i) => i.product_id).filter((v): v is number => !!v)));
+    if (ids.length === 0) return;
+    try {
+      const res = await fetch(`/api/reviews/eligibility?productIds=${ids.join(",")}`, { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok) setReviewedIds((json.data.reviewed ?? []).map(Number));
+    } catch {
+      // sem isso o botão só não mostra "já avaliado" — o servidor bloqueia duplicada de qualquer jeito
     }
   }
 
@@ -323,10 +352,14 @@ export default function OrdersPage() {
         <div className="ordersPageList">
           {orders.map((order) => (
             <button key={order.id} className="ordersPageRow" onClick={() => openOrder(order.id)}>
-              <img src={order.thumbnail_url || "/file.svg"} alt="" className="ordersPageRowThumb" />
+              <img src={order.thumbnail_url || "/placeholders/product.svg"} alt="" className="ordersPageRowThumb" />
               <div className="ordersPageRowBody">
                 <div className="ordersPageRowTop">
-                  <span className="ordersPageRowId">{displayOrderNumber(order)}</span>
+                  <span className="ordersPageRowId">
+                    {order.first_product_name
+                      ? `${order.first_product_name} - ${displayOrderNumber(order)}${Number(order.item_count) > 1 ? ` (+${Number(order.item_count) - 1})` : ""}`
+                      : displayOrderNumber(order)}
+                  </span>
                   <span className={`ordersPageStatus status-${order.status}`}>
                     {STATUS_LABELS[order.status] ?? order.status}
                   </span>
@@ -334,7 +367,7 @@ export default function OrdersPage() {
                 <div className="ordersPageRowBottom">
                   {order.has_physical && order.shipment_status && (
                     <span className="ordersPageShipmentBadge">
-                      📦 {SHIPMENT_STATUS_LABELS[order.shipment_status] ?? order.shipment_status}
+                      <Icon name="box" /> {SHIPMENT_STATUS_LABELS[order.shipment_status] ?? order.shipment_status}
                     </span>
                   )}
                   <span className="ordersPageItemCount">{order.item_count} item(ns)</span>
@@ -395,7 +428,7 @@ export default function OrdersPage() {
                         const active = !shipmentIsEndState && idx === shipmentStepIndex;
                         return (
                           <div key={step.value} className={`sheinStep ${done ? "done" : ""} ${active ? "active" : ""}`}>
-                            <span className="sheinStepIcon">{step.icon}</span>
+                            <span className="sheinStepIcon"><Icon name={step.icon as IconName} size="1.4em" /></span>
                             <span className="sheinStepLabel">{step.label}</span>
                             {idx < SHIPMENT_STEPS.length - 1 && <span className="sheinStepLine" />}
                           </div>
@@ -405,7 +438,7 @@ export default function OrdersPage() {
 
                     {shipmentIsEndState && (
                       <p className={`sheinEndStateBanner ${selectedOrder.shipment.status}`}>
-                        {selectedOrder.shipment.status === "cancelled" ? "❌ Envio cancelado" : "↩️ Devolvido ao remetente"}
+                        {selectedOrder.shipment.status === "cancelled" ? <><Icon name="x" /> Envio cancelado</> : <><Icon name="undo" /> Devolvido ao remetente</>}
                       </p>
                     )}
 
@@ -414,6 +447,12 @@ export default function OrdersPage() {
                         <span>Rastreio: <strong>{selectedOrder.shipment.tracking_code}</strong></span>
                         <span className="sheinCopyHint">{copiedTracking ? "Copiado!" : "Copiar"}</span>
                       </button>
+                    )}
+                    {selectedOrder.shipment.tracking_code && selectedOrder.shipment.tracking_generated && (
+                      <p className="ordersHint">
+                        Esse é um código de acompanhamento interno da loja — pode não aparecer no site da transportadora.
+                        Acompanhe o andamento pela linha do tempo abaixo e, se tiver dúvida, fale com o suporte.
+                      </p>
                     )}
 
                     <BrazilMap state={lastEvent?.state ?? null} city={lastEvent?.city ?? null} />
@@ -438,7 +477,7 @@ export default function OrdersPage() {
 
                     {canConfirmDelivery && (
                       <button className="sheinConfirmBtn" onClick={confirmDelivery} disabled={confirmingDelivery}>
-                        {confirmingDelivery ? "Confirmando..." : "📦 Recebi meu pedido"}
+                        {confirmingDelivery ? "Confirmando..." : <><Icon name="box" /> Recebi meu pedido</>}
                       </button>
                     )}
                   </div>
@@ -446,22 +485,27 @@ export default function OrdersPage() {
 
                 <div className="orderDetailItems">
                   {selectedOrder.items.map((item) => (
-                    <div key={item.id} className="ordersItemRich">
-                      <img src={item.image_url || "/file.svg"} alt={item.product_name} className="ordersItemThumb" />
+                    <div key={item.id} className="ordersItemRich clickable" onClick={() => setChoiceItem(item)} title="Suporte ou avaliação">
+                      <img src={item.image_url || "/placeholders/product.svg"} alt={item.product_name} className="ordersItemThumb" />
                       <div className="ordersItemInfo">
                         <span className="ordersItemName">
-                          {item.product_name}{item.variation_name ? ` — ${item.variation_name}` : ""}
+                          {item.product_name}{item.variation_name ? ` — ${item.variation_name}` : ""} - {displayOrderNumber(selectedOrder)}
                         </span>
                         <span className="ordersItemMeta">
-                          {item.category_name ?? "Sem categoria"} · {item.product_type === "physical" ? "📦 Físico" : "💾 Digital"} · Qtd {item.quantity}
+                          {item.category_name ?? "Sem categoria"} · {item.product_type === "physical" ? <><Icon name="box" /> Físico</> : <><Icon name="save" /> Digital</>} · Qtd {item.quantity}
                         </span>
                         {item.deliveredContent && item.deliveredContent.length > 0 && (
                           <div className="deliveredList">
                             {item.deliveredContent.map((content, i) =>
                               content.startsWith("/api/files/") ? (
-                                <a key={i} href={content} target="_blank" rel="noreferrer" className="ordersDeliveredLink">
+                                <button
+                                  key={i}
+                                  type="button"
+                                  className="ordersDeliveredLink"
+                                  onClick={(e) => { e.stopPropagation(); void downloadFile(content, extractDownloadFilename(content)).catch(() => modal.alert("Não foi possível baixar o arquivo. Tente de novo.")); }}
+                                >
                                   Baixar arquivo
-                                </a>
+                                </button>
                               ) : (
                                 <code key={i}>{content}</code>
                               )
@@ -476,14 +520,21 @@ export default function OrdersPage() {
                   ))}
                 </div>
 
+                {!supportOpen && !ticketConversationId && (
+                  <button className="ordersTicketOpenBtn" onClick={() => setSupportOpen(true)}>
+                    <Icon name="chat" /> Precisa de ajuda com esse pedido?
+                  </button>
+                )}
+
+                {(supportOpen || ticketConversationId) && (
                 <div className="ordersTicketBox">
-                  <p className="ordersTicketPrompt">Precisa de ajuda com esse pedido?</p>
+                  <p className="ordersTicketPrompt">Suporte do pedido</p>
 
                   {ticketError && <p className="ordersErrorBanner">{ticketError}</p>}
 
                   {!ticketConversationId && (
                     <button className="ordersTicketOpenBtn" onClick={openTicket} disabled={ticketOpening}>
-                      {ticketOpening ? "Abrindo..." : "💬 Abrir ticket de suporte"}
+                      {ticketOpening ? "Abrindo..." : <><Icon name="chat" /> Abrir ticket de suporte</>}
                     </button>
                   )}
 
@@ -524,12 +575,61 @@ export default function OrdersPage() {
                     </div>
                   )}
                 </div>
+                )}
 
                 <button className="ordersBtnSecondary" onClick={closeOrderModal}>Fechar</button>
               </>
             )}
           </div>
         </div>
+      )}
+
+      {choiceItem && selectedOrder && (
+        <div className="modalOverlay" onClick={() => setChoiceItem(null)}>
+          <div className="modalContent ordersChoiceModal" onClick={(e) => e.stopPropagation()}>
+            <h4>{choiceItem.product_name} - {displayOrderNumber(selectedOrder)}</h4>
+            <button
+              className="ordersChoiceBtn"
+              onClick={() => { setChoiceItem(null); setSupportOpen(true); }}
+            >
+              <span><Icon name="chat" /></span>
+              <span>Suporte<small>Abrir ou continuar o ticket deste pedido</small></span>
+            </button>
+            <button
+              className="ordersChoiceBtn"
+              disabled={
+                !choiceItem.product_id ||
+                !["paid", "delivered"].includes(selectedOrder.status) ||
+                reviewedIds.includes(Number(choiceItem.product_id))
+              }
+              onClick={() => { setReviewItem(choiceItem); setChoiceItem(null); }}
+            >
+              <span><Icon name="star" /></span>
+              <span>
+                {reviewedIds.includes(Number(choiceItem.product_id)) ? "Já avaliado" : "Avaliar produto"}
+                <small>
+                  {["paid", "delivered"].includes(selectedOrder.status)
+                    ? "Nota, comentário e fotos/prints"
+                    : "Disponível depois do pagamento confirmado"}
+                </small>
+              </span>
+            </button>
+            <button className="ordersBtnSecondary" onClick={() => setChoiceItem(null)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {reviewItem && reviewItem.product_id && (
+        <ReviewForm
+          productId={Number(reviewItem.product_id)}
+          productName={reviewItem.product_name}
+          onClose={() => setReviewItem(null)}
+          onDone={(pid) => {
+            setReviewedIds((prev) => (prev.includes(pid) ? prev : [...prev, pid]));
+            setReviewItem(null);
+            void modal.alert("Avaliação enviada. Obrigado!");
+          }}
+        />
       )}
     </main>
   );

@@ -68,7 +68,7 @@ export async function POST() {
       await db.query(
         `INSERT INTO carriers (name, service_code, melhor_envio_service_id, active)
          VALUES ($1, $2, $3, false)
-         ON CONFLICT (melhor_envio_service_id)
+         ON CONFLICT (store_id, melhor_envio_service_id)
          WHERE melhor_envio_service_id IS NOT NULL
          DO UPDATE SET name = EXCLUDED.name, service_code = EXCLUDED.service_code`,
         [name, String(item.company!.id), item.id]

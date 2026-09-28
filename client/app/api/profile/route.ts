@@ -41,7 +41,7 @@ export async function PUT(req: Request) {
     const result = await db.query(
       `INSERT INTO customer_profiles (email, full_name, phone, cep, street, number, complement, neighborhood, city, state, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-       ON CONFLICT (email) DO UPDATE SET
+       ON CONFLICT (store_id, email) DO UPDATE SET
          full_name = EXCLUDED.full_name,
          phone = EXCLUDED.phone,
          cep = EXCLUDED.cep,

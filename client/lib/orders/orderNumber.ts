@@ -2,10 +2,11 @@ import crypto from "crypto";
 import type { Pool, PoolClient } from "pg";
 import { getDB } from "@/lib/database/db";
 
-// Sem 0/O/1/I/L — costumam ser confundidos entre si quando o cliente
-// digita/lê o número em voz alta pro suporte.
-const CHARSET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-const LENGTH = 8;
+// Maiúsculas + minúsculas, sem 0/O/o/1/I/l (ainda fáceis de confundir
+// mesmo misturando caixa) — mais caracteres/entropia que a versão
+// anterior (só maiúsculas, 8 chars), a pedido do dono da loja.
+const CHARSET = "23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+const LENGTH = 12;
 
 function randomOrderNumber(): string {
   const bytes = crypto.randomBytes(LENGTH);

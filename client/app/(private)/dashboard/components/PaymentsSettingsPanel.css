@@ -5,28 +5,108 @@
 
 .paymentsSection {
   display: grid;
-  gap: 8px;
-  padding: 16px;
-  border-radius: 14px;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .paymentsSection h4 {
   margin: 0;
+  font-size: 15px;
 }
 
-.paymentsCheckboxRow {
-  display: flex !important;
-  flex-direction: row !important;
+.paymentsMethodGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.paymentsMethodCard {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.paymentsCheckboxRow input {
-  width: auto;
-  height: auto;
+.paymentsMethodCard.active {
+  border-color: var(--secondary, #6400ff);
+  background: rgba(100, 0, 255, 0.08);
+}
+
+.paymentsMethodIcon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.paymentsMethodInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.paymentsMethodInfo strong {
+  font-size: 13.5px;
+  color: #fff;
+}
+
+.paymentsMethodInfo span {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.paymentsToggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+}
+
+.paymentsToggle input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.paymentsToggleTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.15s ease;
+}
+
+.paymentsToggleTrack::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.paymentsToggle input:checked ~ .paymentsToggleTrack {
+  background: var(--secondary, #6400ff);
+}
+
+.paymentsToggle input:checked ~ .paymentsToggleTrack::before {
+  transform: translateX(16px);
 }
 
 .paymentsFieldRow {
@@ -45,12 +125,35 @@
 }
 
 .paymentsFieldRow input {
-  height: 42px;
+  height: 44px;
   min-width: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(18, 18, 20, 0.9);
   color: #fff;
-  padding: 0 12px;
+  padding: 0 14px;
   font-size: 13.5px;
+}
+
+.paymentsFieldRow input:focus-visible {
+  outline: none;
+  border-color: var(--secondary, #6400ff);
+}
+
+.paymentsSaveBtn {
+  justify-self: start;
+  min-width: 160px;
+}
+
+.paymentsFeedback {
+  margin: 0;
+  font-size: 13px;
+}
+
+.paymentsFeedback.success {
+  color: #4ade80;
+}
+
+.paymentsFeedback.error {
+  color: #ff8484;
 }

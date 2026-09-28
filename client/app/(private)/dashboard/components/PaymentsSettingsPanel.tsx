@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Icon from "@/components/icons/Icon";
 import "./PaymentsSettingsPanel.css";
 
 type FormState = {
@@ -38,7 +39,7 @@ export default function PaymentsSettingsPanel() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     void load();
@@ -66,7 +67,7 @@ export default function PaymentsSettingsPanel() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setFeedback("");
+    setFeedback(null);
 
     try {
       const res = await fetch("/api/admin/payment-settings", {
@@ -74,7 +75,7 @@ export default function PaymentsSettingsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      setFeedback(res.ok ? "Salvo!" : "Erro ao salvar.");
+      setFeedback(res.ok ? { type: "success", message: "Salvo!" } : { type: "error", message: "Erro ao salvar." });
     } finally {
       setSaving(false);
     }
@@ -87,50 +88,86 @@ export default function PaymentsSettingsPanel() {
       <div className="tabHeader">
         <h3>Pagamentos</h3>
         <p className="helperText">
-          Métodos aceitos no checkout (processados via Mercado Pago — configure suas credenciais na aba
-          Configurações) e markup sobre o frete.
+          Métodos aceitos no checkout e markup sobre o frete. As credenciais do Mercado Pago (quem processa os
+          pagamentos de verdade) ficam configuradas direto no servidor — veja o status em <code>/dev</code>, não aqui.
         </p>
       </div>
 
       <form className="paymentsForm" onSubmit={handleSubmit}>
         <div className="paymentsSection">
-          <h4>Métodos aceitos</h4>
-          <label className="paymentsCheckboxRow">
-            <input
-              type="checkbox"
-              checked={form.acceptsPix}
-              onChange={(e) => setForm({ ...form, acceptsPix: e.target.checked })}
-            />
-            Pix
-          </label>
-          <label className="paymentsCheckboxRow">
-            <input
-              type="checkbox"
-              checked={form.acceptsCreditCard}
-              onChange={(e) => setForm({ ...form, acceptsCreditCard: e.target.checked })}
-            />
-            Cartão de crédito
-          </label>
-          <label className="paymentsCheckboxRow">
-            <input
-              type="checkbox"
-              checked={form.acceptsDebitCard}
-              onChange={(e) => setForm({ ...form, acceptsDebitCard: e.target.checked })}
-            />
-            Cartão de débito
-          </label>
-          <label className="paymentsCheckboxRow">
-            <input
-              type="checkbox"
-              checked={form.acceptsBoleto}
-              onChange={(e) => setForm({ ...form, acceptsBoleto: e.target.checked })}
-            />
-            Boleto
-          </label>
+          <h4>Métodos aceitos no checkout</h4>
+          <p className="helperText">Desligar um método aqui remove ele da tela de pagamento do cliente na hora.</p>
+
+          <div className="paymentsMethodGrid">
+            <label className={`paymentsMethodCard ${form.acceptsPix ? "active" : ""}`}>
+              <span className="paymentsMethodIcon"><Icon name="pix" /></span>
+              <span className="paymentsMethodInfo">
+                <strong>Pix</strong>
+                <span>Aprovação instantânea</span>
+              </span>
+              <span className="paymentsToggle">
+                <input
+                  type="checkbox"
+                  checked={form.acceptsPix}
+                  onChange={(e) => setForm({ ...form, acceptsPix: e.target.checked })}
+                />
+                <span className="paymentsToggleTrack" />
+              </span>
+            </label>
+
+            <label className={`paymentsMethodCard ${form.acceptsCreditCard ? "active" : ""}`}>
+              <span className="paymentsMethodIcon"><Icon name="card" /></span>
+              <span className="paymentsMethodInfo">
+                <strong>Cartão de crédito</strong>
+                <span>Parcelamento disponível</span>
+              </span>
+              <span className="paymentsToggle">
+                <input
+                  type="checkbox"
+                  checked={form.acceptsCreditCard}
+                  onChange={(e) => setForm({ ...form, acceptsCreditCard: e.target.checked })}
+                />
+                <span className="paymentsToggleTrack" />
+              </span>
+            </label>
+
+            <label className={`paymentsMethodCard ${form.acceptsDebitCard ? "active" : ""}`}>
+              <span className="paymentsMethodIcon"><Icon name="card" /></span>
+              <span className="paymentsMethodInfo">
+                <strong>Cartão de débito</strong>
+                <span>Débito à vista</span>
+              </span>
+              <span className="paymentsToggle">
+                <input
+                  type="checkbox"
+                  checked={form.acceptsDebitCard}
+                  onChange={(e) => setForm({ ...form, acceptsDebitCard: e.target.checked })}
+                />
+                <span className="paymentsToggleTrack" />
+              </span>
+            </label>
+
+            <label className={`paymentsMethodCard ${form.acceptsBoleto ? "active" : ""}`}>
+              <span className="paymentsMethodIcon"><Icon name="receipt" /></span>
+              <span className="paymentsMethodInfo">
+                <strong>Boleto</strong>
+                <span>Compensação em até 3 dias</span>
+              </span>
+              <span className="paymentsToggle">
+                <input
+                  type="checkbox"
+                  checked={form.acceptsBoleto}
+                  onChange={(e) => setForm({ ...form, acceptsBoleto: e.target.checked })}
+                />
+                <span className="paymentsToggleTrack" />
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="paymentsSection">
           <h4>Markup sobre o frete</h4>
+          <p className="helperText">Somado em cima do valor de frete cotado — vira parte do total pago pelo cliente.</p>
           <div className="paymentsFieldRow">
             <label>
               Percentual (%)
@@ -153,13 +190,12 @@ export default function PaymentsSettingsPanel() {
               />
             </label>
           </div>
-          <p className="helperText">Somado em cima do valor de frete cotado — vira parte do total pago pelo cliente.</p>
         </div>
 
-        <button type="submit" className="btn" disabled={saving}>
+        <button type="submit" className="btn paymentsSaveBtn" disabled={saving}>
           {saving ? "Salvando..." : "Salvar"}
         </button>
-        {feedback && <p className="helperText">{feedback}</p>}
+        {feedback && <p className={`paymentsFeedback ${feedback.type}`}>{feedback.message}</p>}
       </form>
     </section>
   );

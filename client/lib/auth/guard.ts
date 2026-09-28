@@ -1,14 +1,15 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { verifyJWT, type AppJWTPayload } from "@/lib/jwt/init";
+import { type AppJWTPayload } from "@/lib/jwt/init";
+import { verifyJWTForStore } from "@/lib/jwt/storeAware";
 import { fail } from "@/lib/api/response";
 
 export async function requireSession(): Promise<AppJWTPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get("auth_token")?.value;
   if (!token) return null;
-  return verifyJWT(token);
+  return verifyJWTForStore(token);
 }
 
 export async function requirePermission(permission: string) {

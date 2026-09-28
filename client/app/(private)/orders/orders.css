@@ -443,8 +443,17 @@
 }
 
 .ordersDeliveredLink {
+  border: none;
+  background: none;
+  padding: 0;
   color: var(--secondary, #6400ff);
   font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ordersDeliveredLink:hover {
+  text-decoration: underline;
 }
 
 .shipmentTimeline {
@@ -560,19 +569,40 @@
 
 .ordersTicketComposer {
   display: flex;
+  align-items: center;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.ordersTicketInput {
-  flex: 1;
+.ordersTicketComposer .ordersTicketInput {
+  flex: 1 1 auto;
   min-width: 0;
+  width: auto;
   height: 42px;
+  box-sizing: border-box;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(18, 18, 20, 0.9);
   color: #fff;
   padding: 0 12px;
   font-size: 13.5px;
+  margin: 0;
+}
+
+.ordersTicketComposer .ordersTicketInput:focus-visible {
+  outline: none;
+  border-color: var(--secondary, #6400ff);
+}
+
+.ordersTicketComposer .ordersBtnSecondary {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 84px;
+  height: 42px;
+  margin: 0;
+  padding: 0 16px;
+  white-space: nowrap;
 }
 
 @media (max-width: 480px) {

@@ -5,6 +5,7 @@ import { fail, ok } from "@/lib/api/response";
 import { requireCustomer } from "@/lib/auth/customer";
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
 import { sendOrderDeliveryEmail } from "@/lib/mail/sendOrderDeliveryEmail";
+import { logDeliveryFailure } from "@/lib/payments/deliveryFailures";
 
 // Endpoint de teste — simula o webhook que o Mercado Pago mandaria quando
 // um Pix/boleto pendente é pago (cartão já confirma na hora, em
@@ -36,7 +37,17 @@ export async function POST(req: Request) {
       return fail("MOCK_DISABLED_FOR_REAL_PAYMENT", 403);
     }
 
-    const result = await confirmOrderPayment(orderIdNum);
+    // Mesmo padrão de tratamento de erro dos outros 3 pontos que chamam
+    // confirmOrderPayment (webhook, pay, check-payment): se falhar aqui
+    // dentro, não deixa cair no catch genérico do fim da rota sem rastro —
+    // registra em delivery_failures pra reconciliação manual.
+    let result;
+    try {
+      result = await confirmOrderPayment(orderIdNum);
+    } catch (deliveryError) {
+      await logDeliveryFailure(orderIdNum, "mock_confirm_payment", deliveryError);
+      return fail("DELIVERY_FAILED", 500);
+    }
 
     if (!result.alreadyProcessed && result.deliveredItems.length > 0 && result.customerEmail) {
       try {

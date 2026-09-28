@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Icon from "@/components/icons/Icon";
 import { useParams } from "next/navigation";
 import "./product.css";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +9,9 @@ import { useRouter } from "next/navigation";
 import { FiLock, FiX, FiMaximize2 } from "react-icons/fi";
 import ShippingQuoteList, { type ShippingQuote } from "@/app/(components)/shipping/ShippingQuoteList";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
+import { captureReferralFromUrl } from "@/lib/resellers/captureReferralClient";
+import ProductQuestions from "./ProductQuestions";
+import ProductReviews from "./ProductReviews";
 
 type ProductImage = { id: number; url: string; position: number };
 
@@ -75,6 +79,25 @@ export default function ProductPage() {
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
 
   const [loadingAdd, setLoadingAdd] = useState(false);
+  const [paymentMethodLabels, setPaymentMethodLabels] = useState<string[]>(["Pix"]);
+
+  useEffect(() => {
+    // Lista real de métodos aceitos (aba Pagamentos da dashboard) em vez do
+    // "Pix" fixo que aparecia aqui independente da configuração.
+    fetch("/api/store-settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const d = json?.data;
+        if (!d) return;
+        const list: string[] = [];
+        if (d.accepts_pix !== false) list.push("Pix");
+        if (d.accepts_credit_card !== false) list.push("Cartão de crédito");
+        if (d.accepts_debit_card !== false) list.push("Cartão de débito");
+        if (d.accepts_boleto !== false) list.push("Boleto");
+        if (list.length > 0) setPaymentMethodLabels(list);
+      })
+      .catch(() => {});
+  }, []);
 
   const [freightCep, setFreightCep] = useState("");
   const [freightQuotes, setFreightQuotes] = useState<ShippingQuote[]>([]);
@@ -91,6 +114,10 @@ export default function ProductPage() {
   }, [similar, currentPage]);
 
   var pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  useEffect(() => {
+    captureReferralFromUrl();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -232,8 +259,8 @@ export default function ProductPage() {
   }, [finalPrice, basePrice]);
 
   var currentImage = useMemo(() => {
-    if (!product || !product.images.length) return "/file.svg";
-    return product.images[selectedImage]?.url || "/file.svg";
+    if (!product || !product.images.length) return "/placeholders/product.svg";
+    return product.images[selectedImage]?.url || "/placeholders/product.svg";
   }, [product, selectedImage]);
 
   var isAvailable = useMemo(() => {
@@ -454,7 +481,7 @@ export default function ProductPage() {
 
           {product.product_type === "physical" && (
             <div className="freightCalc">
-              <p className="freightCalcLabel">📦 Calcular frete e prazo de entrega</p>
+              <p className="freightCalcLabel"><Icon name="box" /> Calcular frete e prazo de entrega</p>
               <div className="freightCalcRow">
                 <input
                   className="freightCalcInput"
@@ -516,14 +543,21 @@ export default function ProductPage() {
 
           <aside className="sideBar">
             <article className="sideCard">
-              <h3>Método de pagamento</h3>
-              <p className="pix">
-                Pix <img src="/pix.jpg" className="pix" />
-              </p>
+              <h3>Métodos de pagamento</h3>
+              <ul className="paymentMethodList">
+                {paymentMethodLabels.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+              <p className="paymentMethodHint">Os métodos disponíveis dependem do valor do pedido.</p>
             </article>
           </aside>
         </aside>
       </section>
+
+      {product && <ProductReviews productId={Number(product.id)} />}
+
+      {product && <ProductQuestions productId={Number(product.id)} />}
 
       {similar.length > 0 && (
         <section className="similarSection">
@@ -533,7 +567,7 @@ export default function ProductPage() {
             {paginatedProducts.map((item) => (
               <div key={item.id} className="similarCard" onClick={() => router.push(`/product/${item.slug}`)}>
                 <div className="similarImgWrapper">
-                  <img src={item.image_url || "/file.svg"} alt={item.name} className="similarThumb" />
+                  <img src={item.image_url || "/placeholders/product.svg"} alt={item.name} className="similarThumb" />
                 </div>
 
                 <div className="similarInfo">
@@ -577,9 +611,6 @@ export default function ProductPage() {
         </div>
       )}
 
-      {similar.length === 0 && (
-        <p className="emptyMsg">Nenhum produto encontrado.</p>
-      )}
     </main>
   );
 }

@@ -7,6 +7,7 @@ import path from "path";
 import crypto from "crypto";
 import { requirePermission } from "@/lib/auth/guard";
 
+import { sniffFile } from "@/lib/files/sniffFile";
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
@@ -44,6 +45,7 @@ async function ensureSchema() {
     "background_style TEXT",
     "background_img_url TEXT",
     "background_css TEXT",
+    "background_solid_color TEXT",
     "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
   ];
 
@@ -65,8 +67,14 @@ export async function GET() {
   try {
     const db = await ensureSchema();
 
+    // Rota PÚBLICA (tema, logo, checkout, página de produto): lista só as
+    // colunas que o site precisa. `SELECT *` vazaria também colunas
+    // internas (ex: chat_encryption_key, suspended, origin_cep).
     const result = await db.query(`
-      SELECT *
+      SELECT id, primary_color, secondary_color, store_name, logo_url,
+             background_style, background_img_url, background_css, background_solid_color,
+             accepts_pix, accepts_credit_card, accepts_debit_card, accepts_boleto,
+             updated_at
       FROM store_settings
       ORDER BY id DESC
       LIMIT 1
@@ -94,6 +102,8 @@ export async function POST(req: Request) {
     var backgroundStyle: string | undefined;
     var backgroundCss: string | undefined;
     var backgroundImgUrl: string | undefined;
+    var backgroundSolidColor: string | undefined;
+    var removeBackgroundImage = false;
 
     if (contentType.includes("multipart/form-data")) {
       var form = await req.formData();
@@ -103,7 +113,9 @@ export async function POST(req: Request) {
       backgroundStyle = form.get("backgroundStyle")?.toString().trim() || undefined;
       backgroundCss = form.get("backgroundCss")?.toString() || undefined;
       storeName = form.get("storeName")?.toString().trim() || undefined;
+      backgroundSolidColor = form.get("backgroundSolidColor")?.toString().trim() || undefined;
 
+      removeBackgroundImage = form.get("removeBackgroundImage")?.toString() === "1";
       var image = form.get("backgroundImage");
       var logo = form.get("logoUrl");
 
@@ -114,11 +126,11 @@ export async function POST(req: Request) {
         var uploadDir = path.join(process.cwd(), "public", "uploads", "store");
         await mkdir(uploadDir, { recursive: true });
 
-        var ext = path.extname(image.name) || ".jpg";
-        var fileName = `${crypto.randomUUID()}${ext}`;
-        var filePath = path.join(uploadDir, fileName);
-
         var bytes = Buffer.from(await image.arrayBuffer());
+        var sniffed = sniffFile(bytes);
+        if (!sniffed || sniffed.kind !== "image") return fail("INVALID_IMAGE_TYPE", 400);
+        var fileName = `${crypto.randomUUID()}${sniffed.ext}`;
+        var filePath = path.join(uploadDir, fileName);
         await writeFile(filePath, bytes);
 
         backgroundImgUrl = `/uploads/store/${fileName}`;
@@ -132,11 +144,11 @@ export async function POST(req: Request) {
 
         await mkdir(uploadDir, { recursive: true });
 
-        var ext = path.extname(logo.name) || ".png";
-        var fileName = `logo-${crypto.randomUUID()}${ext}`;
-        var filePath = path.join(uploadDir, fileName);
-
         var bytes = Buffer.from(await logo.arrayBuffer());
+        var sniffed = sniffFile(bytes);
+        if (!sniffed || sniffed.kind !== "image") return fail("INVALID_IMAGE_TYPE", 400);
+        var fileName = `logo-${crypto.randomUUID()}${sniffed.ext}`;
+        var filePath = path.join(uploadDir, fileName);
 
         await writeFile(filePath, bytes);
 
@@ -153,6 +165,7 @@ export async function POST(req: Request) {
       backgroundStyle = body.backgroundStyle?.trim();
       backgroundCss = body.backgroundCss;
       backgroundImgUrl = body.backgroundImgUrl?.trim();
+      backgroundSolidColor = body.backgroundSolidColor?.trim();
     }
 
     const current = await db.query(`
@@ -172,9 +185,10 @@ export async function POST(req: Request) {
         logo_url = COALESCE($4, logo_url),
         background_style = COALESCE($5, background_style),
         background_css = COALESCE($6, background_css),
-        background_img_url = COALESCE($7, background_img_url),
+        background_img_url = CASE WHEN $10::boolean THEN NULL ELSE COALESCE($7, background_img_url) END,
+        background_solid_color = COALESCE($8, background_solid_color),
         updated_at = NOW()
-      WHERE id = $8
+      WHERE id = $9
       RETURNING *
       `,
       [
@@ -185,12 +199,15 @@ export async function POST(req: Request) {
         backgroundStyle ?? null,
         backgroundCss ?? null,
         backgroundImgUrl ?? null,
+        backgroundSolidColor && /^#[0-9a-fA-F]{6}$/.test(backgroundSolidColor) ? backgroundSolidColor : null,
         row.id,
+        removeBackgroundImage && !backgroundImgUrl,
       ]
     );
 
     await deleteOldStoreFile(logoUrl, row.logo_url);
     await deleteOldStoreFile(backgroundImgUrl, row.background_img_url);
+    if (removeBackgroundImage && !backgroundImgUrl) await deleteOldStoreFile("removed", row.background_img_url);
 
     return ok(updated.rows[0]);
   } catch (error) {
@@ -203,7 +220,7 @@ export async function POST(req: Request) {
 
 async function deleteOldStoreFile(newUrl: string | undefined, oldUrl: string | null | undefined) {
   if (!newUrl || !oldUrl || newUrl === oldUrl) return;
-  if (!oldUrl.startsWith("/uploads/store/")) return;
+  if (!oldUrl.startsWith("/uploads/store/") || oldUrl.includes("..")) return;
 
   try {
     var oldPath = path.join(process.cwd(), "public", oldUrl.replace(/^\/+/, ""));

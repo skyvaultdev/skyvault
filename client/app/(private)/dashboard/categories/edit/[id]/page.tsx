@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Icon from "@/components/icons/Icon";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import "./category.css";
@@ -145,7 +146,7 @@ export default function EditCategoryPage() {
                   )}
                 </div>
 
-                {active && <span className="checkIcon">Lincado ✓</span>}
+                {active && <span className="checkIcon">Lincado <Icon name="check" /></span>}
               </div>
             );
           })}
@@ -159,7 +160,7 @@ export default function EditCategoryPage() {
       {successData && (
         <div className="modalOverlay">
           <div className="modalContent">
-            <div className="modalIcon">✓</div>
+            <div className="modalIcon"><Icon name="check" /></div>
             <h2>Sucesso!</h2>
             <p>A categoria <strong>{successData.name}</strong> foi atualizada.</p>
             <p>Total de produtos vinculados: {successData.totalProducts}</p>

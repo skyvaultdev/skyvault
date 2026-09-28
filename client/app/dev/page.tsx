@@ -37,7 +37,7 @@ export default function DevDashboardPage() {
   return (
     <main className="devPage">
       <header className="devHeader">
-        <h1>🛠 Dashboard de devs</h1>
+        <h1>Dashboard de devs</h1>
         <button
           onClick={async () => {
             await fetch("/api/dev/auth/logout", { method: "POST" });
@@ -93,11 +93,11 @@ function MercadoPagoSection() {
       const res = await fetch("/api/dev/mercadopago-status/test", { method: "POST" });
       const json = await res.json();
       if (res.ok) {
-        setTestResult(`✅ Conectado — conta: ${json.data.accountEmail}`);
+        setTestResult(`Conectado — conta: ${json.data.accountEmail}`);
       } else if (json.error === "NOT_CONFIGURED") {
-        setTestResult("⚠️ A loja ainda não configurou as credenciais.");
+        setTestResult("Aviso: a loja ainda não configurou as credenciais.");
       } else {
-        setTestResult(`❌ Falha na conexão (${json.error}).`);
+        setTestResult(`Falha na conexão (${json.error}).`);
       }
     } finally {
       setTesting(false);
@@ -117,7 +117,7 @@ function MercadoPagoSection() {
 
       {status && (
         <span className={`devStatusBadge ${status.configured ? "ok" : "pending"}`}>
-          {status.configured ? "✅ Configurado" : "⚠️ .env sem credenciais do Mercado Pago"}
+          {status.configured ? "Configurado" : "Aviso: .env sem credenciais do Mercado Pago"}
         </span>
       )}
 
@@ -169,7 +169,7 @@ function MelhorEnvioSection() {
       if (res.ok) {
         setRawData(json.data);
       } else {
-        setRawError(`❌ Falha ao buscar dados (${json.error}).`);
+        setRawError(`Falha ao buscar dados (${json.error}).`);
       }
     } finally {
       setFetchingRaw(false);
@@ -190,7 +190,7 @@ function MelhorEnvioSection() {
 
       {status && (
         <span className={`devStatusBadge ${status.configured ? "ok" : "pending"}`}>
-          {status.configured ? "✅ Configurado" : "⚠️ Loja ainda não configurou"}
+          {status.configured ? "Configurado" : "Aviso: loja ainda não configurou"}
         </span>
       )}
 
@@ -271,7 +271,7 @@ function StoreSection() {
       <section className="devSection">
         <h2>{storeStatus?.store_name || "Loja"}</h2>
         <span className={`devStatusBadge ${storeStatus?.suspended ? "danger" : "ok"}`}>
-          {storeStatus?.suspended ? "🚫 Suspensa" : "✅ Ativa"}
+          {storeStatus?.suspended ? "Suspensa" : "Ativa"}
         </span>
         <p className="devHelperText">
           Suspender bloqueia o acesso à dashboard de TODO o time da loja (owner incluso) e desativa

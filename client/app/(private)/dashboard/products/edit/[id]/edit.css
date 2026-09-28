@@ -565,8 +565,8 @@ input[type="number"] {
   font-weight: bold;
 }
 
-.primaryBtn { background: #000; color: #fff; border: none; }
-.secondaryBtn { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+.primaryBtn { background: var(--secondary, #6400ff); color: #fff; border: none; }
+.secondaryBtn { background: rgba(255,255,255,0.06); color: #fff; border: 1px solid rgba(255,255,255,0.16); }
 
 @media (max-width: 520px) {
 

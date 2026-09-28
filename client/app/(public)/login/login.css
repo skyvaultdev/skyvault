@@ -19,6 +19,8 @@ h1{color: white;}
 
 .logincontainer {
   width: 400px;
+  max-width: 92vw;
+  box-sizing: border-box;
   padding: 40px 20px;
   border-radius: 35px;
   background-color: #1b1b1b;

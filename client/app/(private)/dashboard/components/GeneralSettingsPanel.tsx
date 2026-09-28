@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Icon from "@/components/icons/Icon";
 import "./GeneralSettingsPanel.css";
 
 type Tier = { minSubtotal: number; percent: number };
@@ -16,6 +17,11 @@ export default function GeneralSettingsPanel() {
   const [freeShippingEnabled, setFreeShippingEnabled] = useState(true);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("150");
   const [minOrderValue, setMinOrderValue] = useState("0");
+
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementBody, setAnnouncementBody] = useState("");
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
+  const [announcementFeedback, setAnnouncementFeedback] = useState("");
 
   useEffect(() => {
     void load();
@@ -71,6 +77,29 @@ export default function GeneralSettingsPanel() {
     }
   }
 
+  async function sendAnnouncement() {
+    if (!announcementTitle.trim()) return;
+    setSendingAnnouncement(true);
+    setAnnouncementFeedback("");
+    try {
+      const res = await fetch("/api/admin/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: announcementTitle.trim(), body: announcementBody.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setAnnouncementFeedback(`Enviado pra ${json.data.recipients} cliente(s)!`);
+        setAnnouncementTitle("");
+        setAnnouncementBody("");
+      } else {
+        setAnnouncementFeedback("Erro ao enviar — confira o título.");
+      }
+    } finally {
+      setSendingAnnouncement(false);
+    }
+  }
+
   if (loading) return <section className="settingsPanel"><p>Carregando...</p></section>;
 
   const sortedPreview = [...tiers].sort((a, b) => a.minSubtotal - b.minSubtotal);
@@ -121,7 +150,7 @@ export default function GeneralSettingsPanel() {
                 </div>
               </label>
               <button type="button" className="tierRemoveBtn" onClick={() => removeTier(i)} title="Remover degrau">
-                ✕
+                <Icon name="x" />
               </button>
             </div>
           ))}
@@ -174,6 +203,38 @@ export default function GeneralSettingsPanel() {
         {saving ? "Salvando..." : "Salvar configurações"}
       </button>
       {feedback && <p className="helperText">{feedback}</p>}
+
+      <div className="generalSection">
+        <h4>Enviar aviso pra todos os clientes</h4>
+        <p className="helperText">
+          Aparece na aba de notificações de cada cliente cadastrado. Sem agendamento — envia na hora, pra quem já
+          tem conta hoje.
+        </p>
+        <label>
+          Título
+          <input
+            className="settingsInput"
+            value={announcementTitle}
+            onChange={(e) => setAnnouncementTitle(e.target.value)}
+            placeholder="Ex: Manutenção programada hoje à noite"
+            maxLength={200}
+          />
+        </label>
+        <label>
+          Mensagem (opcional)
+          <textarea
+            className="settingsTextarea"
+            value={announcementBody}
+            onChange={(e) => setAnnouncementBody(e.target.value)}
+            rows={3}
+            maxLength={1000}
+          />
+        </label>
+        <button className="btn" onClick={() => void sendAnnouncement()} disabled={sendingAnnouncement || !announcementTitle.trim()}>
+          {sendingAnnouncement ? "Enviando..." : "Enviar aviso"}
+        </button>
+        {announcementFeedback && <p className="helperText">{announcementFeedback}</p>}
+      </div>
     </section>
   );
 }

@@ -2,9 +2,11 @@
 
 import { Pool, PoolClient } from "pg";
 import { log } from "../logger";
+import { tenantPool } from "./tenantPool";
 
 declare global {
   var pgPool: Pool | undefined;
+  var pgTenantPool: { raw: Pool; wrapped: Pool } | undefined;
 }
 
 export {};
@@ -15,7 +17,10 @@ export function getDB(): Pool {
     throw new Error("Database not initialized");
   }
 
-  return global.pgPool;
+  if (!global.pgTenantPool || global.pgTenantPool.raw !== global.pgPool) {
+    global.pgTenantPool = { raw: global.pgPool, wrapped: tenantPool(global.pgPool) };
+  }
+  return global.pgTenantPool.wrapped;
 }
 
 export async function withTransaction<T>(

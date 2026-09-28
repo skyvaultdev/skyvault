@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Icon from "@/components/icons/Icon";
 import React, { useState, useEffect } from "react";
 
 export interface Product {
@@ -108,11 +109,11 @@ export default function CategoryPreview({
                 setModalMessage("Ordem das categorias foi alterada com sucesso!");
             } else {
                 setModalIsError(true);
-                setModalMessage("❌ Erro ao salvar a ordem das categorias.");
+                setModalMessage("Erro ao salvar a ordem das categorias.");
             }
         } catch (error) {
             setModalIsError(true);
-            setModalMessage("❌ Erro na requisição.");
+            setModalMessage("Erro na requisição.");
         } finally {
             setIsSaving(false);
             setIsSalvarOpen(true);
@@ -138,7 +139,7 @@ export default function CategoryPreview({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className={`modalIcon ${modalIsError ? "modalIconError" : ""}`}>
-                            {modalIsError ? "✕" : "✓"}
+                            {modalIsError ? <Icon name="x" /> : <Icon name="check" />}
                         </div>
                         <p className="modaltxt">{modalMessage}</p>
 
@@ -156,9 +157,9 @@ export default function CategoryPreview({
                 {isPreview && (
                     <div className="savebtnord2">
                         <button onClick={saveHomeOrder} disabled={isSaving}>
-                            {isSaving ? "Salvando..." : "💾 Salvar Ordem"}
+                            {isSaving ? "Salvando..." : <><Icon name="save" /> Salvar Ordem</>}
                         </button>
-                        <span>🖱️ Arraste as categorias para reordenar</span>
+                        <span><Icon name="pointer" /> Arraste as categorias para reordenar</span>
                     </div>
                 )}
 

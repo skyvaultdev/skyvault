@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Icon from "@/components/icons/Icon";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import "./stock.css";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
+import { downloadFile, extractDownloadFilename } from "@/lib/files/downloadFile";
 
 type StockType = "key" | "file" | "infinite";
 
@@ -92,8 +94,12 @@ export default function StockEditPage() {
       setIsUnlimited(!!data.is_unlimited);
 
       if (type === "key") {
-        setKeysInput(data.stock_content || "");
-        setStockCount(data.stock_content ? data.stock_content.split("\n").length : 0);
+        // As keys de verdade ficam uma-por-linha em stock_keys, não em
+        // stock_content (esse campo nunca guardou nada útil pro tipo
+        // "key" — era exatamente por isso que nenhuma chave nunca saía:
+        // o textarea mostrava/salvava o campo errado).
+        setKeysInput(data.keys || "");
+        setStockCount(data.keys ? data.keys.split("\n").filter((k: string) => k.trim()).length : 0);
       } else if (type === "file") {
         setStockContent(data.stock_content || "");
         setStockCount2(currentCount);
@@ -174,7 +180,7 @@ export default function StockEditPage() {
           <Link href="/dashboard" className="textBtn">
             ← Voltar
           </Link>
-          <h2>📦 {product?.name}</h2>
+          <h2><Icon name="box" /> {product?.name}</h2>
         </div>
         <p>
           Este é um produto físico — estoque (quantidade), SKU e dimensões são
@@ -193,7 +199,7 @@ export default function StockEditPage() {
         <Link href="/dashboard" className="textBtn">
           ← Voltar
         </Link>
-        <h2>📦 {product?.name}</h2>
+        <h2><Icon name="box" /> {product?.name}</h2>
       </div>
 
       <div className="stockGrid">
@@ -262,15 +268,13 @@ export default function StockEditPage() {
                           <p className="fileNameText" title={stockContent}>
                             Arquivo atual: <strong>{stockContent}</strong>
                           </p>
-                          <a
-                            href={`/api/files/products/uploads/${stockContent}`}
-                            download={stockContent}
+                          <button
+                            type="button"
                             className="downloadLink"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            onClick={() => void downloadFile(`/api/files/products/uploads/${stockContent}`, extractDownloadFilename(stockContent)).catch(() => modal.alert("Não foi possível baixar o arquivo. Tente de novo."))}
                           >
-                            📥 Baixar Arquivo
-                          </a>
+                            <Icon name="download" /> Baixar Arquivo
+                          </button>
                         </div>
 
                         <div className="filePreview">
@@ -296,7 +300,7 @@ export default function StockEditPage() {
                   </div>
 
                   <div className="unlimitedToggle">
-                    <label className="fieldLabel">📦 - Produto Ilimitado?</label>
+                    <label className="fieldLabel"><Icon name="box" /> Produto Ilimitado?</label>
                     <div className="checkboxRow">
                       <input
                         type="checkbox"
@@ -329,7 +333,7 @@ export default function StockEditPage() {
                   />
 
                   <div>
-                    <label className="fieldLabel">📦 - Produto Ilimitado?</label>
+                    <label className="fieldLabel"><Icon name="box" /> Produto Ilimitado?</label>
 
                     <div className="checkboxRow">
                       <input

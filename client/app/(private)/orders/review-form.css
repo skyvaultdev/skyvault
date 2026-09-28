@@ -1,0 +1,200 @@
+.rfModal,
+.ordersChoiceModal {
+  width: 460px;
+  max-width: 94vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.rfProduct {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  overflow-wrap: anywhere;
+}
+
+.rfStars {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.rfStars button {
+  border: none;
+  background: none;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.2);
+  transition: transform 0.1s ease, color 0.1s ease;
+}
+
+.rfStars button.on {
+  color: #f5b301;
+}
+
+.rfStars button:hover {
+  transform: scale(1.12);
+}
+
+.rfText {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 20, 0.9);
+  color: #fff;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.rfText:focus-visible {
+  outline: none;
+  border-color: var(--secondary, #6400ff);
+}
+
+.rfImages {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rfThumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+
+.rfThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.rfThumb button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #ff4d4d;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.rfAdd {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.rfAdd input {
+  display: none;
+}
+
+.rfHint {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.rfError {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 0, 0, 0.12);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  color: #ffb4b4;
+  font-size: 13px;
+}
+
+.rfActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.rfActions button,
+.ordersChoiceBtn {
+  min-height: 42px;
+  border-radius: 12px;
+  padding: 0 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rfCancel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
+.rfSend {
+  border: none;
+  background: var(--secondary, #6400ff);
+  color: #fff;
+}
+
+.rfActions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ordersChoiceBtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 14px 16px;
+}
+
+.ordersChoiceBtn:hover:not(:disabled) {
+  border-color: var(--secondary, #6400ff);
+  background: rgba(100, 0, 255, 0.1);
+}
+
+.ordersChoiceBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ordersChoiceBtn span:first-child {
+  font-size: 22px;
+}
+
+.ordersChoiceBtn small {
+  display: block;
+  font-weight: 400;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.ordersItemRich.clickable {
+  cursor: pointer;
+}
+
+.ordersItemRich.clickable:hover {
+  border-color: var(--secondary, #6400ff);
+}

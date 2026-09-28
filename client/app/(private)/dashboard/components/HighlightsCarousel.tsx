@@ -29,7 +29,7 @@ export default function HighlightsCarousel({highlights}: { highlights: Product[]
 
     return (
         <article key={product.id} className="highlightCard">
-            <img src={product.image_url || "/file.svg"} alt={product.name} className="highlightImage"/>
+            <img src={product.image_url || "/placeholders/product.svg"} alt={product.name} className="highlightImage"/>
             
             <div className="highlightOverlay">
                 <div className="highlightMeta">

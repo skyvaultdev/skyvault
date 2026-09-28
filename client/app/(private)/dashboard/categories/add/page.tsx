@@ -133,7 +133,7 @@ export default function AddCategoryPage() {
       {successData && (
         <div className="modalOverlay">
           <div className="modalBox">
-            <h2>✅ Categoria criada!</h2>
+            <h2>Categoria criada!</h2>
 
             <p>
               <strong>Nome:</strong> {successData.name}

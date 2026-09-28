@@ -53,6 +53,7 @@
 
 .chatWidgetPanel {
   width: 368px;
+  max-width: 100vw;
   height: 520px;
   max-height: calc(100vh - 110px);
   position: fixed;

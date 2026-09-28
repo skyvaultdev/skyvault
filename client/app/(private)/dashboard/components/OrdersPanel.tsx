@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import Icon from "@/components/icons/Icon";
 import "./OrdersPanel.css";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
+import { downloadFile } from "@/lib/files/downloadFile";
 
 // Mesma regra de app/lib/orders/orderNumber.ts (displayOrderNumber), mas
 // reimplementada aqui pra não puxar lib/database/db (pg) pro bundle do
@@ -12,6 +14,9 @@ function displayOrderNumber(order: { order_number?: string | null; id: number })
 }
 
 type OrderRow = {
+  attention_note?: string | null;
+  first_product_name?: string | null;
+  first_product_id?: number | null;
   id: number;
   order_number: string | null;
   status: string;
@@ -55,7 +60,18 @@ type OrderItemDetail = {
   length_cm: number | null;
   width_cm: number | null;
   height_cm: number | null;
+  deliveredContent: string[] | null;
+  deliveredFileSize: number | null;
 };
+
+const FILE_DOWNLOAD_PREFIX = "/api/files/products/uploads/";
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|webp|gif|svg)$/i;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 type ShipmentEvent = {
   id: number;
@@ -245,6 +261,17 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
 
   async function saveShipment() {
     if (!selectedOrder) return;
+
+    // Postar sem código real gera um código INTERNO da loja (não rastreável
+    // na transportadora) — confirma antes, pra ninguém fazer isso sem querer.
+    if (shipmentStatus === "posted" && !trackingCode.trim() && !selectedOrder.shipment?.tracking_code) {
+      const proceed = await modal.confirm(
+        "Você não informou o código de rastreio da transportadora. Posso gerar um código interno da loja, mas ele NÃO aparece no site da transportadora e o cliente será avisado disso. Gerar mesmo assim?",
+        { confirmLabel: "Gerar código interno" }
+      );
+      if (!proceed) return;
+    }
+
     setSavingShipment(true);
     setFeedback(null);
     try {
@@ -319,7 +346,15 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
         body: JSON.stringify({ action: "cancel_order", notifyEmail, reason: cancelReason.trim() || undefined }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error("cancel_failed");
+      if (!res.ok) {
+        setFeedback({
+          type: "error",
+          message: json?.error === "SHIPMENT_ALREADY_SENT"
+            ? "Esse pedido já foi postado. Não dá pra cancelar (o estoque não voltaria de verdade) — quando a mercadoria voltar, marque o envio como \"Devolvido\", que restoca sozinho."
+            : "Não foi possível cancelar o pedido.",
+        });
+        return;
+      }
 
       await openOrder(selectedOrder.id);
       await loadOrders(ordersPage);
@@ -387,21 +422,26 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
             {orders.map((order) => (
               <button key={order.id} className="orderRow" onClick={() => openOrder(order.id)}>
                 <img
-                  src={order.thumbnail_url || "/file.svg"}
+                  src={order.thumbnail_url || "/placeholders/product.svg"}
                   alt=""
                   className="orderRowThumb"
                 />
-                <span className="orderRowId">{displayOrderNumber(order)}</span>
+                <span className="orderRowId">
+                  {order.first_product_name
+                    ? `${order.first_product_name} - ${displayOrderNumber(order)}${Number(order.item_count) > 1 ? ` (+${Number(order.item_count) - 1})` : ""}`
+                    : displayOrderNumber(order)}
+                </span>
                 <span className="orderRowEmail">{order.customer_email ?? "—"}</span>
                 <span className={`orderStatusBadge status-${order.status}`}>
                   {STATUS_LABELS[order.status] ?? order.status}
                 </span>
                 {order.has_physical && order.shipment_status && (
                   <span className="orderPhysicalBadge" title={SHIPMENT_STATUS_LABELS[order.shipment_status] ?? order.shipment_status}>
-                    📦 {SHIPMENT_STATUS_LABELS[order.shipment_status] ?? order.shipment_status}
+                    <Icon name="box" /> {SHIPMENT_STATUS_LABELS[order.shipment_status] ?? order.shipment_status}
                   </span>
                 )}
                 <span className="orderRowMeta">{order.item_count} item(ns)</span>
+                {order.attention_note && <span className="orderAttentionTag" title={order.attention_note}><Icon name="alert" /> Estoque insuficiente</span>}
                 <span className="orderRowTotal">{formatMoney(order.total)}</span>
                 <span className="orderRowDate">{new Date(order.created_at).toLocaleDateString("pt-BR")}</span>
               </button>
@@ -459,7 +499,7 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                         <div key={idx} className="cartItemRow">
                           <span>
                             {item.productName}{item.variationName ? ` — ${item.variationName}` : ""} × {item.quantity}
-                            {item.productType === "physical" ? " 📦" : ""}
+                            {item.productType === "physical" ? <> <Icon name="box" /></> : ""}
                           </span>
                           <span>{formatMoney(Number(item.unitPrice) * item.quantity)}</span>
                         </div>
@@ -489,6 +529,29 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
             {loadingDetail && <p>Carregando pedido...</p>}
             {selectedOrder && (
               <>
+                {selectedOrder.attention_note && (
+                  <div className="orderAttentionBanner">
+                    <strong><Icon name="alert" /> Atenção da loja</strong>
+                    <span>{selectedOrder.attention_note}</span>
+                    {canManage && (
+                      <button
+                        className="btnSecondary"
+                        onClick={async () => {
+                          await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "clear_attention" }),
+                          });
+                          await openOrder(selectedOrder.id);
+                          await loadOrders(ordersPage);
+                        }}
+                      >
+                        Marcar como resolvido
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="orderDetailHeader">
                   <div>
                     <h4>Pedido {displayOrderNumber(selectedOrder)}</h4>
@@ -502,24 +565,61 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                 <div className="orderDetailItems">
                   {selectedOrder.items.map((item) => (
                     <div key={item.id} className="orderDetailItemRich">
-                      <img
-                        src={item.image_url || "/file.svg"}
-                        alt={item.product_name}
-                        className="orderDetailItemThumb"
-                      />
-                      <div className="orderDetailItemInfo">
-                        <span className="orderDetailItemName">
-                          {item.product_name}{item.variation_name ? ` — ${item.variation_name}` : ""}
-                        </span>
-                        <span className="orderDetailItemMeta">
-                          {item.category_name ?? "Sem categoria"} · {item.product_type === "physical" ? "Físico" : "Digital"}
-                          {item.product_type === "physical" && formatWeight(item.weight_grams) && ` · ${formatWeight(item.weight_grams)}`}
-                          {item.product_type === "physical" && item.length_cm && item.width_cm && item.height_cm &&
-                            ` · ${item.length_cm}×${item.width_cm}×${item.height_cm}cm`}
-                        </span>
-                        <span className="orderDetailItemMeta">Qtd: {item.quantity} × {formatMoney(item.unit_price)}</span>
+                      <div className="orderDetailItemRow">
+                        <img
+                          src={item.image_url || "/placeholders/product.svg"}
+                          alt={item.product_name}
+                          className="orderDetailItemThumb"
+                        />
+                        <div className="orderDetailItemInfo">
+                          <span className="orderDetailItemName">
+                            {item.product_name}{item.variation_name ? ` — ${item.variation_name}` : ""}
+                          </span>
+                          <span className="orderDetailItemMeta">
+                            {item.category_name ?? "Sem categoria"} · {item.product_type === "physical" ? "Físico" : "Digital"}
+                            {item.product_type === "physical" && formatWeight(item.weight_grams) && ` · ${formatWeight(item.weight_grams)}`}
+                            {item.product_type === "physical" && item.length_cm && item.width_cm && item.height_cm &&
+                              ` · ${item.length_cm}×${item.width_cm}×${item.height_cm}cm`}
+                          </span>
+                          <span className="orderDetailItemMeta">Qtd: {item.quantity} × {formatMoney(item.unit_price)}</span>
+                        </div>
+                        <span className="orderDetailItemPrice">{formatMoney(item.unit_price * item.quantity)}</span>
                       </div>
-                      <span className="orderDetailItemPrice">{formatMoney(item.unit_price * item.quantity)}</span>
+
+                      {item.deliveredContent && item.deliveredContent.length > 0 && (
+                        <div className="orderDetailDelivered">
+                          <strong className="orderDetailDeliveredLabel">O que foi entregue:</strong>
+                          {item.deliveredContent.map((content, idx) => {
+                            const isFile = content.startsWith(FILE_DOWNLOAD_PREFIX);
+                            if (isFile) {
+                              const filename = content.slice(FILE_DOWNLOAD_PREFIX.length);
+                              const isImage = IMAGE_EXT_RE.test(filename);
+                              return (
+                                <div key={idx} className="orderDetailDeliveredFile">
+                                  {isImage && (
+                                    <img
+                                      src={content}
+                                      alt={filename}
+                                      className="orderDetailDeliveredPreview"
+                                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                    />
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="downloadLink"
+                                    onClick={() => void downloadFile(content, filename).catch(() => modal.alert("Não foi possível baixar o arquivo. Tente de novo."))}
+                                  >
+                                    <Icon name="download" /> {filename}{item.deliveredFileSize != null ? ` (${formatFileSize(item.deliveredFileSize)})` : ""}
+                                  </button>
+                                </div>
+                              );
+                            }
+                            return (
+                              <code key={idx} className="orderDetailDeliveredCode">{content}</code>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -691,7 +791,7 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                     <div className="statusEditorActions">
                       {canCancelOrder && (
                         <button className="btnDanger" onClick={cancelOrder} disabled={cancelling}>
-                          {cancelling ? "Cancelando..." : "❌ Cancelar pedido"}
+                          {cancelling ? "Cancelando..." : <><Icon name="x" /> Cancelar pedido</>}
                         </button>
                       )}
                       <button className="btnSecondary" onClick={closeOrder}>Fechar</button>

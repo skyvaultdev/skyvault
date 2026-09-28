@@ -1,15 +1,18 @@
 "use server";
 
 import { getDB } from "@/lib/database/db";
+import { getCurrentStoreId, runWithStore } from "@/lib/tenant/tenantContext";
 import { getSession } from "@/lib/jwt/session";
+import { decryptChatBody } from "@/lib/chat/messageCrypto";
 
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return new Response("Não autenticado.", { status: 401 });
 
   const db = await getDB();
+  const storeId = await getCurrentStoreId();
   const convoRes = await db.query(
-    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' ORDER BY id DESC LIMIT 1`,
+    `SELECT id FROM chat_conversations WHERE customer_email = $1 AND status = 'open' AND is_ticket = false ORDER BY id DESC LIMIT 1`,
     [session.email]
   );
   const conversationId = convoRes.rows[0]?.id;
@@ -28,7 +31,7 @@ export async function GET(req: Request) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
-      const interval = setInterval(async () => {
+      const interval = setInterval(() => runWithStore(storeId, async () => {
         try {
           const { rows: newMessages } = await db.query(
             `SELECT id, conversation_id, sender_type, sender_email, body, attachment_url, attachment_type, attachment_name, created_at
@@ -37,7 +40,7 @@ export async function GET(req: Request) {
           );
           for (const row of newMessages) {
             lastMessageId = row.id;
-            send("message", row);
+            send("message", { ...row, body: await decryptChatBody(row.body) });
           }
 
           const { rows: readRows } = await db.query(
@@ -66,7 +69,7 @@ export async function GET(req: Request) {
         } catch {
           // tenta de novo no próximo tick
         }
-      }, 1500);
+      }), 1500);
 
       req.signal.addEventListener("abort", () => {
         closed = true;

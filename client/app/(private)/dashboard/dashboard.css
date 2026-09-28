@@ -71,24 +71,91 @@
 .settingsSidebar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   position: sticky;
   top: 20px;
   align-self: start;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+  scrollbar-width: thin;
+}
+
+.settingsMenuGroup { display: flex; flex-direction: column; gap: 3px; }
+
+.settingsMenuGroupTitle {
+  padding: 0 10px 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 .settingsMenuItem {
-  background: #090909;
-  color: white;
-  border: 1px solid #222;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid transparent;
   border-radius: 10px;
-  padding: 10px;
+  padding: 9px 10px;
   text-align: left;
+  font-size: 14px;
   cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease, border-color 180ms ease;
 }
 
-.settingsMenuItem:hover { border-color: var(--secondary); }
-.settingsMenuItem.active { border-color: var(--secondary); color: var(--secondary); }
+.settingsMenuItem::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 0 3px 3px 0;
+  background: var(--secondary);
+  transform: translateY(-50%);
+  transition: height 200ms ease;
+}
+
+.settingsMenuIcon { opacity: 0.8; transition: transform 200ms ease, opacity 200ms ease; }
+.settingsMenuLabel { flex: 1; min-width: 0; }
+
+.settingsMenuItem:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  transform: translateX(2px);
+}
+.settingsMenuItem:hover:not(.disabled) .settingsMenuIcon { opacity: 1; transform: scale(1.1); }
+
+.settingsMenuItem.active {
+  background: color-mix(in srgb, var(--secondary) 16%, transparent);
+  border-color: color-mix(in srgb, var(--secondary) 35%, transparent);
+  color: var(--secondary);
+  font-weight: 700;
+}
+.settingsMenuItem.active::before { height: 60%; }
+.settingsMenuItem.active .settingsMenuIcon { opacity: 1; }
+
+.settingsMenuItem:focus-visible { outline: 2px solid var(--secondary); outline-offset: 1px; }
+
+.tabContentContainer > * { animation: tabEnter 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+@keyframes tabEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabContentContainer > * { animation: none; }
+  .settingsMenuItem, .settingsMenuIcon { transition: none; }
+}
 
 .settingsPanel {
   border: 1px solid #1f1f1f;
@@ -408,6 +475,8 @@ textarea:focus-visible {
 
 .modalContent {
   width: 420px;
+  max-width: 94vw;
+  box-sizing: border-box;
   background: #161616fa;
   border: 1px solid var(--secondary);
   border-radius: 14px;
@@ -497,7 +566,7 @@ textarea:focus-visible {
 
 .bgThumb {
   position: relative;
-  border: solid var(--primary) 2px;
+  border: solid black 2px;
   background-color: #000000;
   padding: 10px;
   border-radius: 10px;
@@ -880,3 +949,73 @@ textarea:focus-visible {
   }
 
 }
+.bgPaletteGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 6px;
+}
+
+.bgPaletteSwatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.bgPaletteSwatch:hover {
+  transform: scale(1.1);
+}
+
+.bgPaletteSwatch.active {
+  border-color: var(--secondary, #6400ff);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.bgPaletteCustom {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 2px dashed rgba(255, 255, 255, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  overflow: hidden;
+}
+
+.bgPaletteCustom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.fileInputBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: start;
+  width: fit-content;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--secondary) 60%, transparent);
+  background: color-mix(in srgb, var(--secondary) 8%, transparent);
+  color: var(--secondary);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+.fileInputBtn:hover { background: color-mix(in srgb, var(--secondary) 16%, transparent); transform: translateY(-1px); }
+.fileInputBtn input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.fileInputBtn:focus-within { outline: 2px solid var(--secondary); outline-offset: 2px; }
+
+.bgActions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+.bgActions .btnDanger { display: inline-flex; align-items: center; gap: 6px; width: auto; }

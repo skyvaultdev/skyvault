@@ -1,7 +1,8 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { verifyJWT, type AppJWTPayload } from "@/lib/jwt/init";
+import { type AppJWTPayload } from "@/lib/jwt/init";
+import { verifyJWTForStore } from "@/lib/jwt/storeAware";
 
 export type SecureSessionPayload = AppJWTPayload & {
   permissions: string[];
@@ -12,7 +13,7 @@ export async function getSession(): Promise<SecureSessionPayload | null> {
   const token = cookieStore.get("auth_token")?.value;
   if (!token) return null;
 
-  const payload = await verifyJWT(token);
+  const payload = await verifyJWTForStore(token);
   if (!payload) return null;
 
   return {

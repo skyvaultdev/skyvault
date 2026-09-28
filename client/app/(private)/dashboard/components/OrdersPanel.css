@@ -458,11 +458,17 @@
 
 .orderDetailItemRich {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
+}
+
+.orderDetailItemRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .orderDetailItemThumb {
@@ -501,6 +507,63 @@
   font-size: 13px;
   font-weight: 600;
   color: #f8f8f8;
+}
+
+.orderDetailDelivered {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.orderDetailDeliveredLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.orderDetailDeliveredCode {
+  background: rgba(0, 0, 0, 0.35);
+  color: #f8f8f8;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  word-break: break-all;
+  width: fit-content;
+}
+
+.orderDetailDeliveredFile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.orderDetailDeliveredPreview {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.orderDetailDeliveredFile .downloadLink {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: #a78bfa;
+  font-size: 12.5px;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.orderDetailDeliveredFile .downloadLink:hover {
+  text-decoration: underline;
 }
 
 .shipmentTimelineStaff {
@@ -546,4 +609,28 @@
   .shipmentStep.done .shipmentStepLabel {
     display: inline;
   }
+}
+.orderAttentionTag {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(240, 180, 41, 0.16);
+  color: #f0b429;
+  white-space: nowrap;
+}
+
+.orderAttentionBanner {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(240, 180, 41, 0.1);
+  border: 1px solid rgba(240, 180, 41, 0.35);
+  color: #f0d28a;
+  font-size: 13px;
+}
+
+.orderAttentionBanner .btnSecondary {
+  justify-self: start;
 }

@@ -15,14 +15,20 @@ import PaymentsSettingsPanel from "./components/PaymentsSettingsPanel";
 import GeneralSettingsPanel from "./components/GeneralSettingsPanel";
 import StockMovementsPanel from "./components/StockMovementsPanel";
 import StatsPanel from "./components/StatsPanel";
+import ResellersPanel from "./components/ResellersPanel";
+import QuestionsPanel from "./components/QuestionsPanel";
+import ReviewsPanel from "./components/ReviewsPanel";
+import TeamPanel from "./components/TeamPanel";
+import TemplatesPanel from "./components/TemplatesPanel";
 import "./components/categoryprev.css"
+import Icon from "@/components/icons/Icon";
 import CategoryPreview from "./components/CategoryPreview";
 import "@/app/home.css";
 import "./dashboard.css";
 import "./modal.css";
 import "./components/homeprev.css";
 import { Role, ROLES } from "@/lib/jwt/permissions";
-import { PATTERNS, type Pattern } from "@/lib/pattern/patterns";
+import { resolvePattern } from "@/lib/pattern/patterns";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 type TypeKey = "products" | "categories" | "coupon";
@@ -59,6 +65,7 @@ type StoreSettings = {
   backgroundType: BackgroundType;
   backgroundImageUrl: string;
   backgroundCss: string;
+  backgroundSolidColor: string;
   logoUrl: string;
   storeName: string;
 };
@@ -85,13 +92,19 @@ const TAB_PERMISSIONS: Record<DashboardTab, Permission> = {
   posicao: "products.write",
   estoque: "products.write",
   registrosEstoque: "products.write",
+  perguntas: "products.write",
+  avaliacoes: "products.write",
   chat: "chat.access",
   equipe: "team.manage",
   pedidos: "orders.read",
   transportadoras: "shipping.manage",
   pagamentos: "payments.manage",
+  revendedores: "resellers.manage",
+  templates: "store.customize",
   geral: "store.customize",
 };
+
+const BG_PALETTE = ["#050505", "#0d0d12", "#111827", "#0f172a", "#1e1b4b", "#2e1065", "#3b0764", "#4a044e", "#450a0a", "#431407", "#052e16", "#022c22", "#083344", "#172554", "#1c1917", "#27272a", "#ffffff", "#f4f4f5"];
 
 const roleHierarchy: Record<Role, number> = {
   owner: 3,
@@ -162,6 +175,7 @@ export default function Dashboard() {
     backgroundType: "none",
     backgroundImageUrl: "",
     backgroundCss: "",
+    backgroundSolidColor: "#050505",
     logoUrl: "",
     storeName: "",
   });
@@ -248,6 +262,7 @@ export default function Dashboard() {
   }
 
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [questionsUnreadCount, setQuestionsUnreadCount] = useState(0);
 
   useEffect(() => {
     async function loadChatUnread() {
@@ -260,9 +275,21 @@ export default function Dashboard() {
         // ignora erro pontual
       }
     }
+    async function loadQuestionsUnread() {
+      try {
+        const res = await fetch("/api/admin/questions/unread-count", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        setQuestionsUnreadCount(Number(json.data?.count) || 0);
+      } catch {
+        // ignora erro pontual
+      }
+    }
+    void loadQuestionsUnread();
+    const questionsInterval = setInterval(loadQuestionsUnread, 20000);
     void loadChatUnread();
     const interval = setInterval(loadChatUnread, 8000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); clearInterval(questionsInterval); };
   }, []);
 
   const canEditMember = (currentRole: AdminRole | null, targetRole: string | undefined): boolean => {
@@ -531,6 +558,7 @@ export default function Dashboard() {
       backgroundType: (data.background_style ?? "heroicons") as BackgroundType,
       backgroundImageUrl: String(data.background_img_url ?? ""),
       backgroundCss: String(data.background_css ?? ""),
+      backgroundSolidColor: String(data.background_solid_color ?? "#050505"),
       logoUrl: String(data.logo_url ?? ""),
       storeName: String(data.store_name ?? ""),
     };
@@ -695,12 +723,14 @@ export default function Dashboard() {
     }
   }
 
-  async function saveBackground(fileOverride?: File | null) {
+  async function saveBackground(fileOverride?: File | null, removeImage = false) {
     const formData = new FormData();
+    if (removeImage) formData.append("removeBackgroundImage", "1");
     formData.append("backgroundStyle", storeSettings.backgroundType);
     formData.append("backgroundCss", storeSettings.backgroundCss);
+    formData.append("backgroundSolidColor", storeSettings.backgroundSolidColor);
 
-    const fileToSend = fileOverride !== undefined ? fileOverride : backgroundImageFile;
+    const fileToSend = removeImage ? null : fileOverride !== undefined ? fileOverride : backgroundImageFile;
     if (fileToSend) {
       formData.append("backgroundImage", fileToSend);
     }
@@ -819,6 +849,22 @@ export default function Dashboard() {
       return renderProtected("pagamentos", <PaymentsSettingsPanel />);
     }
 
+    if (selectedTab === "templates") {
+      return renderProtected("templates", <TemplatesPanel />);
+    }
+
+    if (selectedTab === "avaliacoes") {
+      return renderProtected("avaliacoes", <ReviewsPanel />);
+    }
+
+    if (selectedTab === "perguntas") {
+      return renderProtected("perguntas", <QuestionsPanel />);
+    }
+
+    if (selectedTab === "revendedores") {
+      return renderProtected("revendedores", <ResellersPanel />);
+    }
+
     if (selectedTab === "geral") {
       return renderProtected("geral", <GeneralSettingsPanel />);
     }
@@ -901,7 +947,7 @@ export default function Dashboard() {
 
                   <div className="infoCard">
                     <div className="infoCardHeader">
-                      <span className="infoCardIcon">🖼️</span>
+                      <span className="infoCardIcon"><Icon name="image" /></span>
                       <div>
                         <h4 className="infoCardTitle">Logo da loja</h4>
                         <p className="infoCardSubtitle">PNG, JPG ou WEBP — até 5MB, recomendado: 150x150px, máx: 1024x1024px</p>
@@ -965,7 +1011,7 @@ export default function Dashboard() {
                             img.src = objectUrl;
                           }}
                         /> <p>Clique ou arraste uma imagem aqui</p>
-                        <span className="inputlogoIcon">📁</span>
+                        <span className="inputlogoIcon"><Icon name="folder" /></span>
                         <span className="inputlogoText">
                           {logoFile ? logoFile.name : "Clique ou arraste uma imagem aqui"}
                         </span>
@@ -983,7 +1029,7 @@ export default function Dashboard() {
 
                   <div className="infoCard">
                     <div className="infoCardHeader">
-                      <span className="infoCardIcon">🏷️</span>
+                      <span className="infoCardIcon"><Icon name="tag" /></span>
                       <div>
                         <h4 className="infoCardTitle">Nome da loja</h4>
                         <p className="infoCardSubtitle">Como sua loja aparece para os clientes</p>
@@ -1122,7 +1168,7 @@ export default function Dashboard() {
 
                         <div
                           className="bgPreview"
-                          style={PATTERNS[bg] || {}}
+                          style={resolvePattern(bg, storeSettings.secondaryColor, storeSettings.backgroundSolidColor)}
                         />
 
                         <span>{bg}</span>
@@ -1130,6 +1176,32 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
+
+                <p className="fieldLabel">Cor de fundo da loja</p>
+                <div className="bgPaletteGrid">
+                  {BG_PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      className={`bgPaletteSwatch ${storeSettings.backgroundSolidColor.toLowerCase() === c ? "active" : ""}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setStoreSettings((p) => ({ ...p, backgroundSolidColor: c }))}
+                    />
+                  ))}
+                  <label className="bgPaletteCustom" title="Escolher outra cor">
+                    <input
+                      type="color"
+                      value={storeSettings.backgroundSolidColor}
+                      onChange={(e) => setStoreSettings((p) => ({ ...p, backgroundSolidColor: e.target.value }))}
+                    />
+                    <span>＋</span>
+                  </label>
+                </div>
+                <p className="helperText">
+                  Cor atual: <strong>{storeSettings.backgroundSolidColor.toUpperCase()}</strong> — fica por trás do
+                  padrão escolhido acima. Clique em &quot;Salvar background&quot; pra aplicar.
+                </p>
 
                 <p className="fieldLabel">Imagem de fundo</p>
 
@@ -1158,12 +1230,14 @@ export default function Dashboard() {
                   </span>
                 </div>
 
+                <label className="fileInputBtn">
+                  <Icon name="upload" />
+                  <span>{backgroundImageFile ? "Trocar arquivo" : "Selecionar arquivo"}</span>
                 <input
                   key="isolated-file-input"
                   type="file"
                   accept="image/*"
                   ref={fileInputRef}
-                  className="settingsInput"
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     setBackgroundImageFile(file);
@@ -1175,16 +1249,38 @@ export default function Dashboard() {
                     setBackgroundImagePreview(file ? URL.createObjectURL(file) : null);
                   }}
                 />
+                </label>
 
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const file = fileInputRef.current?.files?.[0] || null;
-                    void saveBackground(file);
-                  }}
-                >
-                  Salvar background
-                </button>
+                <div className="bgActions">
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      const file = fileInputRef.current?.files?.[0] || null;
+                      void saveBackground(file);
+                    }}
+                  >
+                    Salvar background
+                  </button>
+                  {(storeSettings.backgroundImageUrl || backgroundImageFile) && (
+                    <button
+                      className="btnDanger"
+                      type="button"
+                      onClick={async () => {
+                        if (!storeSettings.backgroundImageUrl) {
+                          setBackgroundImageFile(null);
+                          setBackgroundImagePreview(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                          return;
+                        }
+                        if (await modal.confirm("Remover a imagem de fundo? A loja passa a usar só a cor sólida e o padrão escolhidos.", { danger: true })) {
+                          await saveBackground(null, true);
+                        }
+                      }}
+                    >
+                      <Icon name="trash" /> Remover imagem
+                    </button>
+                  )}
+                </div>
 
               </div>
             </div>
@@ -1223,132 +1319,7 @@ export default function Dashboard() {
     }
 
     if (selectedTab === "equipe") {
-      return renderProtected(
-        "equipe",
-        <section className="settingsPanel">
-          <div className="previewHeader">
-            <h3>Equipe</h3>
-          </div>
-
-          <div className="homePreviewWrapper">
-            <div className="browserToolbar"></div>
-
-            <div className="previewScrollContainer">
-              <div className="previewRealSize">
-
-                <div>
-                  <button type="button" className="addbtn" onClick={openAdd}>Adicionar Equipe</button>
-                  <button type="button" className="removebtn" onClick={openRemove} disabled={admins.length === 0}>Remover Equipe</button>
-                </div>
-
-                <table className="teamTable">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentUserRole === null ? (
-                      <tr><td colSpan={4}>Carregando permissões...</td></tr>
-                    ) : (
-                      admins.map((admin) => (
-                        <tr key={admin.id}>
-                          <td>{admin.id}</td>
-                          <td>{admin.email}</td>
-                          <td>{admin.role ?? "-"}</td>
-                          <td>
-                            {canEditMember(currentUserRole, admin.role as AdminRole) ? (
-                              <button className="editBtn" onClick={() => openEdit(admin)}>
-                                Editar
-                              </button>
-                            ) : (
-                              <span className="disabledAction">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-
-              </div>
-            </div>
-          </div>
-
-          {isAddOpen && (
-            <div className="modalOverlay">
-              <div className="modalContent">
-                <h4>Adicionar equipe</h4>
-                <input value={addEmail ?? ""} onChange={(e) => setAddEmail(e.target.value)} className="settingsInput" />
-                <select value={addRole ?? ""} onChange={(e) => setAddRole(e.target.value as AdminRole)} className="settingsInput">
-                  <option value="owner">Owner</option>
-                  <option value="admin">Admin</option>
-                  <option value="editor">Editor</option>
-                </select>
-                <ul>
-                  {ROLE_PERMISSIONS[addRole].map((perm) => (
-                    <li key={perm}>{perm}</li>
-                  ))}
-                </ul>
-                {addError && <p>{addError}</p>}
-                <button className="btnSecondary" onClick={closeAdd}>Cancelar</button>
-                <button className="btnadc" onClick={() => void handleAddConfirm()} disabled={addBusy}>{addBusy ? "Salvando..." : "Adicionar"}</button>
-              </div>
-            </div>
-          )}
-
-          {isRemoveOpen && (
-            <div className="modalOverlay">
-              <div className="modalContent">
-                <h4>Remover equipe</h4>
-                <select value={removeId ?? ""} onChange={(e) => setRemoveId(Number(e.target.value))} className="settingsInputR">
-                  {admins.map((a) => (
-                    <option key={a.id} value={a.id ?? ""}>{a.email}</option>
-                  ))}
-                </select>
-                {removeError && <p>{removeError}</p>}
-                <button className="btncancel" onClick={closeRemove}>Cancelar</button>
-                <button className="removebutton" onClick={() => void handleRemoveConfirm()} disabled={removeBusy}>{removeBusy ? "Removendo..." : "Remover"}</button>
-              </div>
-            </div>
-          )}
-
-          {isEditOpen && (
-            <div className="modalOverlay">
-              <div className="modalContent">
-                <h4>Editar membro</h4>
-                <p><strong>Email:</strong> {editEmail}</p>
-                <select
-                  value={editRole ?? ""}
-                  onChange={(e) => setEditRole(e.target.value as AdminRole)}
-                  className="settingsInput"
-                >
-                  <option value="owner">Owner</option>
-                  <option value="admin">Admin</option>
-                  <option value="editor">Editor</option>
-                </select>
-                <ul>
-                  {ROLE_PERMISSIONS[editRole].map((perm) => (
-                    <li key={perm}>{perm}</li>
-                  ))}
-                </ul>
-                {editError && <p className="error">{editError}</p>}
-                <button className="btnSecondary" onClick={closeEdit}>Cancelar</button>
-                <button
-                  className="btnadc"
-                  onClick={() => void handleEditConfirm()}
-                  disabled={editBusy}
-                >
-                  {editBusy ? "Salvando..." : "Salvar alterações"}
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-      );
+      return renderProtected("equipe", <TeamPanel />);
     }
 
     return null;
@@ -1393,8 +1364,9 @@ export default function Dashboard() {
               permissions={permissions}
               permissionsLoading={permissionsLoading}
               chatUnreadCount={chatUnreadCount}
+              questionsUnreadCount={questionsUnreadCount}
             />
-            <div className="tabContentContainer">{renderTabContent()}</div>
+            <div className="tabContentContainer" key={selectedTab}>{renderTabContent()}</div>
           </div>
         </section>
 
@@ -1415,16 +1387,17 @@ export default function Dashboard() {
             {!loadingItems && paginatedItems.map((item) => (
               <div className="productItem" key={item.id}>
                 <a onClick={() => {
-                  if (itemType === "products" && item.slug) {
-                    setPreviewSlug(item?.slug);
+                  if (itemType === "products") {
+                    // slug ausente/vazio (produto antigo) cai pro id — a API aceita os dois
+                    setPreviewSlug(String(item.slug || item.id));
                     setSelectedTab("inicio");
                   }
                 }}>
                   {item.name || item.code}
                 </a>
                 <div className="productActions">
-                  <button className="iconBtn iconEdit" onClick={() => handleEdit(item.slug ?? item.id)}>✎</button>
-                  <button className="iconBtn iconRemove" onClick={() => openDeleteModal(item.id)}>✕</button>
+                  <button className="iconBtn iconEdit" onClick={() => handleEdit(item.slug ?? item.id)}><Icon name="edit" /></button>
+                  <button className="iconBtn iconRemove" onClick={() => openDeleteModal(item.id)}><Icon name="x" /></button>
                 </div>
               </div>
             ))}
@@ -1462,7 +1435,7 @@ export default function Dashboard() {
       {isDeleteOpen && (
         <div className="modalOverlay" onClick={closeDeleteModal}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-            <div className="modalIcon">✓</div>
+            <div className="modalIcon"><Icon name="check" /></div>
             <h3>Confirmar exclusão</h3>
             <p>Tem certeza que deseja deletar este {deleteLabel}?</p>
             <div className="modalActions">
@@ -1478,7 +1451,7 @@ export default function Dashboard() {
       {isSalvarOpen && (
         <div className="modalOverlay" onClick={closeSalvarModal}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-            <div className="modalIcon">✓</div>
+            <div className="modalIcon"><Icon name="check" /></div>
             <h3>{modalMessage}</h3>
             <div className="modalActions">
               <button className="btnConfirm" onClick={closeSalvarModal}>OK</button>

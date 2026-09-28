@@ -1,5 +1,35 @@
+// Gerado uma vez, no boot do processo, só quando DEV_JWT_SECRET não está
+// definido — nunca mais derivado de JWT_SECRET. A área /dev é
+// deliberadamente isolada da autenticação normal da loja (um token de
+// admin da loja comprometido não deve conseguir chegar lá); derivar o
+// segredo de dev do mesmo JWT_SECRET principal anulava essa separação,
+// já que quem soubesse um soubesse o outro. Efeito colateral aceitável:
+// reiniciar o processo invalida sessões de /dev em aberto — área de baixo
+// tráfego, super-admin só, não afeta clientes/loja.
+//
+// Usa a Web Crypto API (globalThis.crypto.getRandomValues), não o módulo
+// "crypto" do Node — este arquivo é importado por middlewares/auth.middleware.ts,
+// e todo middleware do Next roda em Edge Runtime por padrão, que não tem
+// os módulos nativos do Node (só a API padrão de navegador/Edge).
+function generateRandomHex(byteLength: number): string {
+    const bytes = new Uint8Array(byteLength);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+const generatedDevSecret = generateRandomHex(32);
+
 export const config = {
     WEBSITE_URL: process.env.WEBSITE_URL || "http://localhost:3000",
+
+    // Multi-loja: com ROOT_DOMAIN definido (ex: "minhaplataforma.com"), cada
+    // loja é <slug>.ROOT_DOMAIN ou um custom_domain da tabela `stores`; host
+    // desconhecido = 404. Sem ROOT_DOMAIN o app roda em modo loja única e
+    // qualquer host cai em DEFAULT_STORE_ID.
+    tenant: {
+        rootDomain: (process.env.ROOT_DOMAIN || "").trim().toLowerCase(),
+        defaultStoreId: Number(process.env.DEFAULT_STORE_ID) || 1,
+    },
 
     jwt: {
         secret: process.env.JWT_SECRET!,
@@ -37,7 +67,7 @@ export const config = {
         },
     },
     devAuth: {
-        secret: process.env.DEV_JWT_SECRET || `dev::${process.env.JWT_SECRET}`,
+        secret: process.env.DEV_JWT_SECRET || generatedDevSecret,
         expiresIn: process.env.DEV_JWT_EXPIRES_IN || "12h",
     },
     shipping: {

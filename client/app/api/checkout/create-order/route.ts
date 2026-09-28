@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { getDB, withTransaction } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requireCustomer } from "@/lib/auth/customer";
@@ -7,6 +8,9 @@ import { config } from "@/config/configuration";
 import { getDiscountAmount, qualifiesForFreeShipping } from "@/lib/pricing/cartDiscount";
 import { loadPromotionSettings } from "@/lib/pricing/promotionSettings";
 import { ensureOrderNumberColumn, generateUniqueOrderNumber } from "@/lib/orders/orderNumber";
+import { getShippingProvider, type PackageInfo } from "@/lib/shipping";
+import { ensureResellerTables } from "@/lib/resellers/ensureResellerTables";
+import { REFERRAL_COOKIE_NAME } from "@/lib/resellers/referralCookie";
 
 type ShippingChoice = {
   recipientName: string;
@@ -49,7 +53,11 @@ export async function POST(req: Request) {
          v.id AS variation_id, v.name AS variation_name,
          COALESCE(v.price, p.price) AS unit_price,
          COALESCE(v.stock_count, p.stock_count) AS stock_count,
-         COALESCE(v.is_unlimited, p.is_unlimited) AS is_unlimited
+         COALESCE(v.is_unlimited, p.is_unlimited) AS is_unlimited,
+         COALESCE(v.weight_grams, p.weight_grams, 0) AS weight_grams,
+         COALESCE(v.length_cm, p.length_cm, 16) AS length_cm,
+         COALESCE(v.width_cm, p.width_cm, 12) AS width_cm,
+         COALESCE(v.height_cm, p.height_cm, 4) AS height_cm
        FROM cart_items c
        JOIN products p ON p.id = c.product_id
        LEFT JOIN product_variations v ON v.id = c.variation_id
@@ -95,7 +103,43 @@ export async function POST(req: Request) {
         !shipping.recipientName || shipping.cep.length !== 8 || !shipping.street ||
         !shipping.number || !shipping.neighborhood || !shipping.city || shipping.state.length !== 2;
       if (missingAddress) return fail("MISSING_SHIPPING_ADDRESS", 400);
-      if (!shipping.serviceName || isNaN(shipping.price)) return fail("MISSING_SHIPPING_QUOTE", 400);
+      if (!shipping.serviceName) return fail("MISSING_SHIPPING_QUOTE", 400);
+
+      // O preço do frete NUNCA vem do cliente: recota aqui, com o carrinho
+      // real e o CEP informado, e exige que a opção escolhida (transportadora
+      // + serviço) exista na cotação nova. Antes o valor enviado pelo
+      // navegador era gravado direto — dava pra pagar frete R$ 0,00 editando
+      // a requisição.
+      const physicalRows = cartRes.rows.filter((row) => row.product_type === "physical");
+      const packages: PackageInfo[] = physicalRows.map((row) => ({
+        weightGrams: Number(row.weight_grams) || 300,
+        lengthCm: Number(row.length_cm),
+        widthCm: Number(row.width_cm),
+        heightCm: Number(row.height_cm),
+        quantity: row.quantity,
+      }));
+      const originRes = await db.query(`SELECT origin_cep FROM store_settings ORDER BY id DESC LIMIT 1`);
+      let freshQuotes;
+      try {
+        freshQuotes = await (await getShippingProvider()).quote({
+          originCep: originRes.rows[0]?.origin_cep ?? "",
+          destinationCep: shipping.cep,
+          packages,
+        });
+      } catch (quoteError) {
+        if (quoteError instanceof Error && quoteError.message === "SHIPPING_ORIGIN_NOT_CONFIGURED") {
+          return fail("SHIPPING_ORIGIN_NOT_CONFIGURED", 409);
+        }
+        console.error("Erro ao revalidar frete:", quoteError);
+        return fail("SHIPPING_QUOTE_ERROR", 502);
+      }
+      const chosen = freshQuotes.find(
+        (q) => String(q.carrierId ?? "") === String(shipping!.carrierId ?? "") && q.serviceName === shipping!.serviceName
+      );
+      if (!chosen) return fail("SHIPPING_QUOTE_MISMATCH", 409);
+      shipping.price = Number(chosen.price);
+      shipping.etaDays = Number(chosen.etaDays) || shipping.etaDays;
+      shipping.carrierName = chosen.carrierName || shipping.carrierName;
     }
 
     const subtotal = cartRes.rows.reduce((sum, row) => sum + Number(row.unit_price) * row.quantity, 0);
@@ -137,6 +181,22 @@ export async function POST(req: Request) {
     const total = Math.round((subtotal - discount + shippingFee) * 100) / 100;
 
     await ensureOrderNumberColumn();
+    await ensureResellerTables();
+
+    // Atribuição por último clique: se o cliente tem o cookie de referral
+    // (setado na página do produto ao visitar um link ?ref=CODE), amarra
+    // o pedido a esse revendedor — só se o código existir e o revendedor
+    // estiver aprovado. Comissão em si só é calculada depois, quando o
+    // pagamento confirma (ver confirmOrderPayment.ts).
+    let resellerId: number | null = null;
+    const referralCode = (await cookies()).get(REFERRAL_COOKIE_NAME)?.value;
+    if (referralCode) {
+      const resellerRes = await db.query(
+        `SELECT id FROM resellers WHERE referral_code = $1 AND status = 'approved'`,
+        [referralCode]
+      );
+      resellerId = resellerRes.rows[0]?.id ?? null;
+    }
 
     const { orderId, orderNumber: newOrderNumber } = await withTransaction(async (client) => {
       const orderNumber = await generateUniqueOrderNumber(client);
@@ -157,10 +217,10 @@ export async function POST(req: Request) {
       }
 
       const orderRes = await client.query(
-        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number)
-         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number, reseller_id)
+         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id`,
-        [userId, total, subtotal, discount, shippingFee, shippingAddressId, appliedCouponId, orderNumber]
+        [userId, total, subtotal, discount, shippingFee, shippingAddressId, appliedCouponId, orderNumber, resellerId]
       );
       const newOrderId = orderRes.rows[0].id;
 

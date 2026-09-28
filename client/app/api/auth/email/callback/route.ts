@@ -1,5 +1,7 @@
 "use server";
 
+import { getCurrentStoreId } from "@/lib/tenant/tenantContext";
+
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { getDB } from "@/lib/database/db";
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
         [email]
     );
 
-    await db.query(`INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (email) DO NOTHING`,
+    await db.query(`INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING`,
         [username, email]
     );
 
@@ -60,6 +62,7 @@ export async function POST(req: Request) {
     }
 
     const token = await signJWT({
+      sid: await getCurrentStoreId(),
         email,
         role,
         permissions,

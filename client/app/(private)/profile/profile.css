@@ -2,7 +2,9 @@
   min-height: 100vh;
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   padding: 40px 20px;
   box-sizing: border-box;
   color: rgba(255, 255, 255, 0.92);
@@ -46,6 +48,71 @@
   letter-spacing: 0.04em;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 14px;
+}
+
+.profileForm {
+  display: grid;
+  gap: 14px;
+}
+
+.profileSummary {
+  display: grid;
+  gap: 10px;
+}
+
+.profileSummaryRow {
+  display: grid;
+  gap: 2px;
+  font-size: 13.5px;
+}
+
+.profileSummaryRow span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.profileSummaryRow strong {
+  color: #fff;
+  font-weight: 500;
+}
+
+.profileEditBtn {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.profileFormActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.profileFormActions .profileSaveBtn {
+  flex: 1;
+}
+
+.profileCancelBtn {
+  margin-top: 0;
+}
+
+.profileSelect {
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 18, 20, 0.9);
+  color: #fff;
+  padding: 0 14px;
+  font-size: 14px;
 }
 
 .profileCard label {

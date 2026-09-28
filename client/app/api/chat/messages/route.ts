@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { getSession } from "@/lib/jwt/session";
+import { encryptChatBody, decryptChatRows } from "@/lib/chat/messageCrypto";
 
 // is_ticket = false garante que isso nunca reaproveita (nem cria em cima
 // de) uma conversa de ticket aberta pro mesmo cliente — chat geral e
@@ -42,7 +43,7 @@ export async function GET() {
     [conversationId]
   );
 
-  return NextResponse.json({ data: rows, conversationId });
+  return NextResponse.json({ data: await decryptChatRows(rows), conversationId });
 }
 
 export async function POST(req: Request) {
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
      VALUES ($1, 'customer', $2, $3, true)
      RETURNING id, conversation_id, sender_type, sender_email, body,
                attachment_url, attachment_type, attachment_name, created_at`,
-    [conversationId, session.email, text]
+    [conversationId, session.email, await encryptChatBody(text)]
   );
 
   await db.query(
@@ -69,5 +70,5 @@ export async function POST(req: Request) {
     [conversationId]
   );
 
-  return NextResponse.json({ data: rows[0] });
+  return NextResponse.json({ data: { ...rows[0], body: text } });
 }

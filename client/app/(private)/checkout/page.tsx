@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Icon from "@/components/icons/Icon";
 import Link from "next/link";
 import "./checkout.css";
 import ShippingQuoteList, { type ShippingQuote } from "@/app/(components)/shipping/ShippingQuoteList";
@@ -8,6 +9,7 @@ import { getDiscountAmount, getDiscountPercent, getNextMilestone, qualifiesForFr
 import { QRCodeSVG } from "qrcode.react";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
 import { FiShoppingCart } from "react-icons/fi";
+import { downloadFile, extractDownloadFilename } from "@/lib/files/downloadFile";
 
 type CartItem = {
   cart_item_id: number;
@@ -27,7 +29,25 @@ type DeliveredItem = {
   variation_name?: string | null;
   type: "key" | "file" | "infinite";
   content: string;
+  fileSize?: number | null;
 };
+
+// Só os campos usados de /api/checkout/order/[id] pra montar a tela de
+// entrega — a resposta real tem mais colunas de order_items que não
+// interessam aqui.
+type LoadedOrderItem = {
+  product_name: string;
+  variation_name: string | null;
+  product_type: string;
+  deliveredContent: string[] | null;
+  deliveredFileSize: number | null;
+};
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 type AddressForm = {
   recipientName: string;
@@ -115,6 +135,30 @@ function loadMercadoPagoScript(): Promise<void> {
   return mercadoPagoScriptPromise;
 }
 
+// O pedido confirmado vai pra URL (?order=123) assim que o pagamento cai —
+// não é só pra "lembrar" em memória: um reload logo depois do pagamento
+// relê esse id e busca o pedido de novo no servidor (loadDeliveredOrder),
+// então a entrega continua acessível mesmo se a página recarregar. Sem
+// isso, o pop-up de entrega só existia enquanto o pedido ainda estivesse
+// "pending_payment" no banco — assim que confirmava, um reload caía direto
+// pro carrinho (já vazio) em vez de mostrar a entrega de novo.
+function setOrderUrlParam(id: number) {
+  if (typeof window === "undefined") return;
+  window.history.replaceState(null, "", `${window.location.pathname}?order=${id}`);
+}
+
+function clearOrderUrlParam() {
+  if (typeof window === "undefined") return;
+  window.history.replaceState(null, "", window.location.pathname);
+}
+
+function getOrderIdFromUrl(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("order");
+  const id = raw ? Number(raw) : NaN;
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 export default function CheckoutPage() {
   const modal = useModal();
   const [stage, setStage] = useState<CheckoutStage>("loading");
@@ -132,6 +176,13 @@ export default function CheckoutPage() {
   const [boletoBarcode, setBoletoBarcode] = useState<string | null>(null);
   const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
   const [deliveredItems, setDeliveredItems] = useState<DeliveredItem[]>([]);
+  const [orderTotal, setOrderTotal] = useState<number | null>(null);
+  const [orderPaidAt, setOrderPaidAt] = useState<string | null>(null);
+  // true quando o Mercado Pago já confirmou o pagamento mas a entrega
+  // (baixa de estoque/geração do item digital) falhou do nosso lado —
+  // nunca deve aparecer como sucesso silencioso pro cliente.
+  const [deliveryIssue, setDeliveryIssue] = useState(false);
+  const deliveryFailCountRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -146,6 +197,11 @@ export default function CheckoutPage() {
   const [removingItem, setRemovingItem] = useState<number | null>(null);
 
   const [promotionSettings, setPromotionSettings] = useState<PromotionSettings>(DEFAULT_PROMOTION_SETTINGS);
+  // Quais métodos a loja aceita (aba Pagamentos da dashboard) — antes essas
+  // checkboxes só gravavam no banco e nunca eram lidas de volta em lugar
+  // nenhum, então desmarcar "Pix" por exemplo não tinha efeito nenhum no
+  // checkout de verdade.
+  const [acceptedMethods, setAcceptedMethods] = useState({ pix: true, creditCard: true, debitCard: true, boleto: true });
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; percentOff: number } | null>(null);
   const [couponError, setCouponError] = useState("");
@@ -171,6 +227,7 @@ export default function CheckoutPage() {
     void init();
     void loadCustomerEmail();
     void loadPromotionSettings();
+    void loadAcceptedMethods();
   }, []);
 
   // Se já existe um pedido criado (create-order) e ainda não pago, mostra
@@ -180,6 +237,21 @@ export default function CheckoutPage() {
   // nem como cancelar; só sobrava comprar tudo de novo e acumular vários
   // pedidos pendentes soltos.
   async function init() {
+    // Reload logo depois do pagamento confirmar — o pedido não está mais
+    // "pending_payment" no banco, então loadPendingOrder() abaixo não acha
+    // mais nada. É pra isso que serve o ?order= na URL: busca ESSE pedido
+    // específico direto, sem depender de heurística nem de estado que se
+    // perdeu com o reload.
+    const urlOrderId = getOrderIdFromUrl();
+    if (urlOrderId) {
+      const loaded = await loadDeliveredOrder(urlOrderId);
+      if (loaded) return;
+      // Pedido da URL não existe, não é do usuário, ou ainda não foi
+      // confirmado — não é mais válido como link de retomada, limpa e
+      // segue o fluxo normal (carrinho / pedido pendente de verdade).
+      clearOrderUrlParam();
+    }
+
     const pending = await loadPendingOrder();
     if (pending) {
       // O cliente pode ter fechado a aba logo depois de pagar via Pix/
@@ -190,8 +262,7 @@ export default function CheckoutPage() {
         const checkRes = await fetch(`/api/checkout/order/${pending.orderId}/check-payment`, { method: "POST" });
         const checkJson = await checkRes.json();
         if (checkRes.ok && (checkJson.data?.status === "paid" || checkJson.data?.status === "delivered")) {
-          await loadDeliveredOrder(pending.orderId);
-          return;
+          if (await loadDeliveredOrder(pending.orderId)) return;
         }
       } catch {
         // se a checagem falhar, mostra a tela de retomar normalmente
@@ -202,26 +273,51 @@ export default function CheckoutPage() {
     await loadCart();
   }
 
-  async function loadDeliveredOrder(id: number) {
-    const res = await fetch(`/api/checkout/order/${id}`, { cache: "no-store" });
-    const json = await res.json();
-    if (res.ok) {
-      const delivered: DeliveredItem[] = (json.data.items ?? [])
-        .filter((item: any) => item.deliveredContent)
-        .flatMap((item: any) =>
-          item.deliveredContent.map((content: string) => ({
+  // Devolve true se o pedido realmente está pago/entregue (e nesse caso já
+  // deixa a tela pronta) — false se o id não existe, não é do usuário
+  // logado, ou ainda não foi confirmado, pra quem chamou decidir o que
+  // fazer em seguida (ex: cair pro fluxo normal em vez de mostrar uma
+  // tela de "entregue" errada).
+  async function loadDeliveredOrder(id: number): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/checkout/order/${id}`, { cache: "no-store" });
+      if (!res.ok) return false;
+      const json = await res.json();
+      const status = json.data?.status;
+      if (status !== "paid" && status !== "delivered") return false;
+
+      const items: LoadedOrderItem[] = json.data.items ?? [];
+      const delivered: DeliveredItem[] = items
+        .filter((item) => item.deliveredContent && item.deliveredContent.length > 0)
+        .flatMap((item) =>
+          (item.deliveredContent ?? []).map((content) => ({
             productName: item.product_name,
             variationName: item.variation_name,
             type: content.startsWith("/api/files/") ? "file" : "key",
             content,
-          }))
+            fileSize: content.startsWith("/api/files/") ? item.deliveredFileSize : null,
+          } as DeliveredItem))
         );
+      // hasPhysical (estado do componente) vem do CARRINHO — já está vazio
+      // depois da compra, então não serve mais pra saber se ESSE pedido
+      // tinha item físico. Usa os itens do próprio pedido carregado.
+      const orderHasPhysical = items.some((item) => item.product_type === "physical");
+
       setOrderId(id);
       setOrderNumber(json.data.order_number ?? null);
+      setOrderTotal(json.data.total != null ? Number(json.data.total) : null);
+      setOrderPaidAt(json.data.paid_at ?? null);
       setDeliveredItems(delivered);
+      // Pedido pago mas sem nada entregue e sem item físico — normalmente
+      // estoque de chave insuficiente no momento da confirmação (ver
+      // stockShortages em confirmOrderPayment). O cliente pagou e não pode
+      // ver uma tela de "sucesso" em branco como se estivesse tudo certo.
+      setDeliveryIssue(delivered.length === 0 && !orderHasPhysical);
       setStage("delivered");
-    } else {
-      setStage("pending_resume");
+      setOrderUrlParam(id);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -304,6 +400,23 @@ export default function CheckoutPage() {
       if (res.ok && json.data) setPromotionSettings(json.data);
     } catch {
       // fica no default (mesmos valores hoje configurados como padrão da loja)
+    }
+  }
+
+  async function loadAcceptedMethods() {
+    try {
+      const res = await fetch("/api/store-settings", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setAcceptedMethods({
+          pix: json.data.accepts_pix !== false,
+          creditCard: json.data.accepts_credit_card !== false,
+          debitCard: json.data.accepts_debit_card !== false,
+          boleto: json.data.accepts_boleto !== false,
+        });
+      }
+    } catch {
+      // fica no default (todos aceitos) se a busca falhar
     }
   }
 
@@ -560,6 +673,10 @@ export default function CheckoutPage() {
           setErrorMessage(`Item esgotado: ${String(json.error).split(":")[1] ?? ""}`);
         } else if (json.error === "MISSING_SHIPPING_ADDRESS" || json.error === "MISSING_SHIPPING_QUOTE") {
           setErrorMessage("Preencha o endereço e escolha uma opção de frete.");
+        } else if (json.error === "SHIPPING_QUOTE_MISMATCH") {
+          setErrorMessage("O valor do frete mudou ou a opção escolhida não está mais disponível. Calcule o frete de novo e escolha outra vez.");
+        } else if (json.error === "SHIPPING_ORIGIN_NOT_CONFIGURED" || json.error === "SHIPPING_QUOTE_ERROR") {
+          setErrorMessage("Não foi possível confirmar o frete agora. Tente novamente em instantes.");
         } else if (json.error === "EMPTY_CART") {
           setErrorMessage("Seu carrinho está vazio.");
         } else if (String(json.error).startsWith("MIN_ORDER_VALUE")) {
@@ -577,6 +694,11 @@ export default function CheckoutPage() {
         return;
       }
 
+      // Um ?order= de um pedido antigo já entregue pode ainda estar na URL
+      // (aba nunca fechada, voltou pelo histórico) — limpa aqui pra um
+      // reload durante o pagamento desse pedido NOVO não voltar mostrando
+      // a entrega do pedido velho por engano.
+      clearOrderUrlParam();
       setOrderId(json.data.orderId);
       setOrderNumber(json.data.orderNumber ?? null);
       setMercadoPagoPublicKey(json.data.mercadoPagoPublicKey ?? null);
@@ -702,9 +824,17 @@ export default function CheckoutPage() {
 
       const mp = new (window as any).MercadoPago(mercadoPagoPublicKey, { locale: "pt-BR" });
 
+      // Só entra na lista o que a loja aceita (aba Pagamentos) — omitir a
+      // chave é como o Brick esconde aquele método por completo.
+      const fullPaymentMethods: Record<string, string> = {};
+      if (acceptedMethods.creditCard) fullPaymentMethods.creditCard = "all";
+      if (acceptedMethods.debitCard) fullPaymentMethods.debitCard = "all";
+      if (acceptedMethods.boleto) fullPaymentMethods.ticket = "all";
+      if (acceptedMethods.pix) fullPaymentMethods.bankTransfer = "all";
+
       let controller;
       try {
-        controller = await createBrickQuietly(mp, { creditCard: "all", debitCard: "all", ticket: "all", bankTransfer: "all" });
+        controller = await createBrickQuietly(mp, fullPaymentMethods);
       } catch (fullErr) {
         // Conta real que ainda não habilitou Pix/boleto no painel do
         // Mercado Pago derruba a inicialização inteira pedindo todos os 4
@@ -713,8 +843,11 @@ export default function CheckoutPage() {
         console.warn("Brick com todos os métodos falhou, tentando só cartão. Detalhe:", describeError(fullErr));
         if (cancelled || !brickContainerRef.current) return;
         brickContainerRef.current.innerHTML = "";
+        const cardOnlyMethods: Record<string, string> = {};
+        if (acceptedMethods.creditCard) cardOnlyMethods.creditCard = "all";
+        if (acceptedMethods.debitCard) cardOnlyMethods.debitCard = "all";
         try {
-          controller = await createBrick(mp, { creditCard: "all", debitCard: "all" });
+          controller = await createBrick(mp, cardOnlyMethods);
           if (!cancelled) {
             setErrorMessage(
               "Pix e boleto não estão disponíveis agora (verifique se estão habilitados na sua conta Mercado Pago). " +
@@ -777,14 +910,24 @@ export default function CheckoutPage() {
         setErrorMessage(
           json.error === "PAYMENT_PROVIDER_ERROR"
             ? "O Mercado Pago não conseguiu processar esse pagamento agora. Tente novamente em instantes."
-            : "Não deu pra processar o pagamento. Tente novamente."
+            : json.error === "DUPLICATE_PAYMENT_ATTEMPT"
+              ? "Já existe uma cobrança em andamento pra esse pedido. Aguarde alguns segundos antes de tentar de novo."
+              : "Não deu pra processar o pagamento. Tente novamente."
         );
         return;
       }
 
       if (json.data.status === "paid") {
-        setDeliveredItems(json.data.deliveredItems ?? []);
+        const paidItems: unknown[] = json.data.deliveredItems ?? [];
+        setDeliveredItems(paidItems as DeliveredItem[]);
+        setOrderTotal(json.data.orderTotal != null ? Number(json.data.orderTotal) : null);
+        setOrderPaidAt(json.data.orderPaidAt ?? null);
+        // Mesmo caso do reload (loadDeliveredOrder): pagamento aprovado mas
+        // 0 itens entregues e nada físico no carrinho — normalmente
+        // estoque de chave insuficiente. Não mostra "sucesso" em branco.
+        setDeliveryIssue(!!json.data.deliveryFailed || (paidItems.length === 0 && !hasPhysical));
         setStage("delivered");
+        setOrderUrlParam(orderId);
       } else if (json.data.status === "failed") {
         setErrorMessage(json.data.failureReason || "Pagamento recusado. Tente outro método ou outro cartão.");
       } else {
@@ -812,16 +955,34 @@ export default function CheckoutPage() {
 
     const interval = setInterval(async () => {
       let confirmedStatus: string | null = null;
+      let hadDeliveryFailure = false;
       try {
         const checkRes = await fetch(`/api/checkout/order/${orderId}/check-payment`, { method: "POST" });
         const checkJson = await checkRes.json();
-        if (checkRes.ok) confirmedStatus = checkJson.data?.status ?? null;
+        if (checkRes.ok) {
+          confirmedStatus = checkJson.data?.status ?? null;
+          hadDeliveryFailure = !!checkJson.data?.deliveryFailed;
+        }
       } catch {
         // se a checagem ativa falhar (rede etc.), tenta de novo no próximo intervalo
       }
 
       if (confirmedStatus === "paid" || confirmedStatus === "delivered") {
+        deliveryFailCountRef.current = 0;
         await loadDeliveredOrder(orderId);
+        return;
+      }
+
+      // O Mercado Pago já confirmou o pagamento, mas confirmOrderPayment
+      // falhou depois disso (não é "ainda não pagou" — é um erro nosso).
+      // Só avisa o cliente depois de algumas tentativas seguidas, pra não
+      // disparar um alarme por causa de uma falha isolada e passageira que
+      // se resolve sozinha no próximo poll.
+      if (hadDeliveryFailure) {
+        deliveryFailCountRef.current += 1;
+        if (deliveryFailCountRef.current >= 3) setDeliveryIssue(true);
+      } else {
+        deliveryFailCountRef.current = 0;
       }
     }, 4000);
 
@@ -847,7 +1008,10 @@ export default function CheckoutPage() {
       }
 
       setDeliveredItems(json.data.deliveredItems ?? []);
+      setOrderTotal(json.data.order?.total != null ? Number(json.data.order.total) : null);
+      setOrderPaidAt(json.data.order?.paid_at ?? null);
       setStage("delivered");
+      setOrderUrlParam(orderId);
     } finally {
       setSubmitting(false);
     }
@@ -873,7 +1037,7 @@ export default function CheckoutPage() {
                 <div className="checkoutItemInfo">
                   <strong>{item.product_name}</strong>
                   {item.variation_name && <span>{item.variation_name}</span>}
-                  <span>Qtd: {item.quantity}{item.product_type === "physical" ? " · 📦 físico" : ""}</span>
+                  <span>Qtd: {item.quantity}{item.product_type === "physical" ? " · físico" : ""}</span>
                 </div>
                 <span className="checkoutItemPrice">
                   R$ {(Number(item.unit_price) * item.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -939,17 +1103,58 @@ export default function CheckoutPage() {
   }
 
   if (stage === "delivered") {
+    const orderRef = displayOrderNumber({ order_number: orderNumber, id: orderId ?? 0 });
+    const paidAtLabel = orderPaidAt
+      ? new Date(orderPaidAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+      : null;
+
     return (
       <main className="checkoutPage">
-        <div className="checkoutCard">
-          <h1>Pedido {displayOrderNumber({ order_number: orderNumber, id: orderId ?? 0 })} confirmado 🎉</h1>
-          <p className="checkoutHint">
-            {deliveredItems.length > 0
-              ? "Enviamos os dados de acesso pro seu e-mail. Aqui está uma cópia:"
-              : hasPhysical
-                ? "Seu pedido está sendo preparado pro envio. Acompanhe o status na sua área de pedidos."
-                : ""}
-          </p>
+        <div className="checkoutCard receiptCard">
+          <div className={`receiptStatusIcon ${deliveryIssue ? "issue" : "success"}`}>
+            {deliveryIssue ? <Icon name="alert" /> : <Icon name="check" />}
+          </div>
+
+          {deliveryIssue ? (
+            <>
+              <h1>Pagamento aprovado</h1>
+              <p className="checkoutHint">
+                Identificamos seu pagamento, mas houve um problema ao liberar seu pedido {orderRef}.
+                Nossa equipe já foi notificada e vai resolver em breve — se preferir, entre em contato com o suporte
+                mencionando esse número de pedido.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1>Pedido confirmado</h1>
+              <p className="checkoutHint">
+                {deliveredItems.length > 0
+                  ? "Enviamos os dados de acesso pro seu e-mail. Aqui está uma cópia:"
+                  : hasPhysical
+                    ? "Seu pedido está sendo preparado pro envio. Acompanhe o status na sua área de pedidos."
+                    : ""}
+              </p>
+            </>
+          )}
+
+          <div className="receiptSummary">
+            <div className="receiptSummaryRow">
+              <span>Número do pedido</span>
+              <strong>{orderRef}</strong>
+            </div>
+            {paidAtLabel && (
+              <div className="receiptSummaryRow">
+                <span>Data do pagamento</span>
+                <strong>{paidAtLabel}</strong>
+              </div>
+            )}
+            {orderTotal != null && (
+              <div className="receiptSummaryRow receiptSummaryTotal">
+                <span>Total pago</span>
+                <strong>R$ {orderTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+              </div>
+            )}
+          </div>
 
           {deliveredItems.length > 0 && (
             <div className="deliveredList">
@@ -961,7 +1166,13 @@ export default function CheckoutPage() {
                       : (item.productName ?? item.product_name)}
                   </strong>
                   {item.type === "file" ? (
-                    <a href={item.content} target="_blank" rel="noopener noreferrer">Baixar arquivo</a>
+                    <button
+                      type="button"
+                      className="deliveredDownloadBtn"
+                      onClick={() => void downloadFile(item.content, extractDownloadFilename(item.content)).catch(() => modal.alert("Não foi possível baixar o arquivo. Tente de novo."))}
+                    >
+                      <Icon name="download" /> Baixar arquivo{item.fileSize != null ? ` (${formatFileSize(item.fileSize)})` : ""}
+                    </button>
                   ) : (
                     <code>{item.content}</code>
                   )}
@@ -970,7 +1181,19 @@ export default function CheckoutPage() {
             </div>
           )}
 
+          <p className="checkoutHint receiptSupportHint">
+            Guarde o número do pedido acima — é o que você vai precisar caso entre em contato com o suporte.
+          </p>
+
+          {!deliveryIssue && (
+            <p className="checkoutHint receiptSupportHint">
+              <Icon name="star" /> Gostou da compra? Depois de receber, avalie o produto em &quot;Meus pedidos&quot; (clique no item e escolha
+              &quot;Avaliar produto&quot;) — você pode enviar comentário e fotos.
+            </p>
+          )}
+
           <Link href="/" className="checkoutBtnPrimary">Voltar à loja</Link>
+          <Link href="/orders" className="checkoutBtnSecondary">Ver meus pedidos e avaliar</Link>
         </div>
       </main>
     );
@@ -1051,7 +1274,7 @@ export default function CheckoutPage() {
 
           {selectedQuote && freeShippingUnlocked && (
             <p className="checkoutFreeShippingBadge">
-              🚚 Frete grátis aplicado! <span className="checkoutStrikePrice">R$ {rawShippingFee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+              <Icon name="truck" /> Frete grátis aplicado! <span className="checkoutStrikePrice">R$ {rawShippingFee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
             </p>
           )}
 
@@ -1101,16 +1324,32 @@ export default function CheckoutPage() {
           {errorMessage && <p className="checkoutError">{errorMessage}</p>}
 
           {mercadoPagoPublicKey ? (
-            <div id="mpPaymentBrickContainer" ref={brickContainerRef} />
+            <>
+              {paymentAmount > 0 && paymentAmount < 4 && (
+                <p className="checkoutHint">
+                  Valor baixo: o Mercado Pago só libera cartão a partir de R$ 0,50 e boleto a partir de R$ 4,00.
+                  {paymentAmount < 0.5 ? " Para esse valor só o Pix está disponível." : ""}
+                </p>
+              )}
+              <div id="mpPaymentBrickContainer" ref={brickContainerRef} />
+            </>
           ) : (
             <div className="checkoutMockPaymentMethods">
               <p className="checkoutHint checkoutMockNote">
                 Modo de teste: a loja ainda não configurou o Mercado Pago. Escolha um método pra simular.
               </p>
-              <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("pix")}>Pix</button>
-              <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("credit_card")}>Cartão de crédito</button>
-              <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("debit_card")}>Cartão de débito</button>
-              <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("boleto")}>Boleto</button>
+              {acceptedMethods.pix && (
+                <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("pix")}>Pix</button>
+              )}
+              {acceptedMethods.creditCard && (
+                <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("credit_card")}>Cartão de crédito</button>
+              )}
+              {acceptedMethods.debitCard && (
+                <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("debit_card")}>Cartão de débito</button>
+              )}
+              {acceptedMethods.boleto && (
+                <button className="checkoutBtnPrimary" disabled={submitting} onClick={() => submitPayment("boleto")}>Boleto</button>
+              )}
             </div>
           )}
         </div>
@@ -1123,6 +1362,12 @@ export default function CheckoutPage() {
       <main className="checkoutPage">
         <div className="checkoutCard">
           <h1>Pedido {displayOrderNumber({ order_number: orderNumber, id: orderId ?? 0 })} criado</h1>
+          {deliveryIssue && (
+            <p className="checkoutError">
+              <Icon name="alert" /> Identificamos seu pagamento, mas houve um problema ao liberar seu pedido. Nossa equipe já foi
+              notificada — se preferir, entre em contato com o suporte.
+            </p>
+          )}
           <div className="checkoutPixBox">
             {pendingMethod === "boleto" ? (
               <>
@@ -1208,7 +1453,7 @@ export default function CheckoutPage() {
           <div className="checkoutMilestone">
             <p className="checkoutMilestoneText">
               Faltam <strong>R$ {nextMilestone.amountNeeded.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> para
-              você ganhar <strong>{nextMilestone.label}</strong> 🎁
+              você ganhar <strong>{nextMilestone.label}</strong> <Icon name="gift" />
             </p>
             <div className="checkoutMilestoneBar">
               <div className="checkoutMilestoneBarFill" style={{ width: `${milestoneProgress}%` }} />
@@ -1216,7 +1461,7 @@ export default function CheckoutPage() {
           </div>
         ) : discountPercent > 0 || freeShippingUnlocked ? (
           <p className="checkoutMilestoneDone">
-            🎉 Você desbloqueou{discountPercent > 0 ? ` ${discountPercent}% de desconto` : ""}
+            <Icon name="sparkle" /> Você desbloqueou{discountPercent > 0 ? ` ${discountPercent}% de desconto` : ""}
             {discountPercent > 0 && freeShippingUnlocked ? " e" : ""}
             {freeShippingUnlocked ? " frete grátis" : ""}!
           </p>
@@ -1225,11 +1470,11 @@ export default function CheckoutPage() {
         <div className="checkoutItems">
           {cart.map((item) => (
             <div key={item.cart_item_id} className="checkoutItem">
-              <img src={item.image_url || "/file.svg"} alt={item.product_name} />
+              <img src={item.image_url || "/placeholders/product.svg"} alt={item.product_name} />
               <div className="checkoutItemInfo">
                 <strong>{item.product_name}</strong>
                 {item.variation_name && <span>{item.variation_name}</span>}
-                <span>Qtd: {item.quantity}{item.product_type === "physical" ? " · 📦 físico" : ""}</span>
+                <span>Qtd: {item.quantity}{item.product_type === "physical" ? " · físico" : ""}</span>
               </div>
               <span className="checkoutItemPrice">
                 R$ {(Number(item.unit_price) * item.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -1242,7 +1487,7 @@ export default function CheckoutPage() {
                 aria-label={`Remover ${item.product_name}`}
                 title="Remover item"
               >
-                {removingItem === item.cart_item_id ? "…" : "✕"}
+                {removingItem === item.cart_item_id ? "…" : <Icon name="x" />}
               </button>
             </div>
           ))}
@@ -1250,11 +1495,11 @@ export default function CheckoutPage() {
 
         {recommendations.length > 0 && (
           <div className="checkoutRecommendations">
-            <p className="checkoutRecommendationsTitle">✨ Que tal adicionar também?</p>
+            <p className="checkoutRecommendationsTitle"><Icon name="sparkle" /> Que tal adicionar também?</p>
             <div className="checkoutRecommendationsRow">
               {recommendations.map((r) => (
                 <div key={r.id} className="checkoutRecommendationCard">
-                  <img src={r.image_url || "/file.svg"} alt={r.name} />
+                  <img src={r.image_url || "/placeholders/product.svg"} alt={r.name} />
                   <span className="checkoutRecommendationName">{r.name}</span>
                   <span className="checkoutRecommendationPrice">
                     R$ {Number(r.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -1276,7 +1521,7 @@ export default function CheckoutPage() {
         <div className="checkoutCouponBox">
           {appliedCoupon ? (
             <div className="checkoutCouponApplied">
-              <span>🎟️ Cupom <strong>{appliedCoupon.code}</strong> aplicado ({appliedCoupon.percentOff}% off){!usingCoupon && " — desconto automático já é melhor"}</span>
+              <span><Icon name="ticket" /> Cupom <strong>{appliedCoupon.code}</strong> aplicado ({appliedCoupon.percentOff}% off){!usingCoupon && " — desconto automático já é melhor"}</span>
               <button type="button" onClick={removeCoupon}>Remover</button>
             </div>
           ) : (

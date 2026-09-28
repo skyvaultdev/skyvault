@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
-import { verifyJWT } from "@/lib/jwt/init";
+import { verifyJWTForStore } from "@/lib/jwt/storeAware";
 
 export async function POST(req: Request) {
   try {
@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const token = cookieStore.get("auth_token")?.value;
     if (!token) return fail("UNAUTHORIZED", 401);
 
-    const payload = await verifyJWT(token);
+    const payload = await verifyJWTForStore(token);
     if (!payload?.email) return fail("UNAUTHORIZED", 401);
 
     var { productId, variationId, orderId } = await req.json();

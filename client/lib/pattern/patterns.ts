@@ -72,3 +72,29 @@ export const PATTERNS = {
 } as const;
 
 export type Pattern = keyof typeof PATTERNS;
+
+function hexToRgb(hex: string): [number, number, number] | null {
+    const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+// Os padrões usavam cores fixas (cinza-roxo #9C92AC nos SVGs, branco nos
+// gradientes) — agora o traço acompanha a cor secundária escolhida em
+// "Cores". A cor de fundo escolhida na paleta vale para qualquer padrão.
+export function resolvePattern(type: string, secondary: string, solidColor?: string | null) {
+    const base = (type in PATTERNS ? PATTERNS[type as Pattern] : PATTERNS.none) as {
+        backgroundImage?: string; backgroundSize?: string; backgroundColor?: string;
+    };
+    const rgb = hexToRgb(secondary);
+    let image = base.backgroundImage;
+    if (image && rgb) {
+        image = image
+            .replace(/%239C92AC/g, "%23" + secondary.replace("#", ""))
+            .replace(/rgba\(255,\s*255,\s*255,\s*([0-9.]+)\)/g, (_m, a) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, Number(a) * 2.2)})`);
+    }
+    let backgroundColor = base.backgroundColor;
+    if (solidColor && hexToRgb(solidColor)) backgroundColor = solidColor;
+    return { backgroundImage: image, backgroundSize: base.backgroundSize, backgroundColor };
+}

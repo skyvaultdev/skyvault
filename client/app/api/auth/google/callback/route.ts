@@ -1,4 +1,5 @@
 "use server"
+import { getCurrentStoreId } from "@/lib/tenant/tenantContext";
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -94,11 +95,11 @@ export async function GET(req: Request) {
     await db.query(`
         INSERT INTO googleuser
         (username, email, access_token, refresh_token, expires_in)
-        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING`, userFormatted
+        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (store_id, email) DO NOTHING`, userFormatted
     );
 
     await db.query(
-        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (email) DO NOTHING`,
+        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING`,
         [userFormatted[0], userFormatted[1]]
     );
     await db.query(
@@ -141,6 +142,7 @@ export async function GET(req: Request) {
     }
 
     const token = await signJWT({
+      sid: await getCurrentStoreId(),
         email,
         role,
         permissions,

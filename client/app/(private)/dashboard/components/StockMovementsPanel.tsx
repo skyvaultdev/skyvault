@@ -139,7 +139,7 @@ export default function StockMovementsPanel() {
           const isIn = m.change > 0;
           return (
             <div key={m.id} className="stockMovRow">
-              <img src={m.thumbnail_url || "/file.svg"} alt="" className="stockMovThumb" />
+              <img src={m.thumbnail_url || "/placeholders/product.svg"} alt="" className="stockMovThumb" />
 
               <div className="stockMovInfo">
                 <span className="stockMovProductName">
@@ -157,7 +157,7 @@ export default function StockMovementsPanel() {
 
               <div className="stockMovRight">
                 <span className={`stockMovChange ${isIn ? "in" : "out"}`}>
-                  {isIn ? "+" : ""}{m.change}
+                  {m.change === 0 && m.note?.includes("ilimitado") ? "∞" : `${isIn ? "+" : ""}${m.change}`}
                 </span>
                 <span className="stockMovDate">
                   {new Date(m.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}

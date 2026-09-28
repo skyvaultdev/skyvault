@@ -1,5 +1,6 @@
 "use server";
 
+import { sniffFile } from "@/lib/files/sniffFile";
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
@@ -8,7 +9,8 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { requirePermission } from "@/lib/auth/guard";
-import { logStockMovement } from "@/lib/stock/stockMovements";
+import { validatePhysicalProduct } from "@/lib/products/physicalValidation";
+import { ensureStockMovementsTable, logStockMovement } from "@/lib/stock/stockMovements";
 
 type Variation = {
   name: string;
@@ -46,6 +48,7 @@ export async function POST(req: Request) {
     if (denied) return denied;
 
     const db = getDB();
+    await ensureStockMovementsTable();
     var formData = await req.formData();
 
     var name = String(formData.get("name") ?? "").trim();
@@ -72,6 +75,11 @@ export async function POST(req: Request) {
 
     if (!name || isNaN(price) || price <= 0) {
       return fail("DADOS_INVALIDOS", 400);
+    }
+
+    if (isPhysical) {
+      const physicalError = validatePhysicalProduct({ weightGrams, lengthCm, widthCm, heightCm, stockCount, stockIsUnlimited });
+      if (physicalError) return fail(physicalError, 400);
     }
 
     const slug = slugify(rawSlug || name);
@@ -139,11 +147,11 @@ export async function POST(req: Request) {
         const file = images[i];
         if (!file.type.startsWith("image/")) continue;
 
-        var ext = path.extname(file.name) || ".jpg";
-        const fileName = `${crypto.randomUUID()}${ext}`;
-        const filePath = path.join(uploadDir, fileName);
-
         const buffer = Buffer.from(await file.arrayBuffer());
+        const sniffed = sniffFile(buffer);
+        if (!sniffed || sniffed.kind !== "image") continue;
+        const fileName = `${crypto.randomUUID()}${sniffed.ext}`;
+        const filePath = path.join(uploadDir, fileName);
         await writeFile(filePath, buffer);
 
         await db.query(

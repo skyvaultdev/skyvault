@@ -4,7 +4,7 @@ import { existsSync } from "fs";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/guard";
-import { logStockMovement } from "@/lib/stock/stockMovements";
+import { ensureStockMovementsTable, logStockMovement } from "@/lib/stock/stockMovements";
 
 type RouteParams = {
   params: Promise<{ id: string; target: string }>;
@@ -24,7 +24,8 @@ export async function POST(req: Request, { params }: RouteParams) {
     var type = formData.get("type") as string;
     var ghostStock = formData.get("ghost_stock") as string;
     let content = (formData.get("content") as string) || "";
-    let isUnlimited = (formData.get("is_unlimited") as boolean) || false;
+    const rawUnlimited = formData.get("is_unlimited");
+    const isUnlimited = rawUnlimited === "true" || rawUnlimited === "on" || rawUnlimited === "1";
     var file = formData.get("file") as File | null;
 
     if (type === "file" && file && file.size > 0) {
@@ -55,12 +56,56 @@ export async function POST(req: Request, { params }: RouteParams) {
     } else if (type === "file") {
       count = ghostStock ? parseInt(ghostStock) : 100;
     }
-    
+
     const db = getDB();
+    await ensureStockMovementsTable();
     var table = target === "variation" ? "product_variations" : "products";
 
     const beforeRes = await db.query(`SELECT stock_count, name FROM ${table} WHERE id = $1`, [id]);
     const before = beforeRes.rows[0];
+
+    // "key" não usa stock_content pra guardar nada — cada chave é sua
+    // própria linha em stock_keys (é isso que confirmOrderPayment lê na
+    // hora de entregar). O textarea manda uma chave por linha em
+    // "content"; reconcilia com o que já existe em vez de só salvar o
+    // texto puro num campo que ninguém nunca leu de volta pra entregar —
+    // ERA exatamente por isso que produto tipo chave nunca entregava nada:
+    // o estoque "existia" só como texto solto, nunca como linhas reais.
+    let savedContent = content;
+    if (type === "key") {
+      const keyColumn = target === "variation" ? "variation_id" : "product_id";
+      const submittedLines = content
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const submittedSet = new Set(submittedLines);
+
+      const existingRes = await db.query(
+        `SELECT id, key_content FROM stock_keys WHERE ${keyColumn} = $1 AND is_sold = false`,
+        [id]
+      );
+
+      // Linha que sumiu do textarea = staff removeu essa chave do estoque.
+      const toDeleteIds = existingRes.rows
+        .filter((row) => !submittedSet.has(row.key_content))
+        .map((row) => row.id);
+      if (toDeleteIds.length > 0) {
+        await db.query(`DELETE FROM stock_keys WHERE id = ANY($1)`, [toDeleteIds]);
+      }
+
+      // Linha nova (ainda não existe como chave não vendida) = adiciona.
+      const existingContents = new Set(existingRes.rows.map((row) => row.key_content));
+      const toInsert = submittedLines.filter((line) => !existingContents.has(line));
+      for (const line of toInsert) {
+        await db.query(
+          `INSERT INTO stock_keys (${keyColumn}, key_content, is_sold) VALUES ($1, $2, false)`,
+          [id, line]
+        );
+      }
+
+      count = submittedSet.size;
+      savedContent = ""; // nada útil pra guardar aqui pra esse tipo
+    }
 
     await db.query(
       `UPDATE ${table}
@@ -69,7 +114,7 @@ export async function POST(req: Request, { params }: RouteParams) {
            stock_count = $3,
            is_unlimited = $5
        WHERE id = $4`,
-      [type, content, count, id, isUnlimited]
+      [type, savedContent, count, id, isUnlimited]
     );
 
     if (before) {
@@ -89,10 +134,14 @@ export async function POST(req: Request, { params }: RouteParams) {
       } else {
         productId = Number(id);
       }
+      // Estoque infinito/ilimitado não tem quantidade real — o "100" padrão
+      // é só um valor interno, não deve aparecer no ledger como entrada.
+      const isInfinite = type === "infinite" || isUnlimited;
       await logStockMovement(db, {
         productId, variationId, productName, variationName,
-        change: delta, reason: "manual_adjustment", staffEmail: session?.email ?? null,
-        note: "Configuração de estoque digital",
+        change: isInfinite ? 0 : delta,
+        reason: "manual_adjustment", staffEmail: session?.email ?? null,
+        note: isInfinite ? "Configuração de estoque digital — ilimitado (sem quantidade)" : "Configuração de estoque digital",
       });
     }
 

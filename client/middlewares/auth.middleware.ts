@@ -34,7 +34,7 @@ export async function authMiddleware(req: NextRequest) {
         "Content-Type": "application/json",
         "x-internal-secret": config.jwt.secret,
       },
-      body: JSON.stringify({ email: decrypted.email }),
+      body: JSON.stringify({ email: decrypted.email, sid: decrypted.sid }),
     }
   );
 
@@ -44,6 +44,7 @@ export async function authMiddleware(req: NextRequest) {
 
   if (roleChanged || permsChanged) {
     const newToken = await signJWT({
+      sid: decrypted.sid,
       email: decrypted.email,
       role,
       permissions,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import Icon from "@/components/icons/Icon";
 import "./StaffChatPannel.css";
 import "@/components/chat/ChatShared.css";
 import ChatLightbox from "./ChatLightbox";
@@ -339,7 +340,7 @@ export default function StaffChatPanel() {
     const label = isOwn
       ? "Você"
       : selectedConversation?.customer_name || selectedConversation?.customer_email || message.sender_email || "Cliente";
-    const snippet = message.body?.trim() || (message.attachment_name ? `📎 ${message.attachment_name}` : "anexo");
+    const snippet = message.body?.trim() || (message.attachment_name ? `Anexo: ${message.attachment_name}` : "anexo");
     setReplyTarget({ id: message.id, label, snippet });
   }
 
@@ -577,7 +578,7 @@ export default function StaffChatPanel() {
 
     return (
       <a href={m.attachment_url} target="_blank" rel="noopener noreferrer" className="chatAttachmentFile">
-        📎 {m.attachment_name ?? "Arquivo"}
+        <Icon name="paperclip" /> {m.attachment_name ?? "Arquivo"}
       </a>
     );
   }
@@ -689,10 +690,10 @@ export default function StaffChatPanel() {
                         storeLogoUrl ? (
                           <img src={storeLogoUrl} className="chatAvatar" alt="Loja" />
                         ) : (
-                          <div className="chatAvatarPlaceholder">🏬</div>
+                          <div className="chatAvatarPlaceholder"><Icon name="store" /></div>
                         )
                       ) : (
-                        <div className="chatAvatarPlaceholder">👤</div>
+                        <div className="chatAvatarPlaceholder"><Icon name="user" /></div>
                       )}
                       <div
                         className={`chatBubble ${isOwn ? "fromStaff" : "fromCustomer"} ${m.failed ? "chatBubbleFailed" : ""}`}
@@ -707,8 +708,8 @@ export default function StaffChatPanel() {
                               : m.failed
                                 ? "falha ao enviar"
                                 : typeof m.id === "number" && readIds.has(m.id)
-                                  ? "✓✓"
-                                  : "✓"}
+                                  ? <><Icon name="check" /><Icon name="check" /></>
+                                  : <Icon name="check" />}
                           </span>
                         )}
                       </div>
@@ -722,7 +723,7 @@ export default function StaffChatPanel() {
               {pendingFiles.length > 0 && (
                 <div className="chatStagingOverlay">
                   <div className="chatStagingHeader">
-                    <button className="chatStagingClose" onClick={cancelPendingFiles}>✕</button>
+                    <button className="chatStagingClose" onClick={cancelPendingFiles}><Icon name="x" /></button>
                     <span>{pendingFiles.length} arquivo{pendingFiles.length > 1 ? "s" : ""} selecionado{pendingFiles.length > 1 ? "s" : ""}</span>
                   </div>
 
@@ -734,7 +735,7 @@ export default function StaffChatPanel() {
                         <img src={focusedPending.previewUrl} alt="" className="chatStagingMedia" />
                       )
                     ) : (
-                      <div className="chatStagingFileIcon">📄 {focusedPending?.file.name}</div>
+                      <div className="chatStagingFileIcon"><Icon name="file" /> {focusedPending?.file.name}</div>
                     )}
 
                     {focusedPending?.status === "uploading" && (
@@ -770,11 +771,11 @@ export default function StaffChatPanel() {
                                 <img src={pf.previewUrl} alt="" className="chatStagingThumbMedia" />
                               )
                             ) : (
-                              <span className="chatStagingThumbFileIcon">📄</span>
+                              <span className="chatStagingThumbFileIcon"><Icon name="file" /></span>
                             )}
                             {pf.status === "uploading" && <span className="chatStagingThumbProgress">{pf.progress}%</span>}
                           </button>
-                          <button className="chatStagingThumbRemove" onClick={() => removePendingFile(pf.id)}>✕</button>
+                          <button className="chatStagingThumbRemove" onClick={() => removePendingFile(pf.id)}><Icon name="x" /></button>
                         </div>
                       ))}
                     </div>
@@ -795,7 +796,7 @@ export default function StaffChatPanel() {
                     <span className="chatReplyBarLabel">Respondendo a {replyTarget.label}</span>
                     <span className="chatReplyBarSnippet">{replyTarget.snippet}</span>
                   </div>
-                  <button type="button" className="chatReplyBarClose" onClick={() => setReplyTarget(null)}>✕</button>
+                  <button type="button" className="chatReplyBarClose" onClick={() => setReplyTarget(null)}><Icon name="x" /></button>
                 </div>
               )}
 
@@ -811,7 +812,7 @@ export default function StaffChatPanel() {
                   }}
                 />
                 <button type="button" className="chatAttachBtn" onClick={() => fileInputRef.current?.click()}>
-                  📎
+                  <Icon name="paperclip" />
                 </button>
                 <input
                   value={draft}

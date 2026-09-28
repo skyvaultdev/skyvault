@@ -1,3 +1,5 @@
+import { sniffFile } from "@/lib/files/sniffFile";
+import { validatePhysicalProduct } from "@/lib/products/physicalValidation";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { slugify } from "@/lib/utils/slugify";
@@ -5,7 +7,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { requirePermission } from "@/lib/auth/guard";
-import { logStockMovement } from "@/lib/stock/stockMovements";
+import { ensureStockMovementsTable, logStockMovement } from "@/lib/stock/stockMovements";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,6 +25,7 @@ export async function PUT(req: Request, { params }: Params) {
         if (isNaN(productId)) return fail("INVALID_ID", 400);
 
         const db = getDB();
+        await ensureStockMovementsTable();
         var formData = await req.formData();
         var name = String(formData.get("name") ?? "").trim();
         var rawSlug = String(formData.get("slug") ?? "").trim();
@@ -42,7 +45,17 @@ export async function PUT(req: Request, { params }: Params) {
         var widthCm = isPhysical && formData.get("width_cm") ? Number(formData.get("width_cm")) : null;
         var heightCm = isPhysical && formData.get("height_cm") ? Number(formData.get("height_cm")) : null;
 
-        if (!name || isNaN(price)) return fail("MISSING_FIELDS", 400);
+        if (!name || isNaN(price) || price <= 0) return fail("MISSING_FIELDS", 400);
+
+        if (isPhysical) {
+            const unlimitedFlag = formData.get("stock_is_unlimited") === "true";
+            const physicalError = validatePhysicalProduct({
+                weightGrams, lengthCm, widthCm, heightCm,
+                stockCount: Number(formData.get("stock_count") ?? 0) || 0,
+                stockIsUnlimited: unlimitedFlag,
+            });
+            if (physicalError) return fail(physicalError, 400);
+        }
 
         var slug = slugify(rawSlug || name);
 
@@ -136,11 +149,11 @@ export async function PUT(req: Request, { params }: Params) {
             await mkdir(uploadDir, { recursive: true });
 
             for (var file of newImages) {
-                var ext = path.extname(file.name) || ".jpg";
-                var fileName = `${crypto.randomUUID()}${ext}`;
-                var filePath = path.join(uploadDir, fileName);
-                
                 var buffer = Buffer.from(await file.arrayBuffer());
+                var sniffed = sniffFile(buffer);
+                if (!sniffed || sniffed.kind !== "image") continue;
+                var fileName = `${crypto.randomUUID()}${sniffed.ext}`;
+                var filePath = path.join(uploadDir, fileName);
                 await writeFile(filePath, buffer);
 
                 await db.query(

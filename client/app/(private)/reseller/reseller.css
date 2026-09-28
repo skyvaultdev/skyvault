@@ -1,0 +1,199 @@
+.resellerPage {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.resellerPage,
+.resellerPage * {
+  box-sizing: border-box;
+}
+
+.resellerCard2 {
+  width: 100%;
+  max-width: 560px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 28px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 12, 14, 0.75);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.resellerPageWide .resellerCard2 {
+  max-width: 780px;
+}
+
+.resellerCard2 h1 {
+  margin: 0;
+  font-size: clamp(20px, 4vw, 26px);
+}
+
+.resellerCard2 h2 {
+  margin: 10px 0 0 0;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.resellerHint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13.5px;
+}
+
+.resellerLabel {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.resellerLabel input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  font-size: 14px;
+}
+
+.resellerBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  background: var(--secondary, #6400ff);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.resellerBtnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resellerBtnLink {
+  text-decoration: none;
+}
+
+.resellerBtnSecondary {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.resellerBalanceRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.resellerBalanceBox {
+  display: grid;
+  gap: 2px;
+}
+
+.resellerBalanceBox span {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.resellerBalanceBox strong {
+  font-size: 18px;
+  color: #fff;
+}
+
+.resellerBalanceRow .resellerBtnPrimary {
+  margin-left: auto;
+}
+
+.resellerProductList {
+  display: grid;
+  gap: 10px;
+}
+
+.resellerProductRow {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.resellerLinkRow {
+  display: flex;
+  gap: 8px;
+}
+
+.resellerLinkRow input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #18181b;
+  color: #fff;
+  font-size: 12.5px;
+}
+
+.resellerTableWrap {
+  overflow-x: auto;
+}
+
+.resellerTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.resellerTable th {
+  text-align: left;
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.resellerTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  white-space: nowrap;
+}
+
+.resellerCommissionStatus {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.resellerCommissionStatus.status-confirmed,
+.resellerCommissionStatus.status-requested { background: rgba(240, 180, 41, 0.16); color: #f0b429; }
+.resellerCommissionStatus.status-paid { background: rgba(34, 197, 94, 0.16); color: #4ade80; }
+.resellerCommissionStatus.status-cancelled,
+.resellerCommissionStatus.status-rejected { background: rgba(255, 0, 0, 0.14); color: #ff8484; }

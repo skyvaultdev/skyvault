@@ -74,7 +74,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
         <div className="products-grid">
           {products.map((product) => (
             <article key={product.id} className="product-card">
-              <img src={product.image_url || "/file.svg"} alt={product.name} className="product-image" />
+              <img src={product.image_url || "/placeholders/product.svg"} alt={product.name} className="product-image" />
               <h4>{product.name}</h4>
               <p>R$ {Number(product.price).toFixed(2)}</p>
               <Link href={`/product/${product.slug}`}>Comprar</Link>

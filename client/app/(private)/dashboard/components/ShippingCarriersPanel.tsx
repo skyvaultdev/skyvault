@@ -204,7 +204,7 @@ export default function ShippingCarriersPanel({ canManageCredentials }: Props) {
           <strong>Melhor Envio · sua conta</strong>
           {meStatus && (
             <div className={`meStatusBadge ${meStatus.configured ? "ok" : "pending"}`}>
-              {meStatus.configured ? "✅ Configurado" : "⚠️ Sem token cadastrado"}
+              {meStatus.configured ? "Configurado" : "Sem token cadastrado"}
             </div>
           )}
           <label>

@@ -1,0 +1,185 @@
+.qpTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.qpTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.qpTab.active {
+  background: var(--secondary, #6400ff);
+  border-color: transparent;
+  color: #fff;
+}
+
+.qpBadge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ff4d4d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qpList {
+  display: grid;
+  gap: 12px;
+}
+
+.qpCard {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 0;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.qpCard.unread {
+  border-color: color-mix(in srgb, var(--secondary, #6400ff) 55%, transparent);
+  background: color-mix(in srgb, var(--secondary, #6400ff) 6%, transparent);
+}
+
+.qpCard.hidden { opacity: 0.55; }
+
+.qpHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.qpDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 3px rgba(255, 77, 77, 0.2);
+}
+
+.qpThread {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 2px;
+  scrollbar-width: thin;
+}
+
+.qpBubble {
+  display: grid;
+  gap: 2px;
+  max-width: 82%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+  animation: qpIn 200ms ease both;
+}
+.qpBubble p { margin: 0; font-size: 14px; }
+
+.qpBubble.customer {
+  justify-self: start;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom-left-radius: 4px;
+}
+
+.qpBubble.staff {
+  justify-self: end;
+  background: color-mix(in srgb, var(--secondary, #6400ff) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--secondary, #6400ff) 40%, transparent);
+  border-bottom-right-radius: 4px;
+}
+
+.qpWho { font-size: 11px; font-weight: 700; opacity: 0.7; }
+.qpTime { font-size: 10.5px; opacity: 0.45; justify-self: end; }
+
+@keyframes qpIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.qpComposer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 6px 6px 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 20, 0.9);
+}
+
+.qpComposer:focus-within { border-color: var(--secondary, #6400ff); }
+
+.qpComposer textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  padding: 8px 0;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.qpSend {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: var(--secondary, #6400ff);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 160ms ease;
+}
+.qpSend:hover:not(:disabled) { transform: scale(1.08); }
+.qpSend:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.qpActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.qpActions .btnSecondary { display: inline-flex; align-items: center; gap: 6px; }
+
+.qpLink {
+  font-size: 12.5px;
+  color: var(--secondary, #6400ff);
+}
+
+.qpPager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}

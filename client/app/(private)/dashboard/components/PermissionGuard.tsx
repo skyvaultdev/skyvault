@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import Icon from "@/components/icons/Icon";
 import "./PermissionGuard.css";
 
 type Props = {
@@ -24,7 +25,7 @@ export default function PermissionGuard({
 
       <div className="permissionOverlay">
         <div className="permissionBox">
-          <div className="permissionLock">🔒</div>
+          <div className="permissionLock"><Icon name="lock" size="2em" /></div>
 
           <strong>Acesso restrito</strong>
 

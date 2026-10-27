@@ -28,6 +28,15 @@ export async function POST(req: Request, { params }: RouteParams) {
     const isUnlimited = rawUnlimited === "true" || rawUnlimited === "on" || rawUnlimited === "1";
     var file = formData.get("file") as File | null;
 
+    // Validade opcional das chaves vendidas (dias) — só faz sentido pra
+    // tipo "key"; qualquer outro tipo grava NULL (sem recorrência/cobrança
+    // automática, só a data informativa usada na entrega).
+    const rawValidityDays = formData.get("key_validity_days") as string | null;
+    const parsedValidityDays = rawValidityDays ? parseInt(rawValidityDays, 10) : NaN;
+    const keyValidityDays = type === "key" && Number.isFinite(parsedValidityDays) && parsedValidityDays > 0
+      ? parsedValidityDays
+      : null;
+
     if (type === "file" && file && file.size > 0) {
       if (file.size > MAX_FILE_SIZE) return fail("TOO_LARGE_FILE", 400);
 
@@ -112,9 +121,10 @@ export async function POST(req: Request, { params }: RouteParams) {
        SET stock_type = $1,
            stock_content = $2,
            stock_count = $3,
-           is_unlimited = $5
+           is_unlimited = $5,
+           key_validity_days = $6
        WHERE id = $4`,
-      [type, savedContent, count, id, isUnlimited]
+      [type, savedContent, count, id, isUnlimited, keyValidityDays]
     );
 
     if (before) {

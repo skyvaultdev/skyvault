@@ -3,6 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import "./StockMovementsPanel.css";
 
+type ExpiringKey = {
+  id: number;
+  expires_at: string;
+  order_id: number | null;
+  order_number: string | null;
+  customer_email: string | null;
+  product_name: string | null;
+  variation_name: string | null;
+};
+
 type StockMovement = {
   id: number;
   product_id: number | null;
@@ -53,6 +63,8 @@ export default function StockMovementsPanel() {
   const [search, setSearch] = useState("");
   const [reasonFilter, setReasonFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
+  const [expiringKeys, setExpiringKeys] = useState<ExpiringKey[]>([]);
+  const [expiringLoading, setExpiringLoading] = useState(true);
 
   const load = useCallback(async (targetPage = 1) => {
     setLoading(true);
@@ -82,6 +94,20 @@ export default function StockMovementsPanel() {
     void load(1);
   }, [load]);
 
+  useEffect(() => {
+    async function loadExpiring() {
+      setExpiringLoading(true);
+      try {
+        const res = await fetch("/api/admin/stock-keys/expiring", { cache: "no-store" });
+        const json = await res.json();
+        setExpiringKeys(res.ok && Array.isArray(json.data?.items) ? json.data.items : []);
+      } finally {
+        setExpiringLoading(false);
+      }
+    }
+    void loadExpiring();
+  }, []);
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -93,6 +119,27 @@ export default function StockMovementsPanel() {
           a variação e o pedido envolvidos.
         </p>
       </div>
+
+      {!expiringLoading && expiringKeys.length > 0 && (
+        <div className="stockExpiringBox">
+          <h4>Chaves vencendo nos próximos 30 dias</h4>
+          <div className="stockExpiringList">
+            {expiringKeys.map((k) => (
+              <div key={k.id} className="stockExpiringRow">
+                <span className="stockExpiringProduct">
+                  {k.product_name ?? "Produto removido"}{k.variation_name ? ` — ${k.variation_name}` : ""}
+                </span>
+                <span className="stockExpiringMeta">
+                  {k.customer_email ?? "cliente desconhecido"} · pedido {k.order_number || (k.order_id ? `#${k.order_id}` : "—")}
+                </span>
+                <span className="stockExpiringDate">
+                  vence em {new Date(k.expires_at).toLocaleDateString("pt-BR")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="searchContainer stockMovFilterRow">
         <input

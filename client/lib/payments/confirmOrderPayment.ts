@@ -58,6 +58,31 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       return { alreadyProcessed: true, order, customerEmail, deliveredItems: [], hasPhysical: false, stockShortages: [] };
     }
 
+    // Cupom só conta uso quando o pedido É pago de verdade — create-order
+    // só valida, nunca incrementa (senão um pedido nunca pago consumiria
+    // vaga de cupom pra sempre). FOR UPDATE serializa confirmações
+    // concorrentes do mesmo cupom; a revalidação do usage_limit aqui é só
+    // um alerta: pode ter passado tempo entre o pedido ser criado (cupom
+    // ainda tinha vaga) e o pagamento confirmar (cupom esgotado por outras
+    // vendas nesse meio-tempo) — o desconto já foi dado e o cliente já
+    // pagou, então isso nunca bloqueia a entrega, só avisa pro staff.
+    if (order.coupon_id) {
+      const couponRes = await client.query(
+        `SELECT usage_limit, used_count FROM coupons WHERE id = $1 FOR UPDATE`,
+        [order.coupon_id]
+      );
+      const coupon = couponRes.rows[0];
+      if (coupon) {
+        if (coupon.usage_limit > 0 && coupon.used_count >= coupon.usage_limit) {
+          console.warn(
+            `[confirmOrderPayment] pedido #${orderId}: cupom ${order.coupon_id} já tinha atingido o limite de uso ` +
+            `(${coupon.used_count}/${coupon.usage_limit}) quando o pagamento confirmou — contando mesmo assim, o desconto já foi aplicado.`
+          );
+        }
+        await client.query(`UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`, [order.coupon_id]);
+      }
+    }
+
     await client.query(
       `UPDATE payment_transactions SET status = 'paid', updated_at = NOW() WHERE order_id = $1 AND status != 'paid'`,
       [orderId]
@@ -83,7 +108,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
       // stock_count JÁ atualizado. É isso que evita overselling por race
       // condition, não a lógica abaixo.
       const infoRes = await client.query(
-        `SELECT stock_type, stock_content, stock_count, is_unlimited FROM ${table} WHERE id = $1 FOR UPDATE`,
+        `SELECT stock_type, stock_content, stock_count, is_unlimited, key_validity_days FROM ${table} WHERE id = $1 FOR UPDATE`,
         [targetId]
       );
       if (infoRes.rows.length === 0) continue;
@@ -163,18 +188,20 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
 
       if (info.stock_type === "key") {
         const keyColumn = isVariation ? "variation_id" : "product_id";
+        const validityDays = info.key_validity_days != null ? Number(info.key_validity_days) : null;
         let keysDelivered = 0;
         for (let i = 0; i < item.quantity; i++) {
           const keyRes = await client.query(
             `UPDATE stock_keys
-             SET is_sold = true, order_id = $1, sold_at = NOW()
+             SET is_sold = true, order_id = $1, sold_at = NOW(),
+                 expires_at = CASE WHEN $3::int IS NOT NULL THEN NOW() + ($3::int || ' days')::interval ELSE NULL END
              WHERE id = (
                SELECT id FROM stock_keys
                WHERE ${keyColumn} = $2 AND is_sold = false
                LIMIT 1 FOR UPDATE SKIP LOCKED
              )
-             RETURNING key_content`,
-            [orderId, targetId]
+             RETURNING key_content, expires_at`,
+            [orderId, targetId, validityDays]
           );
           if (keyRes.rows.length > 0) {
             keysDelivered++;
@@ -183,6 +210,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
               variationName: item.variation_name,
               type: "key",
               content: keyRes.rows[0].key_content,
+              expiresAt: keyRes.rows[0].expires_at ?? null,
             });
           }
         }

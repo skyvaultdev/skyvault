@@ -9,6 +9,7 @@ export type DeliveredDigitalItem = {
   type: "key" | "file" | "infinite";
   content: string; // key content, download path, or a display message
   fileSize?: number | null; // bytes — só preenchido pra type "file"
+  expiresAt?: string | Date | null; // só preenchido pra type "key" com validade configurada
 };
 
 function formatFileSize(bytes: number): string {
@@ -71,11 +72,16 @@ export async function sendOrderDeliveryEmail(params: {
           contentHtml = `<code style="background:#18181b;color:#fff;padding:6px 10px;border-radius:6px;display:inline-block;">${item.content}</code>`;
         }
 
+        const expiresLabel = item.expiresAt
+          ? `<p style="margin:6px 0 0 0;color:#a1a1aa;font-size:12px;">Válida até <strong style="color:#fff;">${new Date(item.expiresAt).toLocaleDateString("pt-BR")}</strong></p>`
+          : "";
+
         return `
         <tr>
           <td style="padding:14px 0;border-bottom:1px solid #27272a;">
             <p style="margin:0 0 6px 0;color:#fff;font-size:14px;font-weight:700;">${label}</p>
             <div style="font-size:13px;">${contentHtml}</div>
+            ${expiresLabel}
           </td>
         </tr>`;
       })

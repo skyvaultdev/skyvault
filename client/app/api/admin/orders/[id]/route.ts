@@ -13,6 +13,11 @@ import { ensureOrderAttentionColumn } from "@/lib/orders/deliverySnapshot";
 import { cancelResellerCommissionsForOrder } from "@/lib/resellers/creditCommissions";
 import { createNotification } from "@/lib/notifications/createNotification";
 import { ensureNotificationsTable } from "@/lib/notifications/ensureNotificationsTable";
+import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
+import { sendOrderDeliveryEmail } from "@/lib/mail/sendOrderDeliveryEmail";
+import { refundMercadoPagoPayment } from "@/lib/payments/mercadoPagoProvider";
+import { logDeliveryFailure } from "@/lib/payments/deliveryFailures";
+import { ensureTeamTables, logTeamAction } from "@/lib/team/team";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,8 +85,8 @@ export async function GET(_req: Request, { params }: Params) {
     // conteúdo real vendido em cada pedido, não só nome/quantidade/preço.
     const items = [];
     for (const item of itemsRes.rows) {
-      const { deliveredContent, deliveredFileSize } = await resolveDeliveredContent(db, orderId, item);
-      items.push({ ...item, deliveredContent, deliveredFileSize });
+      const { deliveredContent, deliveredFileSize, deliveredExpiresAt } = await resolveDeliveredContent(db, orderId, item);
+      items.push({ ...item, deliveredContent, deliveredFileSize, deliveredExpiresAt });
     }
 
     return ok({
@@ -346,6 +351,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const db = getDB();
     await ensureStockMovementsTable();
     await ensureNotificationsTable();
+    await ensureTeamTables();
     const notifyEmail = body.notifyEmail !== false;
     const reason = body.reason ? String(body.reason).trim().slice(0, 500) || null : null;
 
@@ -460,13 +466,18 @@ export async function PATCH(req: Request, { params }: Params) {
         const event = SHIPMENT_NOTIFICATION_EVENT[newStatus];
         if (event) {
           const items = await fetchOrderEmailItems(db, orderId);
-          emailSent = await sendOrderStatusEmail(
+          // Disparado sem await — SMTP lento não pode travar a resposta
+          // dessa rota (chegou a levar 2min em produção). emailSent aqui
+          // vira "foi pedido pra enviar", não "confirmado entregue" —
+          // igual às outras 2 ações desta rota (cancel_order/set_order_status).
+          sendOrderStatusEmail(
             {
               id: orderId, order_number: orderRow.order_number, total: orderRow.total, customer_email: orderRow.customer_email,
               user_id: orderRow.user_id, tracking_code: result.finalTrackingCode, items, reason: eventDescription ?? reason,
             },
             event
-          );
+          ).catch((err) => console.error(`Erro ao enviar email de status (${event}) para pedido #${orderId}:`, err));
+          emailSent = true;
         }
       }
 
@@ -513,14 +524,21 @@ export async function PATCH(req: Request, { params }: Params) {
         }
       });
 
-      const emailSent = notifyEmail
-        ? await sendOrderStatusEmail(
-            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
-            "order_cancelled"
-          )
-        : false;
+      if (current.status !== "pending_payment") {
+        // Só registra se havia dinheiro/estoque envolvido — cancelar um
+        // pedido que nunca chegou a pagar não é uma ação sensível.
+        await logTeamAction(db, staffEmail ?? "desconhecido", "order.cancel", `pedido #${orderId}`, { reason, previousStatus: current.status });
+      }
 
-      return ok({ updated: true, emailSent });
+      if (notifyEmail) {
+        // Disparado sem await — mesmo motivo do update_shipment acima.
+        sendOrderStatusEmail(
+          { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
+          "order_cancelled"
+        ).catch((err) => console.error(`Erro ao enviar email de cancelamento para pedido #${orderId}:`, err));
+      }
+
+      return ok({ updated: true, emailSent: notifyEmail });
     }
 
     // Ação 3: mudar orders.status direto — só pros estados que não têm
@@ -542,19 +560,103 @@ export async function PATCH(req: Request, { params }: Params) {
       if (current.status === newStatus) return ok({ updated: false, reason: "NO_CHANGE" });
       if (current.status === "cancelled") return fail("ORDER_CANCELLED", 409);
 
-      await db.query(`UPDATE orders SET status = $1 WHERE id = $2`, [newStatus, orderId]);
-      if (newStatus === "refunded") {
-        await cancelResellerCommissionsForOrder(db, orderId);
+      // "Marcar como pago" manual (ex: staff confirmou um PIX recebido por
+      // fora) precisa passar pelo MESMO fluxo de confirmação usado por
+      // webhook/pay/check-payment — senão só o texto do status muda, sem
+      // baixar estoque nem entregar o conteúdo digital.
+      if (newStatus === "paid" && current.status === "pending_payment") {
+        let result;
+        try {
+          result = await confirmOrderPayment(orderId);
+        } catch (confirmError) {
+          await logDeliveryFailure(orderId, "admin_manual_confirm", confirmError);
+          console.error(`Erro ao confirmar pagamento manualmente (pedido #${orderId}):`, confirmError);
+          return fail("MANUAL_CONFIRM_FAILED", 500);
+        }
+
+        const emailSent = !!(result.customerEmail && result.deliveredItems.length > 0);
+        if (emailSent) {
+          // Disparado sem await, mesmo padrão dos outros pontos que chamam
+          // confirmOrderPayment (webhook, pay, check-payment, mock-confirm).
+          sendOrderDeliveryEmail({
+            to: result.customerEmail!, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems,
+          }).catch((mailError) => console.error(`Falha ao enviar e-mail de entrega (pedido #${orderId}):`, mailError));
+        }
+
+        await logTeamAction(db, staffEmail ?? "desconhecido", "order.manual_confirm_payment", `pedido #${orderId}`, { reason });
+
+        return ok({ updated: true, orderStatus: result.order.status, emailSent });
       }
 
-      const emailSent = notifyEmail
-        ? await sendOrderStatusEmail(
-            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
-            newStatus as NotificationEvent
-          )
-        : false;
+      // Reembolso real: se existe um pagamento do Mercado Pago aprovado pra
+      // esse pedido, estorna de verdade antes de mudar qualquer status —
+      // nunca marca como "reembolsado" sem o dinheiro ter voltado pro
+      // cliente. Pedido sem pagamento do Mercado Pago (manual/mock) exige
+      // confirmação explícita do staff (manualRefund === true), pra não
+      // reembolsar um pagamento real por engano só trocando o texto do status.
+      if (newStatus === "refunded") {
+        const mpTxRes = await db.query(
+          `SELECT provider_txid FROM payment_transactions
+           WHERE order_id = $1 AND provider = 'mercadopago' AND status = 'paid'
+           ORDER BY created_at DESC LIMIT 1`,
+          [orderId]
+        );
+        const mpTx = mpTxRes.rows[0];
 
-      return ok({ updated: true, emailSent });
+        if (mpTx) {
+          const refundResult = await refundMercadoPagoPayment(mpTx.provider_txid);
+          if (!refundResult.ok) {
+            return fail(`REFUND_FAILED:${refundResult.message}`, 502);
+          }
+          await db.query(
+            `UPDATE payment_transactions SET status = 'refunded', updated_at = NOW() WHERE order_id = $1 AND provider_txid = $2`,
+            [orderId, mpTx.provider_txid]
+          );
+        } else if (body.manualRefund !== true) {
+          return fail("MANUAL_REFUND_CONFIRMATION_REQUIRED", 400);
+        }
+
+        await db.query(`UPDATE orders SET status = 'refunded' WHERE id = $1`, [orderId]);
+        await cancelResellerCommissionsForOrder(db, orderId);
+        await logTeamAction(
+          db,
+          staffEmail ?? "desconhecido",
+          mpTx ? "order.refund_mercadopago" : "order.refund_manual",
+          `pedido #${orderId}`,
+          { reason, total: current.total }
+        );
+
+        if (notifyEmail) {
+          sendOrderStatusEmail(
+            { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
+            "refunded"
+          ).catch((err) => console.error(`Erro ao enviar email de reembolso para pedido #${orderId}:`, err));
+        }
+
+        return ok({ updated: true, emailSent: notifyEmail, refundedViaMercadoPago: !!mpTx });
+      }
+
+      // Defesa contra regressão: "paid" só é um destino válido vindo de
+      // pending_payment (branch acima, que passa por confirmOrderPayment).
+      // Qualquer outro "paid" direto (ex: current já é "delivered") cairia
+      // aqui e REBAIXARIA o pedido de volta — a UI nunca manda isso (o
+      // botão "Marcar como pago" só aparece em pending_payment), mas a API
+      // não pode depender só da UI pra não fazer isso.
+      if (newStatus === "paid" && current.status !== "pending_payment") {
+        return fail("INVALID_STATUS_TRANSITION", 409);
+      }
+
+      await db.query(`UPDATE orders SET status = $1 WHERE id = $2`, [newStatus, orderId]);
+
+      if (notifyEmail) {
+        // Disparado sem await — mesmo motivo das outras ações desta rota.
+        sendOrderStatusEmail(
+          { id: orderId, order_number: current.order_number, total: current.total, customer_email: current.customer_email, user_id: current.user_id, tracking_code: null, items: await fetchOrderEmailItems(db, orderId), reason },
+          newStatus as NotificationEvent
+        ).catch((err) => console.error(`Erro ao enviar email de status (${newStatus}) para pedido #${orderId}:`, err));
+      }
+
+      return ok({ updated: true, emailSent: notifyEmail });
     }
 
     return fail("INVALID_ACTION", 400);

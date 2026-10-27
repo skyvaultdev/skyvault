@@ -18,8 +18,8 @@ export async function GET(req: Request, { params }: RouteParams) {
     var keyColumn = target === "variation" ? "variation_id" : "product_id";
 
     const infoResult = await db.query(
-      `SELECT stock_type, stock_content, stock_count, is_unlimited 
-       FROM ${table} 
+      `SELECT stock_type, stock_content, stock_count, is_unlimited, key_validity_days
+       FROM ${table}
        WHERE id = $1`,
       [id]
     );
@@ -46,7 +46,8 @@ export async function GET(req: Request, { params }: RouteParams) {
       stock_content: info.stock_content || "",
       stock_count: Number(info.stock_count) || 0,
       is_unlimited: Boolean(info.is_unlimited),
-      keys: keys.map(k => k.key_content).join("\n") 
+      keys: keys.map(k => k.key_content).join("\n"),
+      key_validity_days: info.key_validity_days ?? null,
     });
 
   } catch (error) {

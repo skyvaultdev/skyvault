@@ -28,6 +28,7 @@ export default function StockEditPage() {
   const [stockType, setStockType] = useState<StockType>("key");
   const [stockContent, setStockContent] = useState("");
   const [keysInput, setKeysInput] = useState("");
+  const [keyValidityDays, setKeyValidityDays] = useState("");
   const [infiniteMessage, setInfiniteMessage] = useState("");
 
   const [stockCount, setStockCount] = useState(0);
@@ -70,6 +71,7 @@ export default function StockEditPage() {
     setIsInternalLoading(true);
 
     setKeysInput("");
+    setKeyValidityDays("");
     setStockContent("");
     setInfiniteMessage("");
     setStockCount(0);
@@ -99,6 +101,7 @@ export default function StockEditPage() {
         // "key" — era exatamente por isso que nenhuma chave nunca saía:
         // o textarea mostrava/salvava o campo errado).
         setKeysInput(data.keys || "");
+        setKeyValidityDays(data.key_validity_days ? String(data.key_validity_days) : "");
         setStockCount(data.keys ? data.keys.split("\n").filter((k: string) => k.trim()).length : 0);
       } else if (type === "file") {
         setStockContent(data.stock_content || "");
@@ -128,6 +131,7 @@ export default function StockEditPage() {
       formData.append("content", keysInput);
       formData.append("is_unlimited", "false");
       formData.append("ghost_stock", String(count));
+      if (keyValidityDays) formData.append("key_validity_days", keyValidityDays);
     }
 
     if (stockType === "file") {
@@ -254,6 +258,16 @@ export default function StockEditPage() {
                     onChange={(e) => setKeysInput(e.target.value)}
                     placeholder="Uma key por linha"
                   />
+                  <label className="fieldLabel">Validade da chave após a venda (dias, opcional)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="settingsInput"
+                    value={keyValidityDays}
+                    onChange={(e) => setKeyValidityDays(e.target.value)}
+                    placeholder="Deixe em branco se a chave não expira"
+                  />
+                  <small>Se preenchido, cada chave vendida vence esse número de dias depois da compra. Não há cobrança recorrente automática.</small>
                 </>
               )}
               {stockType === "file" && (

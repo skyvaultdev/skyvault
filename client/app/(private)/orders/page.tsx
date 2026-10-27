@@ -44,6 +44,7 @@ type OrderItem = {
   image_url: string | null;
   category_name: string | null;
   deliveredContent: string[] | null;
+  deliveredExpiresAt?: (string | null)[] | null;
 };
 
 type ShipmentEvent = {
@@ -507,7 +508,14 @@ export default function OrdersPage() {
                                   Baixar arquivo
                                 </button>
                               ) : (
-                                <code key={i}>{content}</code>
+                                <span key={i} className="deliveredKeyRow">
+                                  <code>{content}</code>
+                                  {item.deliveredExpiresAt?.[i] && (
+                                    <small className="deliveredKeyExpiry">
+                                      Válida até {new Date(item.deliveredExpiresAt[i]!).toLocaleDateString("pt-BR")}
+                                    </small>
+                                  )}
+                                </span>
                               )
                             )}
                           </div>

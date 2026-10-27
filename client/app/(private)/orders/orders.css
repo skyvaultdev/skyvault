@@ -442,6 +442,16 @@
   word-break: break-all;
 }
 
+.deliveredKeyRow {
+  display: grid;
+  gap: 2px;
+}
+
+.deliveredKeyExpiry {
+  color: #a1a1aa;
+  font-size: 11px;
+}
+
 .ordersDeliveredLink {
   border: none;
   background: none;

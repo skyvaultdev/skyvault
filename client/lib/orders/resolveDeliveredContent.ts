@@ -21,9 +21,9 @@ export async function resolveDeliveredContent(
   db: Pool,
   orderId: number,
   item: OrderItemRow
-): Promise<{ deliveredContent: string[] | null; deliveredFileSize: number | null }> {
+): Promise<{ deliveredContent: string[] | null; deliveredFileSize: number | null; deliveredExpiresAt: (string | null)[] | null }> {
   if (!item.delivered_at || item.product_type !== "digital") {
-    return { deliveredContent: null, deliveredFileSize: null };
+    return { deliveredContent: null, deliveredFileSize: null, deliveredExpiresAt: null };
   }
 
   const isVariation = item.variation_id != null;
@@ -32,11 +32,15 @@ export async function resolveDeliveredContent(
   if (targetId) {
     const keyColumn = isVariation ? "variation_id" : "product_id";
     const keysRes = await db.query(
-      `SELECT key_content FROM stock_keys WHERE order_id = $1 AND ${keyColumn} = $2`,
+      `SELECT key_content, expires_at FROM stock_keys WHERE order_id = $1 AND ${keyColumn} = $2`,
       [orderId, targetId]
     );
     if (keysRes.rows.length > 0) {
-      return { deliveredContent: keysRes.rows.map((r) => r.key_content), deliveredFileSize: null };
+      return {
+        deliveredContent: keysRes.rows.map((r) => r.key_content),
+        deliveredFileSize: null,
+        deliveredExpiresAt: keysRes.rows.map((r) => r.expires_at ?? null),
+      };
     }
   }
 
@@ -47,7 +51,7 @@ export async function resolveDeliveredContent(
     const deliveredFileSize = item.delivered_content.startsWith("/api/files/products/uploads/") && item.delivered_file_size != null
       ? Number(item.delivered_file_size)
       : null;
-    return { deliveredContent: [item.delivered_content], deliveredFileSize };
+    return { deliveredContent: [item.delivered_content], deliveredFileSize, deliveredExpiresAt: null };
   }
 
   if (targetId) {
@@ -55,12 +59,12 @@ export async function resolveDeliveredContent(
     const infoRes = await db.query(`SELECT stock_type, stock_content FROM ${table} WHERE id = $1`, [targetId]);
     const info = infoRes.rows[0];
     if (info?.stock_type === "file") {
-      return { deliveredContent: [`/api/files/products/uploads/${info.stock_content}`], deliveredFileSize: null };
+      return { deliveredContent: [`/api/files/products/uploads/${info.stock_content}`], deliveredFileSize: null, deliveredExpiresAt: null };
     }
     if (info) {
-      return { deliveredContent: [info.stock_content || "Entrega automática ativada"], deliveredFileSize: null };
+      return { deliveredContent: [info.stock_content || "Entrega automática ativada"], deliveredFileSize: null, deliveredExpiresAt: null };
     }
   }
 
-  return { deliveredContent: null, deliveredFileSize: null };
+  return { deliveredContent: null, deliveredFileSize: null, deliveredExpiresAt: null };
 }

@@ -19,6 +19,14 @@ export function getMailTransporter(): Transporter {
       pool: true,
       maxConnections: 3,
       maxMessages: 100,
+      // Sem isso, um SMTP lento/inacessível trava sendMail() por minutos
+      // (chegou a levar 2min em produção) — e como vários call sites
+      // esperavam essa promise antes de responder, a requisição HTTP
+      // inteira travava junto. 10s é generoso pro Gmail normal, mas corta
+      // rápido um SMTP fora do ar.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 10_000,
     });
   }
   return cachedTransporter;

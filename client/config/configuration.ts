@@ -36,6 +36,15 @@ export const config = {
         expiresIn: process.env.JWT_EXPIRES_IN!,
     },
 
+    // Segredo próprio pra chamadas internas servidor-a-servidor (hoje só
+    // middlewares/auth.middleware.ts -> POST /api/internal/sync-user).
+    // Antes isso reusava JWT_SECRET no header x-internal-secret — um valor
+    // que também assina/verifica todo cookie de sessão. Separar os dois
+    // significa que vazar um não compromete o outro.
+    internalApi: {
+        secret: process.env.INTERNAL_API_SECRET!,
+    },
+
     database: {
         host: process.env.DB_HOST!,
         user: process.env.DB_USER!,
@@ -72,5 +81,36 @@ export const config = {
     },
     shipping: {
         provider: process.env.SHIPPING_PROVIDER || "auto",
+    },
+    orders: {
+        // Depois de quantas horas sem pagamento um pedido pending_payment
+        // vira "expired" (ver lib/orders/expirePendingOrders.ts).
+        expirationHours: Number(process.env.ORDER_EXPIRATION_HOURS) || 24,
+        // Depois de quantas horas sem mudança um carrinho é considerado
+        // abandonado pra fins de e-mail de recuperação (ver
+        // lib/orders/sendAbandonedCartEmails.ts).
+        abandonedCartHours: Number(process.env.ABANDONED_CART_HOURS) || 24,
+    },
+    cron: {
+        // Protege POST /api/internal/cron/expire-orders — exigido no header
+        // x-cron-secret. Sem isso configurado, a rota recusa qualquer chamada.
+        secret: process.env.CRON_SECRET,
+    },
+
+    // Pixels de analytics/conversão — opcionais, cada loja configura os
+    // próprios IDs. Sem nenhum definido, nenhum script extra é carregado
+    // (ver app/(components)/analytics/AnalyticsScripts.tsx).
+    analytics: {
+        ga4MeasurementId: process.env.GA4_MEASUREMENT_ID || null,
+        metaPixelId: process.env.META_PIXEL_ID || null,
+    },
+
+    // Quem fornece a tecnologia (a plataforma, não a loja) — único lugar
+    // configurável pra esse nome/contato. O contrato da plataforma
+    // (app/(public)/termos-plataforma) e o rodapé da loja interpolam a
+    // partir daqui, nunca com o nome escrito fixo no texto.
+    platform: {
+        legalName: process.env.PLATFORM_LEGAL_NAME!,
+        contactEmail: process.env.PLATFORM_CONTACT_EMAIL!,
     },
 };

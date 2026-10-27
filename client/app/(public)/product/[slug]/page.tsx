@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getDB } from "@/lib/database/db";
-import { buildOgMetadata, absoluteUrl } from "@/lib/seo/buildMetadata";
+import { buildOgMetadata, absoluteUrl, serializeJsonLd } from "@/lib/seo/buildMetadata";
 import { getPublicProduct } from "@/lib/products/getPublicProduct";
 import ProductPageClient from "./ProductPageClient";
 
@@ -70,8 +70,7 @@ export default async function ProductPage({ params }: Params) {
 
   return (
     <>
-      {/* eslint-disable-next-line react/no-danger */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       <ProductPageClient initialProduct={product} />
     </>
   );

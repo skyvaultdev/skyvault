@@ -14,6 +14,21 @@ export function absoluteUrl(pathOrUrl: string): string {
   }
 }
 
+// JSON.stringify NÃO escapa "<", ">" nem "&" — um JSON-LD montado com
+// texto vindo do banco (nome/descrição de produto, editável por qualquer
+// staff com products.write) pode fechar a tag <script> cedo e injetar
+// outro <script> no meio, rodando no navegador de QUALQUER visitante da
+// página (XSS armazenado, sem precisar estar logado). </>/&
+// são sequências válidas dentro de uma string JSON e o parser de JSON-LD
+// as decodifica normalmente — só o HTML bruto que não as interpreta como
+// abertura/fechamento de tag.
+export function serializeJsonLd(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
 export function buildOgMetadata(params: {
   title: string;
   description: string;

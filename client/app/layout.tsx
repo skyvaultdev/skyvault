@@ -17,10 +17,14 @@ import { getDB } from "@/lib/database/db";
 import { notFound } from "next/navigation";
 import { requireStoreOr404 } from "@/lib/tenant/tenantContext";
 import { getSession } from "@/lib/jwt/session";
+import { config } from "@/config/configuration";
+import { buildOgMetadata } from "@/lib/seo/buildMetadata";
 
 import { resolvePattern } from "@/lib/pattern/patterns";
 import ChatWidgetGate from "./(components)/chat/ChatWidgetGate";
 import { ModalProvider } from "./(components)/modal/ModalProvider";
+import CookieConsentBanner from "./(components)/cookie-consent/CookieConsentBanner";
+import AnalyticsScripts from "./(components)/analytics/AnalyticsScripts";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -43,11 +47,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const result = await db.query(`SELECT store_name, logo_url FROM store_settings ORDER BY id DESC LIMIT 1`);
 
   const storeName = result.rows[0]?.store_name ?? "Minha Loja";
-  const logoUrl = result.rows[0]?.logo_url;
+  const logoUrl = result.rows[0]?.logo_url as string | null;
+  const description = `${storeName} — entrega automática e suporte rápido.`;
 
   return {
-    title: storeName,
-    description: ` ${storeName} Where your dreams come true! `,
+    metadataBase: new URL(config.WEBSITE_URL),
+    title: { default: storeName, template: `%s · ${storeName}` },
+    description,
     icons: logoUrl
       ? {
           icon: logoUrl,
@@ -55,6 +61,7 @@ export async function generateMetadata(): Promise<Metadata> {
           apple: logoUrl,
         }
       : undefined,
+    ...buildOgMetadata({ title: storeName, description, image: logoUrl, path: "/", siteName: storeName }),
   }
 }
 
@@ -72,7 +79,9 @@ export default async function RootLayout({
 
   const db = await getDB();
 
-  await db.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS background_solid_color TEXT`);
+  // background_solid_color agora é responsabilidade da migration
+  // db/migrations/2026-10-06_store_settings_background_solid_color.sql —
+  // isso rodava em TODA página carregada antes (ver auditoria no item 3).
   const result = await db.query(`
     SELECT
       primary_color,
@@ -81,7 +90,12 @@ export default async function RootLayout({
       background_img_url,
       background_css,
       background_solid_color,
-      store_name  
+      store_name,
+      legal_name,
+      document,
+      address,
+      contact_email,
+      contact_phone
     FROM store_settings
     ORDER BY id DESC
     LIMIT 1
@@ -192,10 +206,21 @@ export default async function RootLayout({
               {children}
             </main>
 
-            <Footer storeName={theme.store_name ?? "Minha Loja"} isLoggedIn={!!session} />
+            <Footer
+              storeName={theme.store_name ?? "Minha Loja"}
+              isLoggedIn={!!session}
+              legalName={theme.legal_name ?? null}
+              document={theme.document ?? null}
+              address={theme.address ?? null}
+              contactEmail={theme.contact_email ?? null}
+              contactPhone={theme.contact_phone ?? null}
+              platformName={config.platform.legalName}
+            />
           </div>
 
           <ChatWidgetGate isLoggedIn={!!session} />
+          <CookieConsentBanner />
+          <AnalyticsScripts ga4MeasurementId={config.analytics.ga4MeasurementId} metaPixelId={config.analytics.metaPixelId} />
 
           {backgroundCss && (
             <style

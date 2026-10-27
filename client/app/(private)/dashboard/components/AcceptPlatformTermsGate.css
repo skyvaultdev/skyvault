@@ -1,0 +1,62 @@
+.platformTermsGate {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.platformTermsGateCard {
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  background: #0f0f0f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 28px;
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.platformTermsGateTitle {
+  margin: 0;
+}
+
+.platformTermsGateScroll {
+  overflow-y: auto;
+  max-height: 55vh;
+  margin: 0;
+  padding: 24px;
+  border-radius: 12px;
+  background: #090909;
+}
+
+.platformTermsGateFiscalNotice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fde68a;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.legalCheckboxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.legalFieldError {
+  font-size: 12px;
+  color: #f87171;
+  margin: 0;
+}

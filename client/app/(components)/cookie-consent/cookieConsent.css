@@ -1,0 +1,47 @@
+.cookieConsentBanner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 15000;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  color: #d4d4d8;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.cookieConsentBanner p {
+  margin: 0;
+  flex: 1 1 260px;
+}
+
+.cookieConsentBanner a {
+  color: var(--secondary);
+  text-decoration: underline;
+}
+
+.cookieConsentBtn {
+  flex: 0 0 auto;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--secondary);
+  color: #0b0b0c;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.cookieConsentBtn:hover {
+  filter: brightness(1.05);
+}

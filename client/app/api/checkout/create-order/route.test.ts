@@ -257,3 +257,35 @@ describe("POST /api/checkout/create-order — aceite dos termos obrigatório", (
     expect(order.rows[0].terms_accepted_at).not.toBeNull();
   });
 });
+
+describe("POST /api/checkout/create-order — rate limit por cliente", () => {
+  let userId: number;
+  let email: string;
+
+  beforeAll(async () => {
+    ({ userId, email } = await createTestUser("ratelimit"));
+  });
+
+  afterAll(async () => {
+    const db = getDB();
+    await db.query(`DELETE FROM users WHERE id = $1`, [userId]);
+  });
+
+  afterEach(async () => {
+    const db = getDB();
+    await db.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = $1)`, [userId]);
+    await db.query(`DELETE FROM orders WHERE user_id = $1`, [userId]);
+  });
+
+  it("devolve 429 com Retry-After depois de 10 pedidos no mesmo minuto", async () => {
+    cookieValue = await signJWT({ email, sid: 1 });
+
+    let last: Response | undefined;
+    for (let i = 0; i < 11; i++) {
+      last = await POST(request());
+    }
+    expect(last!.status).toBe(429);
+    expect((await last!.json()).error).toBe("TOO_MANY_REQUESTS");
+    expect(last!.headers.get("Retry-After")).toBe("60");
+  });
+});

@@ -11,6 +11,7 @@ import { ensureOrderNumberColumn, generateUniqueOrderNumber } from "@/lib/orders
 import { getShippingProvider, type PackageInfo } from "@/lib/shipping";
 import { ensureResellerTables } from "@/lib/resellers/ensureResellerTables";
 import { REFERRAL_COOKIE_NAME } from "@/lib/resellers/referralCookie";
+import { rateLimit } from "@/lib/security/rateLimit";
 
 type ShippingChoice = {
   recipientName: string;
@@ -44,6 +45,16 @@ export async function POST(req: Request) {
   try {
     const { userId, denied } = await requireCustomer();
     if (denied) return denied;
+
+    // requireCustomer() já barra request anônima, então userId é sempre um
+    // número real aqui (sem precisar de fallback por IP) — mesmo padrão já
+    // usado em checkout/pay e checkout/quote-shipping. Sem isso, nada
+    // impedia um script criar dezenas de pedidos pending_payment em
+    // sequência (mitigado parcialmente pelo cron que expira pedidos
+    // velhos, mas ainda gera ruído no banco e nos relatórios de staff).
+    if (!rateLimit(`create-order:${userId}`, 10, 60_000)) {
+      return fail("TOO_MANY_REQUESTS", 429, { "Retry-After": "60" });
+    }
 
     const db = getDB();
 

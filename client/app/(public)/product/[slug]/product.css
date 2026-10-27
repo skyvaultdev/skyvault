@@ -200,6 +200,30 @@ html {
   white-space: pre-wrap;
 }
 
+.productDesc.collapsed {
+  max-height: 8.4em;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+}
+
+.descToggle {
+  align-self: start;
+  margin-top: -4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.descToggle:hover {
+  text-decoration: underline;
+}
+
 .variationBlock {
   display: grid;
   gap: 8px;
@@ -309,6 +333,31 @@ html {
   display: grid;
   gap: 10px;
   margin-top: 6px;
+}
+
+.wishlistBtn {
+  justify-self: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--secondary);
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.wishlistBtn:hover {
+  transform: translateY(-1px);
+  border-color: var(--secondary);
+}
+
+.wishlistBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btnPrimary{

@@ -11,6 +11,7 @@ type Coupon = {
   code: string;
   percent_off: number;
   usage_limit: number;
+  per_user_limit: number;
   min_order_value: number;
   expires_at: string;
   active: boolean;
@@ -24,6 +25,7 @@ const modal = useModal();
   const [code, setCode] = useState("");
   const [percentOff, setPercentOff] = useState("0");
   const [usageLimit, setUsageLimit] = useState("0");
+  const [perUserLimit, setPerUserLimit] = useState("0");
   const [minOrderValue, setMinOrderValue] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [active, setActive] = useState(true);
@@ -38,6 +40,7 @@ const modal = useModal();
       setCode(json.data.code);
       setPercentOff(String(json.data.percent_off));
       setUsageLimit(String(json.data.usage_limit));
+      setPerUserLimit(String(json.data.per_user_limit ?? 0));
       setMinOrderValue(json.data.min_order_value ? String(json.data.min_order_value) : "");
       setExpiresAt(json.data.expires_at ? json.data.expires_at.slice(0, 10) : null);
       setActive(Boolean(json.data.active));
@@ -77,6 +80,7 @@ const modal = useModal();
         code,
         percentOff,
         usageLimit,
+        perUserLimit,
         minOrderValue,
         expiresAt,
         active
@@ -115,6 +119,14 @@ const modal = useModal();
           onChange={(e) => setUsageLimit(e.target.value)}
           type="number"
           placeholder="LIMITE DE USO"
+        />
+
+        <input
+          className="coupon-input"
+          value={perUserLimit}
+          onChange={(e) => setPerUserLimit(e.target.value)}
+          type="number"
+          placeholder="LIMITE DE USO POR CLIENTE (0 = ilimitado)"
         />
 
         <input

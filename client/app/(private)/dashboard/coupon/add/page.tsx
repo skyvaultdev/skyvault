@@ -12,6 +12,7 @@ export default function AddCouponPage() {
   const [code, setCode] = useState("");
   const [percentOff, setPercentOff] = useState("");
   const [usageLimit, setUsageLimit] = useState("");
+  const [perUserLimit, setPerUserLimit] = useState("");
   const [minOrderValue, setMinOrderValue] = useState<number | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [active, setActive] = useState(true);
@@ -50,6 +51,7 @@ export default function AddCouponPage() {
           code,
           percentOff: percent,
           usageLimit: limit,
+          perUserLimit: perUserLimit === "" ? 0 : Number(perUserLimit),
           minOrderValue,
           active,
           expiresAt,
@@ -67,6 +69,7 @@ export default function AddCouponPage() {
       setCode("");
       setPercentOff("");
       setUsageLimit("");
+      setPerUserLimit("");
       setMinOrderValue(null);
       setExpiresAt(null);
       setActive(true);
@@ -108,6 +111,14 @@ export default function AddCouponPage() {
             value={usageLimit}
             onChange={(e) => setUsageLimit(e.target.value)}
             placeholder="LIMITE DE USO"
+          />
+          <input
+            className="coupon-input"
+            type="number"
+            min={0}
+            value={perUserLimit}
+            onChange={(e) => setPerUserLimit(e.target.value)}
+            placeholder="LIMITE DE USO POR CLIENTE (0 = ilimitado)"
           />
           <input
             className="coupon-input"

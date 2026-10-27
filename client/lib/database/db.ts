@@ -1,24 +1,20 @@
 "use server";
 
 import { Pool, PoolClient } from "pg";
-import { log } from "../logger";
 import { tenantPool } from "./tenantPool";
+import { getOrCreatePool } from "./pool";
 
 declare global {
-  var pgPool: Pool | undefined;
   var pgTenantPool: { raw: Pool; wrapped: Pool } | undefined;
 }
 
 export {};
 
 export function getDB(): Pool {
-  if (!global.pgPool) {
-    log.error("Database not initialized. Call initApp first.");
-    throw new Error("Database not initialized");
-  }
+  const pool = getOrCreatePool();
 
-  if (!global.pgTenantPool || global.pgTenantPool.raw !== global.pgPool) {
-    global.pgTenantPool = { raw: global.pgPool, wrapped: tenantPool(global.pgPool) };
+  if (!global.pgTenantPool || global.pgTenantPool.raw !== pool) {
+    global.pgTenantPool = { raw: pool, wrapped: tenantPool(pool) };
   }
   return global.pgTenantPool.wrapped;
 }

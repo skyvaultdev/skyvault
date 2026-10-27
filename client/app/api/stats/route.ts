@@ -2,6 +2,7 @@
 
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
+import { requirePermission } from "@/lib/auth/guard";
 
 const RANGE_DAYS: Record<string, number> = { "7d": 7, "30d": 30, "90d": 90 };
 
@@ -13,6 +14,9 @@ const PAID_STATUSES = "('paid', 'delivered')";
 
 export async function GET(req: Request) {
   try {
+    const { denied } = await requirePermission("dashboard.access");
+    if (denied) return denied;
+
     const { searchParams } = new URL(req.url);
     const rangeParam = searchParams.get("range") ?? "30d";
     const days = RANGE_DAYS[rangeParam] ?? 30;

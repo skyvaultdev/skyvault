@@ -172,6 +172,29 @@
   padding: 14px;
 }
 
+.legalInfoBanner {
+  /* .content é um grid de 2 colunas (mainArea | sidebar); sem isso o banner
+     cai na mesma linha do grid que .mainArea e o align-items:stretch padrão
+     do grid esticava o banner pra altura inteira da prévia da home. Span
+     nas duas colunas = vira sua própria linha, acima do conteúdo. */
+  grid-column: 1 / -1;
+  background: color-mix(in srgb, #f59e0b, #000 75%);
+  border: 1px solid color-mix(in srgb, #f59e0b, #000 30%);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #fde68a;
+  font-size: 13px;
+}
+
+.legalInfoBanner span { display: flex; align-items: center; gap: 8px; }
+
 .previewGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .previewCard { border: 1px solid #252525; border-radius: 10px; padding: 10px; display: grid; gap: 4px; }
 

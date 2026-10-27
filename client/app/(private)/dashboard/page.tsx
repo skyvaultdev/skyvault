@@ -7,7 +7,7 @@ import Sidebar, { type DashboardTab, type Permission } from "./components/Sideba
 import DashboardTabs from "./components/DashboardTabs";
 import ProductPreview from "./components/ProductPreview";
 import PermissionGuard from "./components/PermissionGuard";
-import HomePreview from "./components/HomePreview";
+import HomePreviewAccurate from "./components/HomePreviewAccurate";
 import StaffChatPanel from "./components/StaffChatPanel";
 import OrdersPanel from "./components/OrdersPanel";
 import ShippingCarriersPanel from "./components/ShippingCarriersPanel";
@@ -20,6 +20,10 @@ import QuestionsPanel from "./components/QuestionsPanel";
 import ReviewsPanel from "./components/ReviewsPanel";
 import TeamPanel from "./components/TeamPanel";
 import TemplatesPanel from "./components/TemplatesPanel";
+import LegalSettingsPanel from "./components/LegalSettingsPanel";
+import DataRequestsPanel from "./components/DataRequestsPanel";
+import AccountSecurityPanel from "./components/AccountSecurityPanel";
+import AcceptPlatformTermsGate from "./components/AcceptPlatformTermsGate";
 import "./components/categoryprev.css"
 import Icon from "@/components/icons/Icon";
 import CategoryPreview from "./components/CategoryPreview";
@@ -68,6 +72,9 @@ type StoreSettings = {
   backgroundSolidColor: string;
   logoUrl: string;
   storeName: string;
+  legalName: string;
+  document: string;
+  contactEmail: string;
 };
 
 type Admin = {
@@ -102,6 +109,9 @@ const TAB_PERMISSIONS: Record<DashboardTab, Permission> = {
   revendedores: "resellers.manage",
   templates: "store.customize",
   geral: "store.customize",
+  legal: "store.customize",
+  dataRequests: "users.manage",
+  seguranca: "dashboard.access",
 };
 
 const BG_PALETTE = ["#050505", "#0d0d12", "#111827", "#0f172a", "#1e1b4b", "#2e1065", "#3b0764", "#4a044e", "#450a0a", "#431407", "#052e16", "#022c22", "#083344", "#172554", "#1c1917", "#27272a", "#ffffff", "#f4f4f5"];
@@ -178,6 +188,9 @@ export default function Dashboard() {
     backgroundSolidColor: "#050505",
     logoUrl: "",
     storeName: "",
+    legalName: "",
+    document: "",
+    contactEmail: "",
   });
 
   const [homeData, setHomeData] = useState({
@@ -193,6 +206,7 @@ export default function Dashboard() {
   });
 
   const [loadingHomeData, setLoadingHomeData] = useState(false);
+  const [homePreviewRefreshKey, setHomePreviewRefreshKey] = useState(0);
   const [loadingCategoryData, setLoadingCategoryData] = useState(false);
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
   const [colorTarget, setColorTarget] = useState<"primary" | "secondary">("primary");
@@ -263,6 +277,7 @@ export default function Dashboard() {
 
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [questionsUnreadCount, setQuestionsUnreadCount] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   useEffect(() => {
     async function loadChatUnread() {
@@ -285,11 +300,23 @@ export default function Dashboard() {
         // ignora erro pontual
       }
     }
+    async function loadLowStockCount() {
+      try {
+        const res = await fetch("/api/admin/low-stock-count", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        setLowStockCount(Number(json.data?.count) || 0);
+      } catch {
+        // ignora erro pontual
+      }
+    }
     void loadQuestionsUnread();
     const questionsInterval = setInterval(loadQuestionsUnread, 20000);
     void loadChatUnread();
     const interval = setInterval(loadChatUnread, 8000);
-    return () => { clearInterval(interval); clearInterval(questionsInterval); };
+    void loadLowStockCount();
+    const lowStockInterval = setInterval(loadLowStockCount, 60000);
+    return () => { clearInterval(interval); clearInterval(questionsInterval); clearInterval(lowStockInterval); };
   }, []);
 
   const canEditMember = (currentRole: AdminRole | null, targetRole: string | undefined): boolean => {
@@ -561,6 +588,9 @@ export default function Dashboard() {
       backgroundSolidColor: String(data.background_solid_color ?? "#050505"),
       logoUrl: String(data.logo_url ?? ""),
       storeName: String(data.store_name ?? ""),
+      legalName: String(data.legal_name ?? ""),
+      document: String(data.document ?? ""),
+      contactEmail: String(data.contact_email ?? ""),
     };
 
     setStoreSettings(nextSettings);
@@ -869,6 +899,18 @@ export default function Dashboard() {
       return renderProtected("geral", <GeneralSettingsPanel />);
     }
 
+    if (selectedTab === "legal") {
+      return renderProtected("legal", <LegalSettingsPanel />);
+    }
+
+    if (selectedTab === "dataRequests") {
+      return renderProtected("dataRequests", <DataRequestsPanel />);
+    }
+
+    if (selectedTab === "seguranca") {
+      return renderProtected("seguranca", <AccountSecurityPanel />);
+    }
+
     if (selectedTab === "registrosEstoque") {
       return renderProtected("registrosEstoque", <StockMovementsPanel />);
     }
@@ -904,27 +946,10 @@ export default function Dashboard() {
         <section className="settingsPanel">
           <div className="previewHeader">
             <h3>Prévia da Home</h3>
-            <button className="btnhome" onClick={() => void loadHomeData()}>Atualizar Preview</button>
+            <button className="btnhome" onClick={() => setHomePreviewRefreshKey((k) => k + 1)}>Atualizar Preview</button>
           </div>
 
-          {loadingHomeData ? (
-            <div className="previewPlaceholder">Carregando visualização...</div>
-          ) : (
-            <div className="homePreviewWrapper">
-              <div className="browserToolbar"></div>
-              <div className="previewScrollContainer">
-                <div className="previewRealSize">
-                  <HomePreview
-                    banners={homeData.banners}
-                    categories={homeData.categories}
-                    highlights={homeData.highlights}
-                    sections={homeData.sections}
-                    isPreview={true}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+          <HomePreviewAccurate refreshKey={homePreviewRefreshKey} />
         </section>
       );
     }
@@ -1326,6 +1351,7 @@ export default function Dashboard() {
   };
 
   return (
+    <AcceptPlatformTermsGate>
     <div className="app">
       <header className="topbar">
         {loadingStats && <div>Carregando estatísticas...</div>}
@@ -1356,6 +1382,29 @@ export default function Dashboard() {
       </header>
 
       <main className="content">
+        {canAccess("estoque") && lowStockCount > 0 && (
+          <div className="legalInfoBanner">
+            <span>
+              <Icon name="alert" /> {lowStockCount} produto(s)/variação(ões) com estoque baixo.
+            </span>
+            <button type="button" className="btnSecondary" onClick={() => setSelectedTab("estoque")}>
+              Ver estoque
+            </button>
+          </div>
+        )}
+
+        {canAccess("legal") && (!storeSettings.legalName || !storeSettings.document || !storeSettings.contactEmail) && (
+          <div className="legalInfoBanner">
+            <span>
+              <Icon name="alert" /> Esta loja ainda não pode vender: faltam dados legais (nome/razão social, CPF/CNPJ
+              e e-mail de contato).
+            </span>
+            <button type="button" className="btnSecondary" onClick={() => setSelectedTab("legal")}>
+              Preencher agora
+            </button>
+          </div>
+        )}
+
         <section className="mainArea">
           <div className="dashboardBuilder">
             <Sidebar
@@ -1460,5 +1509,6 @@ export default function Dashboard() {
         </div>
       )}
     </div>
+    </AcceptPlatformTermsGate>
   );
 }

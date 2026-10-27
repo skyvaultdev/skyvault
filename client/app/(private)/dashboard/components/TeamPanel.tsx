@@ -20,6 +20,15 @@ const ACTION_LABELS: Record<string, string> = {
   "member.remove": "removeu o membro",
   "baseRole.update": "editou as permissões do cargo padrão",
   "baseRole.reset": "restaurou as permissões padrão do cargo",
+  "order.manual_confirm_payment": "confirmou pagamento manualmente do",
+  "order.refund_mercadopago": "reembolsou via Mercado Pago o",
+  "order.refund_manual": "marcou como reembolsado (manual) o",
+  "order.cancel": "cancelou o",
+  "coupon.create": "criou o cupom",
+  "coupon.update": "editou o cupom",
+  "coupon.delete": "excluiu o cupom",
+  "user.anonymize": "anonimizou o",
+  "user.data_request_dismiss": "arquivou a solicitação de dados do",
 };
 
 type Diff = { added?: string[]; removed?: string[] };

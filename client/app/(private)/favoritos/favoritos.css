@@ -1,0 +1,73 @@
+.favoritosPage {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 18px 60px;
+  color: #fff;
+}
+
+.favoritosHint {
+  color: #a1a1aa;
+  font-size: 14px;
+}
+
+.favoritosGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.favoritosCard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.favoritosCardLink {
+  color: inherit;
+  text-decoration: none;
+  display: grid;
+  gap: 6px;
+}
+
+.favoritosThumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.favoritosName {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.favoritosPrice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--secondary);
+}
+
+.favoritosInactive {
+  font-size: 11px;
+  color: #f87171;
+}
+
+.favoritosRemoveBtn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #a1a1aa;
+  font-size: 11px;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.favoritosRemoveBtn:hover {
+  color: #fff;
+  border-color: #fff;
+}

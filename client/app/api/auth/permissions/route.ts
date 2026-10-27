@@ -15,6 +15,12 @@ export async function GET() {
         }
 
         var payload = await verifyJWTForStore(token);
+        if (!payload) {
+            return NextResponse.json({
+                ok: false,
+                permissions: [],
+            });
+        }
         return NextResponse.json({
             ok: true,
             role: payload.role ?? null,

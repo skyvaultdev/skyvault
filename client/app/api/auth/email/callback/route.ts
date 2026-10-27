@@ -16,13 +16,15 @@ function hashCode(code: string) {
 }
 
 export async function POST(req: Request) {
-    const { email, code } = await req.json();
+    const body = await req.json();
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const code = body?.code;
 
     if (!email || !code) {
         return NextResponse.json({ error: "INVALID_DATA" }, { status: 400 });
     }
 
-    if (!rateLimit(`otp-verify:${String(email).toLowerCase()}`, 10, 10 * 60_000)) {
+    if (!rateLimit(`otp-verify:${email}`, 10, 10 * 60_000)) {
         return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429 });
     }
 

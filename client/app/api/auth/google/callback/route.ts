@@ -120,7 +120,7 @@ export async function GET(req: Request) {
                 color: 0x4285f4,
                 fields: [
                     { name: "Email", value: email, inline: false },
-                    { name: "IP", value: req.ip, inline: false },
+                    { name: "IP", value: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown", inline: false },
                     { name: "Username", value: user.username, inline: false },
                     { name: "Horário", value: new Date().toLocaleString(), inline: false }
                 ],

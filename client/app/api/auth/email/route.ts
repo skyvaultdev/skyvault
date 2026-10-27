@@ -1,15 +1,18 @@
 "use server";
 
 import { NextResponse } from "next/server";
-import { createHash } from "crypto";
+import { createHash, randomInt } from "crypto";
 import { getDB } from "@/lib/database/db";
 import { readFile } from "fs/promises";
 import path from "path";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { getMailTransporter } from "@/lib/mail/transporter";
 
+// Math.random() não é criptograficamente seguro — dava pra ter alguma
+// chance de prever o código. randomInt vem do módulo nativo "crypto"
+// (CSPRNG de verdade), mesmo padrão usado pros outros tokens do projeto.
 function generateCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 function hashCode(code: string) {
@@ -19,16 +22,17 @@ function hashCode(code: string) {
 export async function POST(req: Request) {
 
 
-  const { email } = await req.json();
+  const body = await req.json();
+  const email = String(body?.email ?? "").trim().toLowerCase();
 
-  if (!email || typeof email !== "string" || !email.includes("@")) {
+  if (!email || !email.includes("@")) {
     return NextResponse.json(
       { error: "INVALID_EMAIL" },
       { status: 400 }
     );
   }
 
-  if (!rateLimit(`otp-send:${email.toLowerCase()}`, 5, 10 * 60_000)) {
+  if (!rateLimit(`otp-send:${email}`, 5, 10 * 60_000)) {
     return NextResponse.json(
       { error: "TOO_MANY_REQUESTS" },
       { status: 429 }

@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { headers } from "next/headers";
 import { config } from "@/config/configuration";
+import { getOrCreatePool } from "@/lib/database/pool";
 
 // Qual loja (tenant) está atendendo a requisição atual.
 //
@@ -39,8 +40,7 @@ function isLocalOrIp(host: string): boolean {
 }
 
 async function queryStoreId(host: string): Promise<number | null> {
-  const pool = global.pgPool;
-  if (!pool) throw new Error("Database not initialized");
+  const pool = getOrCreatePool();
   const root = config.tenant.rootDomain;
   const sub = root && host.endsWith(`.${root}`) ? host.slice(0, -(root.length + 1)) : null;
   try {

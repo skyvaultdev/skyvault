@@ -44,6 +44,7 @@ export async function authMiddleware(req: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         "x-internal-secret": config.internalApi.secret,
+        "x-internal-orchestrator": config.internalApi.orchestratorToken ?? "",
       },
       body: JSON.stringify({ email: decrypted.email, sid: decrypted.sid }),
     }

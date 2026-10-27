@@ -1,18 +1,11 @@
 "use server";
 
-import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { config } from "@/config/configuration";
 import { runWithStore } from "@/lib/tenant/tenantContext";
 import { listActiveStoreIds } from "@/lib/tenant/listActiveStoreIds";
 import { sendAbandonedCartEmails } from "@/lib/orders/sendAbandonedCartEmails";
-
-function timingSafeEqualString(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
+import { timingSafeEqualString, verifyInternalOrchestratorHeader } from "@/lib/security/internalRequest";
 
 // Chamado por um agendador externo (ver README, seção "Cron jobs") pra
 // mandar um lembrete de carrinho abandonado. Mesmo segredo/padrão do
@@ -23,6 +16,9 @@ export async function POST(req: Request) {
   }
   const provided = req.headers.get("x-cron-secret");
   if (!provided || !timingSafeEqualString(provided, config.cron.secret)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  if (!verifyInternalOrchestratorHeader(req)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 

@@ -1,24 +1,11 @@
 "use server";
 
-import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { loadMemberContext } from "@/lib/team/team";
 import { config } from "@/config/configuration";
 import { runWithStore } from "@/lib/tenant/tenantContext";
-
-// Comparação de tempo constante — uma comparação normal (`!==`) sai mais
-// rápido quanto mais cedo os caracteres divergem, o que em teoria permite
-// um atacante deduzir o segredo certo byte a byte medindo a latência da
-// resposta. timingSafeEqual exige buffers do MESMO tamanho (senão lança
-// exceção), então o tamanho é conferido antes — vazar o COMPRIMENTO do
-// segredo não é um risco real aqui, só o conteúdo.
-function timingSafeEqualString(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
+import { timingSafeEqualString, verifyInternalOrchestratorHeader } from "@/lib/security/internalRequest";
 
 export async function POST(req: Request) {
   const body = await req.clone().json().catch(() => ({}));
@@ -29,6 +16,9 @@ export async function POST(req: Request) {
 async function handle(req: Request) {
   const secret = req.headers.get("x-internal-secret");
   if (!secret || !timingSafeEqualString(secret, config.internalApi.secret)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  if (!verifyInternalOrchestratorHeader(req)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 

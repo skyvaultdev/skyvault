@@ -43,6 +43,14 @@ export const config = {
     // significa que vazar um não compromete o outro.
     internalApi: {
         secret: process.env.INTERNAL_API_SECRET!,
+        // Segunda camada além do segredo específico de cada rota interna
+        // (internalApi.secret / cron.secret) — exigida em TODAS as rotas
+        // /api/internal/** via header x-internal-orchestrator. Não
+        // substitui bloquear essas rotas no proxy/reverse-proxy pra
+        // tráfego externo (a mitigação de rede continua sendo a correta
+        // quando existir um proxy na frente) — é defesa em camadas pro
+        // caso de um dos dois segredos vazar sozinho.
+        orchestratorToken: process.env.INTERNAL_ORCHESTRATOR_TOKEN,
     },
 
     database: {

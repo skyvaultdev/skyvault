@@ -1,0 +1,50 @@
+.twoFaChallengePage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.twoFaChallengeCard {
+  width: 100%;
+  max-width: 380px;
+  display: grid;
+  gap: 14px;
+  padding: 32px;
+  border-radius: 16px;
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  text-align: center;
+}
+
+.twoFaChallengeCard h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.twoFaChallengeHint {
+  margin: 0;
+  color: #a1a1aa;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.twoFaChallengeInput {
+  text-align: center;
+  font-size: 28px;
+  letter-spacing: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #0b0b0d;
+  color: #fff;
+}
+
+.twoFaChallengeError {
+  margin: 0;
+  color: #f87171;
+  font-size: 12.5px;
+}

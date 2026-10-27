@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
 async function handle(req: Request) {
   const secret = req.headers.get("x-internal-secret");
-  if (!secret || !timingSafeEqualString(secret, config.jwt.secret)) {
+  if (!secret || !timingSafeEqualString(secret, config.internalApi.secret)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
@@ -37,6 +37,7 @@ async function handle(req: Request) {
   const db = getDB();
   let role = "regular_citizen";
   let permissions: string[] = [];
+  let totpEnabled = false;
 
   // Permissões = cargo-base + cargos personalizados atribuídos (ver
   // lib/team/team.ts). Membro bloqueado perde tudo, igual antes.
@@ -44,6 +45,9 @@ async function handle(req: Request) {
   if (member && !member.blocked) {
     role = member.baseRole;
     permissions = Array.from(member.permissions).sort();
+
+    const totpRow = await db.query(`SELECT totp_enabled FROM admin WHERE email = $1`, [email]);
+    totpEnabled = !!totpRow.rows[0]?.totp_enabled;
   }
 
   // Loja suspensa pelos devs (ex: mensalidade em atraso) — ninguém do
@@ -54,5 +58,5 @@ async function handle(req: Request) {
     permissions = [];
   }
 
-  return NextResponse.json({ role, permissions });
+  return NextResponse.json({ role, permissions, totpEnabled });
 }

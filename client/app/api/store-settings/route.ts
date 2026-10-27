@@ -69,11 +69,18 @@ export async function GET() {
 
     // Rota PÚBLICA (tema, logo, checkout, página de produto): lista só as
     // colunas que o site precisa. `SELECT *` vazaria também colunas
-    // internas (ex: chat_encryption_key, suspended, origin_cep).
+    // internas (ex: chat_encryption_key, suspended, origin_cep). Os 5
+    // campos legais aqui são pequenos e PRECISAM ser públicos (aparecem no
+    // rodapé da loja) — os 3 textos grandes de política (privacy_policy,
+    // returns_policy, store_terms) ficam de fora: as páginas que os
+    // exibem leem o banco direto (app/(public)/_legal/loadStoreLegalInfo.ts),
+    // sem passar por aqui, pra essa rota (chamada em toda página) não
+    // carregar um texto grande sem precisar dele.
     const result = await db.query(`
       SELECT id, primary_color, secondary_color, store_name, logo_url,
              background_style, background_img_url, background_css, background_solid_color,
              accepts_pix, accepts_credit_card, accepts_debit_card, accepts_boleto,
+             legal_name, document, address, contact_email, contact_phone,
              updated_at
       FROM store_settings
       ORDER BY id DESC

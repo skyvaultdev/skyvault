@@ -146,4 +146,51 @@ describe("GET/POST /api/auth/2fa/setup", () => {
       await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
     }
   });
+
+  it("POST recusa reenvio do MESMO código já usado pra confirmar (replay)", async () => {
+    const email = await createAdmin("post-replay");
+    try {
+      cookieValue = await signJWT({ email, sid: 1, permissions: ["dashboard.access"] });
+      const setupRes = await GET();
+      const setupJson = await setupRes.json();
+      const code = codeFor(setupJson.data.secret);
+
+      const confirmRequest = () => new Request("https://example.com/api/auth/2fa/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      const first = await POST(confirmRequest());
+      expect((await first.json()).ok).toBe(true);
+
+      const second = await POST(confirmRequest());
+      const secondJson = await second.json();
+      expect(second.status).toBe(400);
+      expect(secondJson.error).toBe("CODE_ALREADY_USED");
+    } finally {
+      await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
+    }
+  });
+
+  it("POST devolve 429 com Retry-After depois de estourar o limite de tentativas", async () => {
+    const email = await createAdmin("post-ratelimit");
+    try {
+      cookieValue = await signJWT({ email, sid: 1, permissions: ["dashboard.access"] });
+      await GET();
+
+      let last: Response | undefined;
+      for (let i = 0; i < 6; i++) {
+        last = await POST(new Request("https://example.com/api/auth/2fa/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: "000000" }),
+        }));
+      }
+      expect(last!.status).toBe(429);
+      expect(last!.headers.get("Retry-After")).toBe("300");
+    } finally {
+      await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
+    }
+  });
 });

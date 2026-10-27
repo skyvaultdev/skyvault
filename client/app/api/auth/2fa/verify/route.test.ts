@@ -126,4 +126,40 @@ describe("POST /api/auth/2fa/verify", () => {
       await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
     }
   });
+
+  it("recusa reenvio do MESMO código já aceito (replay) mesmo ainda dentro da janela de tolerância", async () => {
+    const email = await createEnabledAdmin("replay");
+    try {
+      cookieValue = await signJWT({ email, sid: 1, role: "editor", permissions: ["dashboard.access"] });
+      const code = codeFor(SECRET);
+
+      const first = await POST(verifyRequest(code));
+      expect((await first.json()).ok).toBe(true);
+
+      const second = await POST(verifyRequest(code));
+      const secondJson = await second.json();
+      expect(second.status).toBe(400);
+      expect(secondJson.error).toBe("CODE_ALREADY_USED");
+      expect(second.headers.get("set-cookie")).toBeNull();
+    } finally {
+      await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
+    }
+  });
+
+  it("devolve 429 com Retry-After depois de estourar o limite de tentativas", async () => {
+    const email = await createEnabledAdmin("ratelimit");
+    try {
+      cookieValue = await signJWT({ email, sid: 1, role: "editor", permissions: ["dashboard.access"] });
+
+      let last: Response | undefined;
+      for (let i = 0; i < 6; i++) {
+        last = await POST(verifyRequest("000000"));
+      }
+      expect(last!.status).toBe(429);
+      expect((await last!.json()).error).toBe("TOO_MANY_REQUESTS");
+      expect(last!.headers.get("Retry-After")).toBe("300");
+    } finally {
+      await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
+    }
+  });
 });

@@ -115,4 +115,20 @@ describe("POST /api/auth/2fa/disable", () => {
       await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
     }
   });
+
+  it("devolve 429 com Retry-After depois de estourar o limite de tentativas", async () => {
+    const email = await createEnabledAdmin("ratelimit");
+    try {
+      cookieValue = await signJWT({ email, sid: 1, permissions: ["dashboard.access"] });
+
+      let last: Response | undefined;
+      for (let i = 0; i < 6; i++) {
+        last = await POST(disableRequest("000000"));
+      }
+      expect(last!.status).toBe(429);
+      expect(last!.headers.get("Retry-After")).toBe("300");
+    } finally {
+      await getDB().query(`DELETE FROM admin WHERE email = $1`, [email]);
+    }
+  });
 });

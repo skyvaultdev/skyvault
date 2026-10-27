@@ -73,9 +73,14 @@ function hotp(secret: Buffer, counter: number): string {
 // `window` = quantos passos de 30s pra cada lado aceitar, pra tolerar
 // relógio do celular levemente dessincronizado — sem isso, um código
 // "certo" falha com muita frequência na prática.
-export function verifyTotpCode(secret: string, code: string, window = 1): boolean {
+//
+// Devolve o NÚMERO do passo que casou (não só true/false) pra quem chama
+// poder recusar replay: guardar esse número e rejeitar qualquer código
+// futuro cujo passo seja <= o último aceito (ver totp_last_step em
+// app/api/auth/2fa/*). null = nenhum passo da janela casou.
+export function verifyTotpStep(secret: string, code: string, window = 1): number | null {
   const cleanCode = code.replace(/\D/g, "");
-  if (cleanCode.length !== DIGITS) return false;
+  if (cleanCode.length !== DIGITS) return null;
 
   const secretBuffer = base32Decode(secret);
   const counter = Math.floor(Date.now() / 1000 / STEP_SECONDS);
@@ -83,8 +88,12 @@ export function verifyTotpCode(secret: string, code: string, window = 1): boolea
   for (let errorWindow = -window; errorWindow <= window; errorWindow++) {
     const candidate = hotp(secretBuffer, counter + errorWindow);
     if (crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(cleanCode))) {
-      return true;
+      return counter + errorWindow;
     }
   }
-  return false;
+  return null;
+}
+
+export function verifyTotpCode(secret: string, code: string, window = 1): boolean {
+  return verifyTotpStep(secret, code, window) !== null;
 }

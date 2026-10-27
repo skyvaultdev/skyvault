@@ -79,20 +79,34 @@ export async function PUT(req: NextRequest) {
 
     var body = await req.json();
     var product_id = Number(body.product_id);
-    var variation_id = body.variation_id ? Number(body.variation_id) : null;
+    var variation_id = body.variation_id != null ? Number(body.variation_id) : null;
     var quantityToAdd = Number(body.quantity ?? 1);
 
-    if (!product_id || quantityToAdd <= 0) return fail("INVALID_DATA", 400);
-    var stockCheckQuery = variation_id
-      ? `SELECT stock_count, is_unlimited FROM product_variations WHERE id = $1 AND product_id = $2`
-      : `SELECT stock_count, is_unlimited FROM products WHERE id = $1`;
+    if (!product_id || !Number.isInteger(quantityToAdd) || quantityToAdd <= 0) return fail("INVALID_DATA", 400);
+    if (variation_id !== null && !Number.isInteger(variation_id)) return fail("INVALID_DATA", 400);
 
-    var stockParams = variation_id ? [variation_id, product_id] : [product_id];
-    const { rows: stockData } = await db.query(stockCheckQuery, stockParams);
+    const { rows: productRows } = await db.query(`SELECT active, stock_count, is_unlimited FROM products WHERE id = $1`, [product_id]);
+    if (productRows.length === 0 || !productRows[0].active) return fail("PRODUCT_NOT_FOUND", 404);
 
-    if (stockData.length === 0) return fail("PRODUCT_NOT_FOUND", 404);
+    // Produto com variações cadastradas não pode ser comprado pelo preço
+    // base "por fora" — tem que escolher uma delas (mesma regra de
+    // create-order, só que travada já aqui, antes de chegar no carrinho).
+    const { rows: variationRows } = await db.query(
+      `SELECT id, stock_count, is_unlimited FROM product_variations WHERE product_id = $1`,
+      [product_id]
+    );
 
-    const item = stockData[0];
+    let item: { stock_count: number; is_unlimited: boolean };
+    if (variationRows.length > 0) {
+      if (variation_id === null) return fail("VARIATION_REQUIRED", 400);
+      const match = variationRows.find((r) => Number(r.id) === variation_id);
+      if (!match) return fail("INVALID_VARIATION", 400);
+      item = match;
+    } else {
+      if (variation_id !== null) return fail("INVALID_VARIATION", 400);
+      item = productRows[0];
+    }
+
     if (!item.is_unlimited && item.stock_count < quantityToAdd) {
       return fail("OUT_OF_STOCK", 400);
     }

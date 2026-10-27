@@ -68,7 +68,7 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
     // pagou, então isso nunca bloqueia a entrega, só avisa pro staff.
     if (order.coupon_id) {
       const couponRes = await client.query(
-        `SELECT usage_limit, used_count FROM coupons WHERE id = $1 FOR UPDATE`,
+        `SELECT usage_limit, used_count, per_user_limit FROM coupons WHERE id = $1 FOR UPDATE`,
         [order.coupon_id]
       );
       const coupon = couponRes.rows[0];
@@ -79,6 +79,31 @@ export async function confirmOrderPayment(orderId: number): Promise<ConfirmOrder
             `(${coupon.used_count}/${coupon.usage_limit}) quando o pagamento confirmou — contando mesmo assim, o desconto já foi aplicado.`
           );
         }
+
+        // Reforço do limite "por cliente" — create-order já tranca isso com
+        // advisory lock na criação (ver app/api/checkout/create-order), mas
+        // dois pedidos PENDENTES com o mesmo cupom podem ter sido criados
+        // antes dessa trava existir (pedidos antigos) ou por algum caminho
+        // que não passa por lá. Mesmo princípio do aviso de usage_limit
+        // acima: nunca bloqueia a entrega (o cliente já pagou), só avisa.
+        const perUserLimit = Number(coupon.per_user_limit ?? 0);
+        if (perUserLimit > 0) {
+          const usedByUserRes = await client.query(
+            `SELECT COUNT(*) AS n FROM orders
+             WHERE coupon_id = $1 AND user_id = $2 AND id != $3
+               AND status NOT IN ('pending_payment', 'cancelled', 'expired')`,
+            [order.coupon_id, order.user_id, orderId]
+          );
+          const usedByUser = Number(usedByUserRes.rows[0]?.n ?? 0);
+          if (usedByUser >= perUserLimit) {
+            console.warn(
+              `[confirmOrderPayment] pedido #${orderId}: cliente ${order.user_id} já tinha atingido o limite por cliente ` +
+              `do cupom ${order.coupon_id} (${usedByUser}/${perUserLimit} outros pedidos pagos) quando este pagamento confirmou ` +
+              `— contando mesmo assim, o desconto já foi aplicado.`
+            );
+          }
+        }
+
         await client.query(`UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`, [order.coupon_id]);
       }
     }

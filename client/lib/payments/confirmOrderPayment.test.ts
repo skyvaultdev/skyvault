@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { initApp } from "@/lib/database/init";
 import { getDB } from "@/lib/database/db";
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
@@ -593,6 +593,31 @@ describe("confirmOrderPayment — cupom: used_count só incrementa na confirmaç
     } finally {
       await cleanupOrder(db, orderId);
       await db.query(`UPDATE coupons SET used_count = 0 WHERE id = $1`, [couponId]);
+    }
+  });
+
+  it("avisa (console.warn) mas NÃO bloqueia a entrega quando o pagamento confirma excedendo o limite por cliente", async () => {
+    const db = getDB();
+    await db.query(`UPDATE coupons SET per_user_limit = 1 WHERE id = $1`, [couponId]);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const firstOrderId = await createOrderWithCoupon(db, 1);
+    const secondOrderId = await createOrderWithCoupon(db, 1);
+    try {
+      const firstResult = await confirmOrderPayment(firstOrderId);
+      expect(firstResult.order.status).toBe("delivered");
+
+      warnSpy.mockClear();
+      const secondResult = await confirmOrderPayment(secondOrderId);
+      // Cliente já pagou o segundo pedido com desconto — não pode ficar
+      // sem receber só porque excedeu o limite por cliente nesse meio-tempo.
+      expect(secondResult.order.status).toBe("delivered");
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("limite por cliente"));
+    } finally {
+      warnSpy.mockRestore();
+      await cleanupOrder(db, firstOrderId);
+      await cleanupOrder(db, secondOrderId);
+      await db.query(`UPDATE coupons SET per_user_limit = 0, used_count = 0 WHERE id = $1`, [couponId]);
     }
   });
 });

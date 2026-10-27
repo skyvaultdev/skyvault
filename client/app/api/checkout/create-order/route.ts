@@ -28,6 +28,12 @@ type ShippingChoice = {
   etaDays: number;
 };
 
+// Lançado dentro da transação quando a re-checagem do limite "por cliente"
+// do cupom (com advisory lock) falha — precisa de um tipo próprio pra o
+// catch de fora distinguir isso de um erro genérico e devolver 400 em vez
+// de 500 (ver confirmOrderPayment.ts e create-order mais abaixo).
+class CouponUserLimitError extends Error {}
+
 // Só monta o pedido — NÃO cobra ainda. A cobrança de verdade acontece em
 // /api/checkout/pay/[orderId], depois que o cliente escolhe o método no
 // Payment Brick (Pix/cartão/boleto). Separar os dois passos evita ter que
@@ -176,6 +182,7 @@ export async function POST(req: Request) {
     // automático não se empilham: usa o que for melhor pro cliente, pra
     // não ter desconto somado sem limite nenhum.
     let coupon: { id: number; code: string; percentOff: number } | null = null;
+    let couponPerUserLimit = 0;
     const couponCode = String(body?.couponCode ?? "").trim().toUpperCase();
     if (couponCode) {
       const couponRes = await db.query(
@@ -193,14 +200,18 @@ export async function POST(req: Request) {
       // Limite por cliente, além do limite global (já filtrado acima) —
       // conta só pedidos que chegaram a pagar de verdade (used_count
       // também só incrementa na confirmação de pagamento, nunca aqui).
-      const perUserLimit = Number(row.per_user_limit ?? 0);
-      if (perUserLimit > 0) {
+      // Esse check aqui é só uma saída rápida (fora de transação, pode
+      // sofrer corrida entre duas requisições simultâneas) — a checagem
+      // que realmente fecha a corrida acontece de novo dentro da
+      // transação, com advisory lock, logo abaixo.
+      couponPerUserLimit = Number(row.per_user_limit ?? 0);
+      if (couponPerUserLimit > 0) {
         const usedByUserRes = await db.query(
           `SELECT COUNT(*) AS n FROM orders
            WHERE coupon_id = $1 AND user_id = $2 AND status NOT IN ('pending_payment', 'cancelled', 'expired')`,
           [row.id, userId]
         );
-        if (Number(usedByUserRes.rows[0]?.n ?? 0) >= perUserLimit) {
+        if (Number(usedByUserRes.rows[0]?.n ?? 0) >= couponPerUserLimit) {
           return fail("COUPON_USER_LIMIT_REACHED", 400);
         }
       }
@@ -238,6 +249,26 @@ export async function POST(req: Request) {
 
     const { orderId, orderNumber: newOrderNumber } = await withTransaction(async (client) => {
       const orderNumber = await generateUniqueOrderNumber(client);
+
+      // Fecha a corrida do limite "por cliente": pg_advisory_xact_lock
+      // serializa duas criações concorrentes do MESMO usuário+cupom (a
+      // segunda espera a primeira COMMITAR antes de contar) — sem isso,
+      // duas requisições simultâneas contam 0 pedidos qualificados cada
+      // uma (nenhum dos dois pedidos existe ainda nesse instante) e as
+      // duas passam, driblando um cupom "1 por cliente". O lock é
+      // liberado sozinho no fim da transação (xact = scoped à transação).
+      if (appliedCouponId && couponPerUserLimit > 0) {
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`coupon-user:${userId}:${appliedCouponId}`]);
+        const recheck = await client.query(
+          `SELECT COUNT(*) AS n FROM orders
+           WHERE coupon_id = $1 AND user_id = $2 AND status NOT IN ('pending_payment', 'cancelled', 'expired')`,
+          [appliedCouponId, userId]
+        );
+        if (Number(recheck.rows[0]?.n ?? 0) >= couponPerUserLimit) {
+          throw new CouponUserLimitError();
+        }
+      }
+
       let shippingAddressId: number | null = null;
 
       if (shipping) {
@@ -300,6 +331,9 @@ export async function POST(req: Request) {
       201
     );
   } catch (error) {
+    if (error instanceof CouponUserLimitError) {
+      return fail("COUPON_USER_LIMIT_REACHED", 400);
+    }
     console.error("Erro ao criar pedido:", error);
     return fail("CHECKOUT_INTERNAL_ERROR", 500);
   }

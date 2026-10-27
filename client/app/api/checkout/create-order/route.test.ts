@@ -167,6 +167,25 @@ describe("POST /api/checkout/create-order — cupom: limite por cliente e used_c
     expect(json.error).toBe("COUPON_USER_LIMIT_REACHED");
   });
 
+  it("com o cliente já no limite, N requisições CONCORRENTES pro mesmo cupom são todas recusadas (advisory lock fecha a corrida)", async () => {
+    const db = getDB();
+    await db.query(
+      `INSERT INTO orders (user_id, status, subtotal, total, coupon_id) VALUES ($1, 'paid', 50, 45, $2)`,
+      [userId, couponId]
+    );
+    cookieValue = await signJWT({ email, sid: 1 });
+    await db.query(`INSERT INTO cart_items (user_id, product_id, quantity) VALUES ($1, $2, 1)`, [userId, productId]);
+
+    const CONCURRENT = 5;
+    // Todas as N chamadas disparadas ao mesmo tempo, não em sequência —
+    // é exatamente o cenário do item 5 do plano: duas (ou mais) abas/scripts
+    // tentando criar pedido com o mesmo cupom ao mesmo tempo.
+    const responses = await Promise.all(Array.from({ length: CONCURRENT }, () => POST(request({ couponCode }))));
+    const statuses = responses.map((r) => r.status);
+
+    expect(statuses.every((s) => s === 400)).toBe(true);
+  });
+
   it("não conta pedido pending_payment/cancelado contra o limite por cliente", async () => {
     const db = getDB();
     await db.query(

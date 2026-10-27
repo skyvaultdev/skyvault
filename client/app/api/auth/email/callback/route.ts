@@ -7,6 +7,7 @@ import { createHash } from "crypto";
 import { getDB } from "@/lib/database/db";
 import { config } from "@/config/configuration"
 import { signJWT, verifyJWT } from "@/lib/jwt/init";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
 import { rateLimit } from "@/lib/security/rateLimit";
 type Role = keyof typeof ROLES
@@ -71,14 +72,6 @@ export async function POST(req: Request) {
     });
 
     const res = NextResponse.json({ ok: true });
-
-    res.cookies.set("auth_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-    });
-
+    setAuthCookie(res, token);
     return res;
 }

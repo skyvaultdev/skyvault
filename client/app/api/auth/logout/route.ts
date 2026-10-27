@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-
-  res.cookies.set("auth_token", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 0,
-  });
-
+  setAuthCookie(res, "", 0);
   return res;
 }

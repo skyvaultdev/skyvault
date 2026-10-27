@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { requireSession } from "@/lib/auth/guard";
 import { signJWT } from "@/lib/jwt/init";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 import { verifyTotpStep } from "@/lib/auth/totp";
 import { rateLimit } from "@/lib/security/rateLimit";
 
@@ -60,12 +61,6 @@ export async function POST(req: Request) {
   });
 
   const response = NextResponse.json({ ok: true, data: { verified: true } });
-  response.cookies.set("auth_token", newToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  setAuthCookie(response, newToken);
   return response;
 }

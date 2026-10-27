@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { config } from "@/config/configuration";
 import { getDB } from "@/lib/database/db";
 import { signJWT } from "@/lib/jwt/init";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
 import { encryptToken } from "@/lib/security/tokenCrypto";
 const discord = config.discord;
@@ -144,13 +145,7 @@ export async function GET(req: Request) {
     });
 
     const res = NextResponse.redirect(config.WEBSITE_URL);
-    res.cookies.set("auth_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-    });
+    setAuthCookie(res, token);
     res.cookies.delete("oauth_state");
 
     return res;

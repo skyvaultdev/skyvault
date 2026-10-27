@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJWT, signJWT } from "@/lib/jwt/init";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 import { isPrivateRoute, isStaffOnlyRoute } from "./routeMap";
 import { config } from "@/config/configuration";
 
@@ -63,13 +64,7 @@ export async function authMiddleware(req: NextRequest) {
       twoFaVerifiedAt: decrypted.twoFaVerifiedAt,
     });
 
-    response.cookies.set("auth_token", newToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    setAuthCookie(response, newToken);
   }
 
   // Chegou até aqui só é possível numa rota staff-only (early return acima

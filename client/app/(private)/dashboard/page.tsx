@@ -68,7 +68,6 @@ type StoreSettings = {
   secondaryColor: string;
   backgroundType: BackgroundType;
   backgroundImageUrl: string;
-  backgroundCss: string;
   backgroundSolidColor: string;
   logoUrl: string;
   storeName: string;
@@ -184,7 +183,6 @@ export default function Dashboard() {
     secondaryColor: "#6400ff",
     backgroundType: "none",
     backgroundImageUrl: "",
-    backgroundCss: "",
     backgroundSolidColor: "#050505",
     logoUrl: "",
     storeName: "",
@@ -584,7 +582,6 @@ export default function Dashboard() {
       secondaryColor: String(data.secondary_color ?? "#6400ff"),
       backgroundType: (data.background_style ?? "heroicons") as BackgroundType,
       backgroundImageUrl: String(data.background_img_url ?? ""),
-      backgroundCss: String(data.background_css ?? ""),
       backgroundSolidColor: String(data.background_solid_color ?? "#050505"),
       logoUrl: String(data.logo_url ?? ""),
       storeName: String(data.store_name ?? ""),
@@ -599,14 +596,6 @@ export default function Dashboard() {
     root.style.setProperty("--primary", nextSettings.primaryColor);
     root.style.setProperty("--secondary", nextSettings.secondaryColor);
     root.style.setProperty("--background-image", nextSettings.backgroundImageUrl ? `url(${nextSettings.backgroundImageUrl})` : "none");
-
-    let styleTag = document.getElementById("dynamic-bg-style") as HTMLStyleElement | null;
-    if (!styleTag) {
-      styleTag = document.createElement("style");
-      styleTag.id = "dynamic-bg-style";
-      document.head.appendChild(styleTag);
-    }
-    styleTag.textContent = nextSettings.backgroundCss || "";
   }, []);
 
   useEffect(() => {
@@ -757,7 +746,6 @@ export default function Dashboard() {
     const formData = new FormData();
     if (removeImage) formData.append("removeBackgroundImage", "1");
     formData.append("backgroundStyle", storeSettings.backgroundType);
-    formData.append("backgroundCss", storeSettings.backgroundCss);
     formData.append("backgroundSolidColor", storeSettings.backgroundSolidColor);
 
     const fileToSend = removeImage ? null : fileOverride !== undefined ? fileOverride : backgroundImageFile;
@@ -929,7 +917,6 @@ export default function Dashboard() {
           onSaveColors={saveColors}
           storeSettings={storeSettings}
           onBackgroundTypeChange={(type) => setStoreSettings((p) => ({ ...p, backgroundType: type }))}
-          onBackgroundCssChange={(css) => setStoreSettings((p) => ({ ...p, backgroundCss: css }))}
           onBackgroundImageChange={setBackgroundImageFile}
           onSaveBackground={saveBackground}
           onDragStart={setDraggedProductId}

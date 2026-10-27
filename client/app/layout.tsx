@@ -88,7 +88,6 @@ export default async function RootLayout({
       secondary_color,
       background_style,
       background_img_url,
-      background_css,
       background_solid_color,
       store_name,
       legal_name,
@@ -114,9 +113,6 @@ export default async function RootLayout({
 
   var backgroundImg =
     theme.background_img_url ?? null;
-
-  var backgroundCss =
-    theme.background_css ?? null;
 
   var bgStyle =
     getBackgroundStyle(backgroundType, secondary, theme.background_solid_color);
@@ -221,14 +217,6 @@ export default async function RootLayout({
           <ChatWidgetGate isLoggedIn={!!session} />
           <CookieConsentBanner />
           <AnalyticsScripts ga4MeasurementId={config.analytics.ga4MeasurementId} metaPixelId={config.analytics.metaPixelId} />
-
-          {backgroundCss && (
-            <style
-              dangerouslySetInnerHTML={{
-                __html: backgroundCss,
-              }}
-            />
-          )}
         </ModalProvider>
       </body>
     </html>

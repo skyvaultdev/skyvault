@@ -92,11 +92,12 @@ export async function POST(_req: Request, { params }: Params) {
       console.error(`[check-payment] pedido #${orderId}: ATENÇÃO — pagamento confirmado com estoque insuficiente:`, result.stockShortages);
     }
     if (!result.alreadyProcessed && result.deliveredItems.length > 0 && result.customerEmail) {
-      try {
-        await sendOrderDeliveryEmail({ to: result.customerEmail, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems });
-      } catch (mailError) {
-        console.error("Falha ao enviar e-mail de entrega:", mailError);
-      }
+      // Disparado sem await — essa rota é chamada por polling a cada 4s;
+      // esperar o SMTP aqui travaria a resposta e, no limite, a própria
+      // tela de espera do cliente.
+      sendOrderDeliveryEmail({ to: result.customerEmail, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems }).catch(
+        (mailError) => console.error("Falha ao enviar e-mail de entrega:", mailError)
+      );
     }
 
     return NextResponse.json({ data: { status: result.order.status } });

@@ -41,15 +41,25 @@ export async function POST(req: Request) {
 
     const db = getDB();
 
-    const storeStatusRes = await db.query(`SELECT suspended FROM store_settings ORDER BY id DESC LIMIT 1`);
+    const storeStatusRes = await db.query(
+      `SELECT suspended, legal_name, document, contact_email FROM store_settings ORDER BY id DESC LIMIT 1`
+    );
     if (storeStatusRes.rows[0]?.suspended) {
       return fail("STORE_SUSPENDED", 503);
+    }
+
+    // A loja só pode vender com os dados legais mínimos preenchidos (item
+    // 8) — sem isso, não tem como identificar o responsável pela venda
+    // nem o contato de atendimento publicado no rodapé/políticas.
+    const legalInfo = storeStatusRes.rows[0];
+    if (!legalInfo?.legal_name || !legalInfo?.document || !legalInfo?.contact_email) {
+      return fail("STORE_LEGAL_INFO_MISSING", 409);
     }
 
     const cartRes = await db.query(
       `SELECT
          c.id AS cart_item_id, c.quantity,
-         p.id AS product_id, p.name AS product_name, p.product_type,
+         p.id AS product_id, p.name AS product_name, p.product_type, p.active,
          v.id AS variation_id, v.name AS variation_name,
          COALESCE(v.price, p.price) AS unit_price,
          COALESCE(v.stock_count, p.stock_count) AS stock_count,
@@ -68,6 +78,9 @@ export async function POST(req: Request) {
     if (cartRes.rows.length === 0) return fail("EMPTY_CART", 400);
 
     for (const row of cartRes.rows) {
+      if (!row.active) {
+        return fail(`PRODUCT_UNAVAILABLE:${row.product_name}`, 409);
+      }
       if (!row.is_unlimited && Number(row.stock_count) < row.quantity) {
         return fail(`OUT_OF_STOCK:${row.product_name}`, 409);
       }
@@ -77,6 +90,15 @@ export async function POST(req: Request) {
     // (só cupom) — antes só era lido dentro do bloco de físico, então
     // cupom nunca chegava a ser considerado num carrinho 100% digital.
     const body = await req.json().catch(() => ({}));
+
+    // Checkbox obrigatório no checkout ("Li e aceito os Termos de Uso e a
+    // Política de Privacidade da loja") — sem isso marcado, a API nem
+    // tenta criar o pedido. O timestamp vira prova de consentimento por
+    // pedido (orders.terms_accepted_at), mesmo princípio do aceite do
+    // owner pro contrato da plataforma (store_settings.platform_terms_accepted_at).
+    if (body?.termsAccepted !== true) {
+      return fail("TERMS_NOT_ACCEPTED", 400);
+    }
 
     const hasPhysical = cartRes.rows.some((row) => row.product_type === "physical");
     let shipping: ShippingChoice | null = null;
@@ -157,7 +179,7 @@ export async function POST(req: Request) {
     const couponCode = String(body?.couponCode ?? "").trim().toUpperCase();
     if (couponCode) {
       const couponRes = await db.query(
-        `SELECT id, code, percent_off, min_order_value FROM coupons
+        `SELECT id, code, percent_off, min_order_value, per_user_limit FROM coupons
          WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())
            AND (usage_limit = 0 OR used_count < usage_limit)`,
         [couponCode]
@@ -167,6 +189,22 @@ export async function POST(req: Request) {
       if (row.min_order_value && subtotal < Number(row.min_order_value)) {
         return fail(`COUPON_MIN_ORDER_VALUE:${row.min_order_value}`, 400);
       }
+
+      // Limite por cliente, além do limite global (já filtrado acima) —
+      // conta só pedidos que chegaram a pagar de verdade (used_count
+      // também só incrementa na confirmação de pagamento, nunca aqui).
+      const perUserLimit = Number(row.per_user_limit ?? 0);
+      if (perUserLimit > 0) {
+        const usedByUserRes = await db.query(
+          `SELECT COUNT(*) AS n FROM orders
+           WHERE coupon_id = $1 AND user_id = $2 AND status NOT IN ('pending_payment', 'cancelled', 'expired')`,
+          [row.id, userId]
+        );
+        if (Number(usedByUserRes.rows[0]?.n ?? 0) >= perUserLimit) {
+          return fail("COUPON_USER_LIMIT_REACHED", 400);
+        }
+      }
+
       coupon = { id: row.id, code: row.code, percentOff: Number(row.percent_off) };
     }
 
@@ -217,8 +255,8 @@ export async function POST(req: Request) {
       }
 
       const orderRes = await client.query(
-        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number, reseller_id)
-         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number, reseller_id, terms_accepted_at)
+         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9, NOW())
          RETURNING id`,
         [userId, total, subtotal, discount, shippingFee, shippingAddressId, appliedCouponId, orderNumber, resellerId]
       );
@@ -244,9 +282,9 @@ export async function POST(req: Request) {
         );
       }
 
-      if (appliedCouponId) {
-        await client.query(`UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`, [appliedCouponId]);
-      }
+      // used_count NÃO incrementa aqui — só em confirmOrderPayment, quando
+      // o pedido realmente é pago (ver lib/payments/confirmOrderPayment.ts).
+      // Um pedido criado e nunca pago não pode consumir vaga de cupom.
 
       await client.query(`DELETE FROM cart_items WHERE user_id = $1`, [userId]);
 

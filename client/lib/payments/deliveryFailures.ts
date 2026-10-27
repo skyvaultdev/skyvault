@@ -1,6 +1,6 @@
 import { getDB } from "@/lib/database/db";
 
-export type DeliveryFailureStage = "checkout_pay" | "webhook" | "check_payment" | "mock_confirm_payment";
+export type DeliveryFailureStage = "checkout_pay" | "webhook" | "check_payment" | "mock_confirm_payment" | "admin_manual_confirm";
 
 // Auto-cria a tabela se a migração (db/migrations/2026-09-18_delivery_failures.sql)
 // ainda não rodou — mesmo padrão usado nas outras tabelas novas deste

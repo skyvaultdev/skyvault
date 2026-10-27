@@ -36,8 +36,8 @@ export async function GET(_req: Request, { params }: Params) {
 
     const items = [];
     for (const item of itemsRes.rows) {
-      const { deliveredContent, deliveredFileSize } = await resolveDeliveredContent(db, orderId, item);
-      items.push({ ...item, deliveredContent, deliveredFileSize });
+      const { deliveredContent, deliveredFileSize, deliveredExpiresAt } = await resolveDeliveredContent(db, orderId, item);
+      items.push({ ...item, deliveredContent, deliveredFileSize, deliveredExpiresAt });
     }
 
     const order = orderRes.rows[0];

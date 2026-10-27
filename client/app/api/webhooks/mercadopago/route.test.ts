@@ -29,7 +29,10 @@ vi.mock("@/lib/payments/confirmOrderPayment", () => ({
   confirmOrderPayment: (orderId: number) => confirmOrderPaymentMock(orderId),
 }));
 
-const sendOrderDeliveryEmailMock = vi.fn();
+// Precisa resolver pra uma Promise (não só `undefined`) — a rota chama
+// sendOrderDeliveryEmail(...).catch(...) sem await (fire-and-forget), e
+// `.catch` em `undefined` quebraria o handler na hora.
+const sendOrderDeliveryEmailMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/mail/sendOrderDeliveryEmail", () => ({
   sendOrderDeliveryEmail: (args: unknown) => sendOrderDeliveryEmailMock(args),
 }));
@@ -41,7 +44,27 @@ vi.mock("@/lib/security/rateLimit", () => ({
   rateLimit: () => true,
 }));
 
+const ensureOrderAttentionColumnMock = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/orders/deliverySnapshot", () => ({
+  ensureOrderAttentionColumn: () => ensureOrderAttentionColumnMock(),
+}));
+
+// A rota chama o SDK do Mercado Pago direto só pra buscar detalhes da
+// contestação (Chargeback.get) — mockado aqui pra não precisar de
+// credenciais reais nem de rede.
+const chargebackGetMock = vi.fn();
+vi.mock("mercadopago", () => ({
+  MercadoPagoConfig: class {},
+  Chargeback: class {
+    get(args: unknown) {
+      return chargebackGetMock(args);
+    }
+  },
+}));
+
 const { POST } = await import("./route");
+
+const ORDER_TOTAL = 100;
 
 function webhookRequest(dataId: string | null) {
   return new Request("https://example.com/api/webhooks/mercadopago", {
@@ -81,18 +104,37 @@ describe("POST /api/webhooks/mercadopago", () => {
   const ORDER_ID = 42;
   const TXID = "mp-payment-123";
 
+  // Payload "válido" padrão pra consulta ao Mercado Pago — já inclui
+  // external_reference/transaction_amount batendo com ORDER_ID/ORDER_TOTAL,
+  // exigidos pela checagem nova (payload tem que corresponder ao pedido).
+  function approvedStatus(overrides?: Record<string, unknown>) {
+    return {
+      paid: true,
+      raw: { status: "approved", external_reference: String(ORDER_ID), transaction_amount: ORDER_TOTAL, ...overrides },
+    };
+  }
+
+  // SELECT order_id FROM payment_transactions ... (lookup por provider_txid)
+  // seguido de SELECT total FROM orders ... — essa ordem é fixa no handler.
+  function mockOwnerAndTotalLookup(total: number = ORDER_TOTAL) {
+    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ total }] });
+  }
+
   beforeEach(() => {
     queryMock.mockReset();
     isMercadoPagoConfiguredMock.mockReset().mockResolvedValue(true);
     loadMercadoPagoCredentialsMock.mockReset().mockResolvedValue({ webhookSecret: null });
     getMercadoPagoPaymentStatusMock.mockReset();
     confirmOrderPaymentMock.mockReset();
-    sendOrderDeliveryEmailMock.mockReset();
+    sendOrderDeliveryEmailMock.mockReset().mockResolvedValue(undefined);
+    ensureOrderAttentionColumnMock.mockReset().mockResolvedValue(undefined);
+    chargebackGetMock.mockReset();
   });
 
   it("confirma o pagamento aprovado e entrega o produto", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] }); // lookup por provider_txid
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockResolvedValue({
       alreadyProcessed: false,
       order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
@@ -106,6 +148,9 @@ describe("POST /api/webhooks/mercadopago", () => {
     const json = await res.json();
 
     expect(confirmOrderPaymentMock).toHaveBeenCalledWith(ORDER_ID);
+    // sendOrderDeliveryEmail é disparado sem await — espera o fim da
+    // microtask queue antes de checar a chamada.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(sendOrderDeliveryEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "cliente@teste.com",
@@ -119,8 +164,8 @@ describe("POST /api/webhooks/mercadopago", () => {
   });
 
   it("não entrega de novo se o webhook disparar mais de uma vez (idempotente)", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockResolvedValue({
       alreadyProcessed: true,
       order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
@@ -150,9 +195,32 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(json.data.received).toBe(true);
   });
 
+  it("não confirma se o external_reference do pagamento não é desse pedido", async () => {
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus({ external_reference: "999" }));
+
+    const res = await POST(webhookRequest(TXID));
+    const json = await res.json();
+
+    expect(confirmOrderPaymentMock).not.toHaveBeenCalled();
+    expect(sendOrderDeliveryEmailMock).not.toHaveBeenCalled();
+    expect(json.data.received).toBe(true);
+  });
+
+  it("não confirma se o valor pago é menor que o total do pedido", async () => {
+    mockOwnerAndTotalLookup(ORDER_TOTAL);
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus({ transaction_amount: ORDER_TOTAL - 1 }));
+
+    const res = await POST(webhookRequest(TXID));
+    const json = await res.json();
+
+    expect(confirmOrderPaymentMock).not.toHaveBeenCalled();
+    expect(json.data.received).toBe(true);
+  });
+
   it("lê o id da query string no formato novo (?data.id=X&type=payment), não só do corpo", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockResolvedValue({
       alreadyProcessed: false,
       order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
@@ -171,8 +239,8 @@ describe("POST /api/webhooks/mercadopago", () => {
   });
 
   it("lê o id da query string no formato antigo/IPN (?id=X&topic=payment)", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockResolvedValue({
       alreadyProcessed: false,
       order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
@@ -202,8 +270,8 @@ describe("POST /api/webhooks/mercadopago", () => {
   });
 
   it("responde erro claro (não silencioso) se a entrega falhar após pagamento aprovado", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockRejectedValue(new Error("DB connection lost"));
 
     const res = await POST(webhookRequest(TXID));
@@ -221,8 +289,8 @@ describe("POST /api/webhooks/mercadopago", () => {
     // segurança de verdade vem do provider_txid bater com uma transação
     // nossa + da confirmação via GET autenticado abaixo, não da assinatura.
     loadMercadoPagoCredentialsMock.mockResolvedValue({ webhookSecret: "shhh-secret" });
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockResolvedValue({
       alreadyProcessed: false,
       order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
@@ -242,8 +310,8 @@ describe("POST /api/webhooks/mercadopago", () => {
 
   it("processa normalmente quando a assinatura do webhook confere", async () => {
     loadMercadoPagoCredentialsMock.mockResolvedValue({ webhookSecret: "shhh-secret" });
-    queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] });
-    getMercadoPagoPaymentStatusMock.mockResolvedValue({ paid: true, raw: { status: "approved" } });
+    mockOwnerAndTotalLookup();
+    getMercadoPagoPaymentStatusMock.mockResolvedValue(approvedStatus());
     confirmOrderPaymentMock.mockResolvedValue({
       alreadyProcessed: false,
       order: { id: ORDER_ID, status: "delivered", order_number: "ABC123XY" },
@@ -258,5 +326,57 @@ describe("POST /api/webhooks/mercadopago", () => {
 
     expect(confirmOrderPaymentMock).toHaveBeenCalledWith(ORDER_ID);
     expect(json.data.received).toBe(true);
+  });
+
+  describe("chargeback (contestação)", () => {
+    const CHARGEBACK_ID = "cb-789";
+    const PAYMENT_ID = 555;
+
+    function chargebackRequest() {
+      return new Request("https://example.com/api/webhooks/mercadopago", {
+        method: "POST",
+        body: JSON.stringify({ type: "chargeback", data: { id: CHARGEBACK_ID } }),
+      });
+    }
+
+    it("marca o pedido com attention_note quando o chargeback corresponde a um pagamento nosso", async () => {
+      loadMercadoPagoCredentialsMock.mockResolvedValue({ accessToken: "TEST-token", webhookSecret: null });
+      chargebackGetMock.mockResolvedValue({ status: "in_review", reason: "fraude alegada", payment_id: PAYMENT_ID });
+      queryMock.mockResolvedValueOnce({ rows: [{ order_id: ORDER_ID }] }); // lookup por provider_txid = payment_id
+
+      const res = await POST(chargebackRequest());
+      const json = await res.json();
+
+      expect(chargebackGetMock).toHaveBeenCalledWith({ id: CHARGEBACK_ID });
+      expect(confirmOrderPaymentMock).not.toHaveBeenCalled(); // chargeback nunca passa pelo fluxo de confirmação de pagamento
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE orders SET attention_note"),
+        [ORDER_ID, expect.stringContaining("Contestação (chargeback)")]
+      );
+      expect(json.data.received).toBe(true);
+    });
+
+    it("não marca nenhum pedido se o payment_id do chargeback não corresponde a nenhuma transação nossa", async () => {
+      loadMercadoPagoCredentialsMock.mockResolvedValue({ accessToken: "TEST-token", webhookSecret: null });
+      chargebackGetMock.mockResolvedValue({ status: "new", payment_id: 999999 });
+      queryMock.mockResolvedValueOnce({ rows: [] });
+
+      const res = await POST(chargebackRequest());
+      const json = await res.json();
+
+      expect(json.data.received).toBe(true);
+      expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining("UPDATE orders SET attention_note"), expect.anything());
+    });
+
+    it("não derruba o webhook se buscar o chargeback no Mercado Pago falhar", async () => {
+      loadMercadoPagoCredentialsMock.mockResolvedValue({ accessToken: "TEST-token", webhookSecret: null });
+      chargebackGetMock.mockRejectedValue(new Error("MP indisponível"));
+
+      const res = await POST(chargebackRequest());
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.data.received).toBe(true);
+    });
   });
 });

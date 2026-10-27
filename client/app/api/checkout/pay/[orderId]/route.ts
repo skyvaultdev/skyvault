@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requireCustomer } from "@/lib/auth/customer";
-import { getPaymentProvider } from "@/lib/payments";
+import { getPaymentProvider, PaymentNotConfiguredError } from "@/lib/payments";
 import type { PaymentMethod } from "@/lib/payments/PaymentProvider";
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
 import { sendOrderDeliveryEmail } from "@/lib/mail/sendOrderDeliveryEmail";
@@ -139,11 +139,11 @@ export async function POST(req: Request, { params }: Params) {
           console.error(`[checkout/pay] pedido #${orderId}: ATENÇÃO — pagamento confirmado com estoque insuficiente:`, result.stockShortages);
         }
         if (!result.alreadyProcessed && result.deliveredItems.length > 0 && result.customerEmail) {
-          try {
-            await sendOrderDeliveryEmail({ to: result.customerEmail, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems });
-          } catch (mailError) {
-            console.error(`[checkout/pay] pedido #${orderId}: falha ao enviar e-mail de entrega —`, mailError);
-          }
+          // Disparado sem await — SMTP lento não pode travar a resposta ao
+          // cliente, que já pagou e está esperando a confirmação na tela.
+          sendOrderDeliveryEmail({ to: result.customerEmail, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems }).catch(
+            (mailError) => console.error(`[checkout/pay] pedido #${orderId}: falha ao enviar e-mail de entrega —`, mailError)
+          );
         }
       } catch (deliveryError) {
         // O cartão JÁ foi cobrado com sucesso nesse ponto — confirmOrderPayment
@@ -171,6 +171,10 @@ export async function POST(req: Request, { params }: Params) {
       orderPaidAt,
     });
   } catch (error) {
+    if (error instanceof PaymentNotConfiguredError) {
+      console.error("Checkout bloqueado: nenhum provedor de pagamento configurado em produção.");
+      return fail("PAYMENT_NOT_CONFIGURED", 503);
+    }
     console.error("Erro ao processar pagamento:", error);
     return fail("PAYMENT_INTERNAL_ERROR", 500);
   }

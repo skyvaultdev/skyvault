@@ -11,6 +11,33 @@ const devAllowedOrigins = (process.env.DEV_ALLOWED_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// CSP em modo Report-Only (item 7 do plano de segurança) — NUNCA bloqueia
+// nada, só reporta violação pra /api/csp-report. Lista de domínios do
+// Mercado Pago (Payment Brick) é um primeiro rascunho (sdk.mercadopago.com
+// confirmado em uso no checkout; os demais — api/secure-fields/eventos —
+// cobertos via wildcard porque não há uma lista oficial publicada pelo MP)
+// e de analytics (GA4/Meta Pixel, só carregados se configurados). Ver
+// docs/security/csp.md pro passo de promoção pra enforced depois de rodar
+// o checkout completo e revisar os relatórios reais.
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  // 'unsafe-inline' em script/style é um gap conhecido (ver doc) — os
+  // scripts inline do GA4/Meta Pixel e o uso extensivo de style={{}} no
+  // app exigiriam nonce por request (mudança maior, fora do escopo deste
+  // primeiro rascunho report-only).
+  "script-src 'self' 'unsafe-inline' https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mlstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mlstatic.com https://www.google-analytics.com https://analytics.google.com https://www.facebook.com https://connect.facebook.net",
+  "frame-src 'self' https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "report-uri /api/csp-report",
+].join("; ");
+
 const nextConfig: NextConfig = {
   serverExternalPackages: [], // opcional
   logging: {
@@ -41,11 +68,9 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
           },
-          // TODO: Content-Security-Policy — precisa de uma configuração
-          // cuidadosa antes de ligar (o Payment Brick do Mercado Pago
-          // carrega scripts/iframes de domínios deles; uma CSP genérica
-          // quebraria o checkout). Fazer numa tarefa separada, testando o
-          // fluxo de pagamento inteiro antes de ir pra produção.
+          // Report-Only: nunca bloqueia nada, só reporta. Ver
+          // docs/security/csp.md pro passo de promoção pra enforced.
+          { key: "Content-Security-Policy-Report-Only", value: CSP_DIRECTIVES },
           ...(process.env.NODE_ENV === "production"
             ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]
             : []),

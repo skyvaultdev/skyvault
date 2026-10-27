@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       [slug]
     );
 
-    if (slugCheck.rowCount > 0) {
+    if ((slugCheck.rowCount ?? 0) > 0) {
       slug = `${slug}-${crypto.randomUUID().slice(0, 6)}`;
     }
     

@@ -68,6 +68,7 @@ export default function EditProductPage() {
   const [variations, setVariations] = useState<Variation[]>([]);
   const [newVariation, setNewVariation] = useState({ name: "", price: "", stockCount: "", isUnlimited: false });
   const [selectedVariationId, setSelectedVariationId] = useState<string>(""); // Para o Preview
+  const [editingVariationId, setEditingVariationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -159,14 +160,31 @@ export default function EditProductPage() {
 
   function addVariation() {
     if (!newVariation.name || !newVariation.price) return;
-    setVariations((prev) => [...prev, {
-      id: crypto.randomUUID(),
-      name: newVariation.name,
-      price: newVariation.price,
-      isNew: true,
-      stockCount: newVariation.stockCount,
-      isUnlimited: newVariation.isUnlimited,
-    }]);
+    if (editingVariationId) {
+      setVariations((prev) => prev.map((v) => v.id === editingVariationId
+        ? { ...v, name: newVariation.name, price: newVariation.price, stockCount: newVariation.stockCount, isUnlimited: newVariation.isUnlimited }
+        : v));
+      setEditingVariationId(null);
+    } else {
+      setVariations((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        name: newVariation.name,
+        price: newVariation.price,
+        isNew: true,
+        stockCount: newVariation.stockCount,
+        isUnlimited: newVariation.isUnlimited,
+      }]);
+    }
+    setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
+  }
+
+  function startEditVariation(v: Variation) {
+    setEditingVariationId(v.id);
+    setNewVariation({ name: v.name, price: v.price, stockCount: v.stockCount, isUnlimited: v.isUnlimited });
+  }
+
+  function cancelEditVariation() {
+    setEditingVariationId(null);
     setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
   }
 
@@ -197,6 +215,7 @@ export default function EditProductPage() {
     }
 
     var variationsToUpload = variations.map(v => ({
+        id: v.isNew ? null : Number(v.id),
         name: v.name,
         price: parseCurrency(v.price),
         stockCount: isPhysical ? Number(v.stockCount || 0) : undefined,
@@ -352,18 +371,22 @@ export default function EditProductPage() {
                   Ilimitado
                 </label>
               )}
-              <button type="button" onClick={addVariation} className="addbtn">Adicionar</button>
+              <button type="button" onClick={addVariation} className="addbtn">{editingVariationId ? "Salvar edição" : "Adicionar"}</button>
+              {editingVariationId && (
+                <button type="button" onClick={cancelEditVariation} className="btnSecondary">Cancelar</button>
+              )}
             </div>
             <div className="variationList">
               {variations.map((v) => (
-                <div key={v.id} className="variationItem">
+                <div key={v.id} className={`variationItem ${editingVariationId === v.id ? "editing" : ""}`}>
                   {v.name} - R$ {v.price}
                   {form.productType === "physical" && (
                     <span className="variationStockHint">
                       {" "}({v.isUnlimited ? "ilimitado" : `${v.stockCount || 0} em estoque`})
                     </span>
                   )}
-                  <button type="button" onClick={() => setVariations(variations.filter(x => x.id !== v.id))}><Icon name="x" /></button>
+                  <button type="button" title="Editar" className="variationEditBtn" onClick={() => startEditVariation(v)}><Icon name="edit" /></button>
+                  <button type="button" title="Remover" onClick={() => { setVariations(variations.filter(x => x.id !== v.id)); if (editingVariationId === v.id) cancelEditVariation(); }}><Icon name="x" /></button>
                 </div>
               ))}
             </div>

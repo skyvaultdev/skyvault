@@ -625,3 +625,15 @@ input[type="number"] {
     border-radius: 12px;
   }
 }
+.variationList button.variationEditBtn {
+  background: rgba(100, 0, 255, 0.25);
+}
+.variationList button.variationEditBtn:hover {
+  background: rgba(100, 0, 255, 0.5);
+  transform: scale(1.15);
+}
+.variationItem.editing {
+  outline: 2px solid var(--secondary, #6400ff);
+  outline-offset: 2px;
+  border-radius: 8px;
+}

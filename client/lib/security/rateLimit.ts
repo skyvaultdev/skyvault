@@ -24,6 +24,25 @@ function rateLimitInMemory(key: string, limit: number, windowMs: number): boolea
 
 let redisClient: Redis | null | undefined;
 
+// TLS mútuo opcional (mesmo esquema do Postgres — ver lib/database/pool.ts)
+// — só usado se REDIS_URL já estiver configurada. As 3 vars são
+// tudo-ou-nada, mesmo raciocínio: TLS mútuo incompleto não protege nada.
+function buildRedisTlsConfig(): import("ioredis").RedisOptions["tls"] {
+  const { sslCaBase64, sslCertBase64, sslKeyBase64 } = config.redis;
+  if (!sslCaBase64 && !sslCertBase64 && !sslKeyBase64) return undefined;
+  if (!sslCaBase64 || !sslCertBase64 || !sslKeyBase64) {
+    throw new Error(
+      "REDIS_SSL_CA_BASE64 / REDIS_SSL_CERT_BASE64 / REDIS_SSL_KEY_BASE64 precisam estar todas definidas juntas, ou nenhuma."
+    );
+  }
+  return {
+    ca: Buffer.from(sslCaBase64, "base64").toString("utf8"),
+    cert: Buffer.from(sslCertBase64, "base64").toString("utf8"),
+    key: Buffer.from(sslKeyBase64, "base64").toString("utf8"),
+    rejectUnauthorized: true,
+  };
+}
+
 // Lazy + memoizado: só conecta se REDIS_URL estiver configurada, e só na
 // primeira chamada real (não no boot do processo). `retryStrategy: null`
 // desliga a reconexão automática infinita do ioredis — preferimos um
@@ -41,6 +60,7 @@ function lazyRedisClient(): Redis | null {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     retryStrategy: () => null,
+    tls: buildRedisTlsConfig(),
   });
   client.on("error", (err) => {
     console.error("[rateLimit] erro de conexão com Redis — chamadas individuais caem pro fallback em memória:", err.message);

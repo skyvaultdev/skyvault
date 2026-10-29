@@ -109,6 +109,16 @@ export const config = {
         password: process.env.DB_PASSWORD!,
         database: process.env.DB_NAME!,
         port: Number(process.env.DB_PORT),
+        // TLS mútuo (CA + certificado + chave de cliente) — a Square Cloud
+        // exige isso pro Postgres gerenciado. Conteúdo em base64 via env,
+        // NUNCA um arquivo no pacote de deploy (ver docs/deploy/squarecloud.md).
+        // As 3 ausentes (dev local) = sem TLS, comportamento de sempre — a
+        // decodificação e o objeto `ssl` em si ficam em lib/database/pool.ts,
+        // não aqui (este arquivo também é importado em Edge Runtime, por
+        // middlewares/auth.middleware.ts, que não tem o Buffer do Node).
+        sslCaBase64: process.env.DB_SSL_CA_BASE64,
+        sslCertBase64: process.env.DB_SSL_CERT_BASE64,
+        sslKeyBase64: process.env.DB_SSL_KEY_BASE64,
     },
 
     google: {
@@ -173,6 +183,12 @@ export const config = {
         // app. Sem configurar, cai automaticamente pro fallback em memória
         // (correto só com uma única instância rodando).
         url: process.env.REDIS_URL,
+        // TLS mútuo opcional, mesmo esquema do Postgres acima (base64 via
+        // env, decodificado em lib/security/rateLimit.ts). Só faz sentido
+        // com REDIS_URL já configurada.
+        sslCaBase64: process.env.REDIS_SSL_CA_BASE64,
+        sslCertBase64: process.env.REDIS_SSL_CERT_BASE64,
+        sslKeyBase64: process.env.REDIS_SSL_KEY_BASE64,
     },
 
     // Pixels de analytics/conversão — opcionais, cada loja configura os

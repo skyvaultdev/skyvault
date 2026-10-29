@@ -101,6 +101,93 @@ describe("rateLimit — com Redis configurado (client mockado)", () => {
   });
 });
 
+describe("rateLimit — TLS mútuo opcional pro Redis (deploy Square Cloud)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("com REDIS_URL mas sem as vars de SSL: conecta sem tls", async () => {
+    const calls: unknown[][] = [];
+    vi.doMock("@/config/configuration", () => ({
+      config: { redis: { url: "redis://localhost:6379", sslCaBase64: undefined, sslCertBase64: undefined, sslKeyBase64: undefined } },
+    }));
+    vi.doMock("ioredis", () => ({
+      default: class {
+        constructor(...args: unknown[]) { calls.push(args); }
+        on = vi.fn();
+        incr = vi.fn();
+        pexpire = vi.fn();
+      },
+    }));
+
+    const { rateLimit } = await import("./rateLimit");
+    await rateLimit(`teste-redis-tls-off-${Date.now()}`, 5, 60_000);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe("redis://localhost:6379");
+    expect((calls[0][1] as { tls?: unknown }).tls).toBeUndefined();
+    vi.doUnmock("@/config/configuration");
+    vi.doUnmock("ioredis");
+  });
+
+  it("com as 3 vars de SSL: decodifica base64 e passa ca/cert/key/rejectUnauthorized em tls", async () => {
+    const calls: unknown[][] = [];
+    vi.doMock("@/config/configuration", () => ({
+      config: {
+        redis: {
+          url: "rediss://redis.squarecloud.app:6380",
+          sslCaBase64: Buffer.from("CA-REDIS").toString("base64"),
+          sslCertBase64: Buffer.from("CERT-REDIS").toString("base64"),
+          sslKeyBase64: Buffer.from("KEY-REDIS").toString("base64"),
+        },
+      },
+    }));
+    vi.doMock("ioredis", () => ({
+      default: class {
+        constructor(...args: unknown[]) { calls.push(args); }
+        on = vi.fn();
+        incr = vi.fn();
+        pexpire = vi.fn();
+      },
+    }));
+
+    const { rateLimit } = await import("./rateLimit");
+    await rateLimit(`teste-redis-tls-on-${Date.now()}`, 5, 60_000);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe("rediss://redis.squarecloud.app:6380");
+    expect((calls[0][1] as { tls?: unknown }).tls).toEqual({
+      ca: "CA-REDIS", cert: "CERT-REDIS", key: "KEY-REDIS", rejectUnauthorized: true,
+    });
+    vi.doUnmock("@/config/configuration");
+    vi.doUnmock("ioredis");
+  });
+
+  it("com só UMA das 3 vars de SSL: a chamada cai pro fallback em memória (erro é pego no lazyRedisClient)", async () => {
+    vi.doMock("@/config/configuration", () => ({
+      config: {
+        redis: {
+          url: "rediss://redis.squarecloud.app:6380",
+          sslCaBase64: Buffer.from("CA-REDIS").toString("base64"),
+          sslCertBase64: undefined,
+          sslKeyBase64: undefined,
+        },
+      },
+    }));
+    vi.doMock("ioredis", () => ({ default: vi.fn() }));
+
+    const { rateLimit } = await import("./rateLimit");
+    // buildRedisTlsConfig() lança dentro de lazyRedisClient(), fora do
+    // try/catch da chamada Redis em si — então isto PROPAGA (configuração
+    // quebrada é bug de deploy, não degradação silenciosa pro fallback).
+    await expect(rateLimit(`teste-redis-tls-incompleto-${Date.now()}`, 5, 60_000)).rejects.toThrow(
+      /precisam estar todas definidas juntas/
+    );
+    vi.doUnmock("@/config/configuration");
+    vi.doUnmock("ioredis");
+  });
+});
+
 describe("getRedisStatus — item B4 (usado por GET /api/health)", () => {
   beforeEach(() => {
     vi.resetModules();

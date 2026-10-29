@@ -10,6 +10,7 @@ import { signJWT, verifyJWT } from "@/lib/jwt/init";
 import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
 import { rateLimit } from "@/lib/security/rateLimit";
+import { sendWelcomeEmail } from "@/lib/mail/sendWelcomeEmail";
 type Role = keyof typeof ROLES
 
 function hashCode(code: string) {
@@ -48,9 +49,18 @@ export async function POST(req: Request) {
         [email]
     );
 
-    await db.query(`INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING`,
+    const insertedUser = await db.query(
+        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING RETURNING id`,
         [username, email]
     );
+    // RETURNING só vem vazio quando ON CONFLICT DO NOTHING bateu (conta já
+    // existia) — rows.length > 0 prova que essa foi a PRIMEIRA vez, sem
+    // precisar de um SELECT separado (e sem a corrida que isso teria).
+    if (insertedUser.rows.length > 0) {
+        sendWelcomeEmail({ to: email, name: String(username) }).catch((err) =>
+            console.error(`Erro ao enviar email de boas-vindas (login por código) para ${email}:`, err)
+        );
+    }
 
     const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
     let role: Role | "regular_citizen" = "regular_citizen";

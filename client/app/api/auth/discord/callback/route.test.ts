@@ -9,6 +9,11 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers({ host: "localhost:3000" }),
 }));
 
+const sendWelcomeEmailMock = vi.fn().mockResolvedValue(true);
+vi.mock("@/lib/mail/sendWelcomeEmail", () => ({
+  sendWelcomeEmail: (args: unknown) => sendWelcomeEmailMock(args),
+}));
+
 const { GET } = await import("./route");
 
 beforeAll(async () => {
@@ -40,6 +45,7 @@ function mockFetch(email: string, username: string, discordId: string) {
 
 afterEach(() => {
   webhookCalls = [];
+  sendWelcomeEmailMock.mockClear();
   vi.unstubAllGlobals();
 });
 
@@ -78,6 +84,29 @@ describe("GET /api/auth/discord/callback — webhook de login não manda email (
       const idField = fields.find((f) => f.name === "ID interno");
       const userRow = await db.query(`SELECT id FROM users WHERE email = $1`, [email]);
       expect(idField?.value).toBe(String(userRow.rows[0].id));
+    } finally {
+      await db.query(`DELETE FROM discuser WHERE email = $1`, [email]);
+      await db.query(`DELETE FROM users WHERE email = $1`, [email]);
+    }
+  });
+});
+
+describe("GET /api/auth/discord/callback — email de boas-vindas (Fase 5)", () => {
+  it("manda o email de boas-vindas no PRIMEIRO login, mas não de novo num segundo login da mesma conta", async () => {
+    const db = getDB();
+    const email = `teste-discord-welcome-${Date.now()}-${Math.random().toString(36).slice(2)}@teste.com`;
+
+    try {
+      vi.stubGlobal("fetch", mockFetch(email, "fulano_discord", "123456789"));
+      await GET(callbackRequest());
+      expect(sendWelcomeEmailMock).toHaveBeenCalledOnce();
+      expect(sendWelcomeEmailMock).toHaveBeenCalledWith({ to: email, name: "fulano_discord" });
+
+      sendWelcomeEmailMock.mockClear();
+      vi.unstubAllGlobals();
+      vi.stubGlobal("fetch", mockFetch(email, "fulano_discord", "123456789"));
+      await GET(callbackRequest());
+      expect(sendWelcomeEmailMock).not.toHaveBeenCalled();
     } finally {
       await db.query(`DELETE FROM discuser WHERE email = $1`, [email]);
       await db.query(`DELETE FROM users WHERE email = $1`, [email]);

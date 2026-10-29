@@ -9,6 +9,7 @@ import { signJWT } from "@/lib/jwt/init";
 import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
 import { encryptToken } from "@/lib/security/tokenCrypto";
+import { sendWelcomeEmail } from "@/lib/mail/sendWelcomeEmail";
 const discord = config.discord;
 type Role = keyof typeof ROLES
 
@@ -94,10 +95,17 @@ export async function GET(req: Request) {
         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (store_id, email) DO NOTHING`, userFormatted
     );
 
-    await db.query(
-        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING`,
+    const insertedUser = await db.query(
+        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING RETURNING id`,
         [userFormatted[0], userFormatted[1]]
     );
+    // RETURNING só vem vazio quando ON CONFLICT DO NOTHING bateu (conta já
+    // existia) — rows.length > 0 prova que essa foi a PRIMEIRA vez.
+    if (insertedUser.rows.length > 0) {
+        sendWelcomeEmail({ to: userFormatted[1] as string, name: userFormatted[0] as string }).catch((err) =>
+            console.error(`Erro ao enviar email de boas-vindas (Discord) para ${userFormatted[1]}:`, err)
+        );
+    }
     await db.query(
         `UPDATE discuser SET user_id = (SELECT id FROM users WHERE email = $1) WHERE email = $1 AND user_id IS NULL`,
         [userFormatted[1]]

@@ -53,6 +53,15 @@ export const config = {
         orchestratorToken: process.env.INTERNAL_ORCHESTRATOR_TOKEN,
     },
 
+    // Item B3: defesa contra CSRF via Sec-Fetch-Site/Origin em rotas
+    // mutáveis (POST/PUT/PATCH/DELETE), ver lib/security/csrfGuard.ts e
+    // proxy.ts. "report" (padrão) só loga o que seria bloqueado, nunca
+    // recusa nada — promover pra "enforce" é decisão de quem administra,
+    // depois de observar os logs por um tempo.
+    csrf: {
+        mode: process.env.CSRF_MODE === "enforce" ? "enforce" as const : "report" as const,
+    },
+
     // Chave de criptografia em repouso de credenciais de integração (hoje:
     // melhor_envio_credentials.access_token_encrypted — ver
     // lib/security/tokenCrypto.ts). Antes a chave vinha de sha256(JWT_SECRET)

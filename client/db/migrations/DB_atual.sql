@@ -454,9 +454,9 @@ CREATE TABLE IF NOT EXISTS public.discuser (
     id integer NOT NULL,
     username text NOT NULL,
     email public.citext NOT NULL,
-    access_token text NOT NULL,
-    refresh_token text NOT NULL,
-    expires_in public.citext NOT NULL,
+    access_token text,
+    refresh_token text,
+    expires_in public.citext,
     user_id bigint,
     store_id integer DEFAULT (NULLIF(current_setting('app.store_id'::text, true), ''::text))::integer NOT NULL
 );

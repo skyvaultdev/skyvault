@@ -123,30 +123,38 @@ nada os encerrar. `POST /api/internal/cron/expire-orders` marca esses
 pedidos como `expired` (e tenta cancelar qualquer Pix/boleto pendente no
 Mercado Pago).
 
-1. Defina `CRON_SECRET` no `.env` do servidor (um valor aleatório qualquer).
-2. Agende uma chamada periódica (ex: a cada hora) a essa rota com o header
-   `x-cron-secret`:
+1. Defina `CRON_SECRET` e `INTERNAL_ORCHESTRATOR_TOKEN` no `.env` do servidor
+   (valores aleatórios, cada um o seu — nunca o mesmo valor nos dois).
+2. Agende uma chamada periódica (ex: a cada hora) a essa rota com os headers
+   `x-cron-secret` **e** `x-internal-orchestrator` — faltando qualquer um dos
+   dois, a chamada nem chega na rota (bloqueada antes, em `proxy.ts`, com
+   404):
 
 ```bash
 # crontab -e
 0 * * * * curl -s -X POST https://sua-loja.com/api/internal/cron/expire-orders \
-  -H "x-cron-secret: SEU_CRON_SECRET_AQUI" >> /var/log/expire-orders.log 2>&1
+  -H "x-cron-secret: SEU_CRON_SECRET_AQUI" \
+  -H "x-internal-orchestrator: SEU_INTERNAL_ORCHESTRATOR_TOKEN_AQUI" >> /var/log/expire-orders.log 2>&1
 ```
 
 Sem `CRON_SECRET` configurado, a rota responde 500 e nunca expira nada —
-ela nunca roda "por acidente" sem o segredo definido.
+ela nunca roda "por acidente" sem o segredo definido. Sem
+`INTERNAL_ORCHESTRATOR_TOKEN` configurado, `/api/internal/**` inteiro fica
+inacessível (404) — nenhuma chamada passa, nem a do próprio app.
 
 ### Recuperação de carrinho abandonado
 
 `POST /api/internal/cron/abandoned-cart-email` manda um e-mail pros
 clientes com itens no carrinho há mais de `ABANDONED_CART_HOURS` horas
 (padrão: 24) que ainda não foram avisados daquela versão do carrinho. Mesmo
-segredo (`CRON_SECRET`) e mesmo formato de chamada do expire-orders:
+segredos (`CRON_SECRET` + `INTERNAL_ORCHESTRATOR_TOKEN`) e mesmo formato de
+chamada do expire-orders:
 
 ```bash
 # crontab -e
 30 * * * * curl -s -X POST https://sua-loja.com/api/internal/cron/abandoned-cart-email \
-  -H "x-cron-secret: SEU_CRON_SECRET_AQUI" >> /var/log/abandoned-cart-email.log 2>&1
+  -H "x-cron-secret: SEU_CRON_SECRET_AQUI" \
+  -H "x-internal-orchestrator: SEU_INTERNAL_ORCHESTRATOR_TOKEN_AQUI" >> /var/log/abandoned-cart-email.log 2>&1
 ```
 
 ## CI

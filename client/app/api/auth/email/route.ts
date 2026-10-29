@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!rateLimit(`otp-send:${email}`, 5, 10 * 60_000)) {
+  if (!(await rateLimit(`otp-send:${email}`, 5, 10 * 60_000))) {
     return NextResponse.json(
       { error: "TOO_MANY_REQUESTS" },
       { status: 429 }

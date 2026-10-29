@@ -105,6 +105,14 @@ export const config = {
         secret: process.env.CRON_SECRET,
     },
 
+    redis: {
+        // Opcional — lib/security/rateLimit.ts usa isso pra compartilhar o
+        // contador de rate limit entre múltiplas instâncias/réplicas do
+        // app. Sem configurar, cai automaticamente pro fallback em memória
+        // (correto só com uma única instância rodando).
+        url: process.env.REDIS_URL,
+    },
+
     // Pixels de analytics/conversão — opcionais, cada loja configura os
     // próprios IDs. Sem nenhum definido, nenhum script extra é carregado
     // (ver app/(components)/analytics/AnalyticsScripts.tsx).

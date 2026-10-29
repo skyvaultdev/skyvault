@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "INVALID_DATA" }, { status: 400 });
     }
 
-    if (!rateLimit(`otp-verify:${email}`, 10, 10 * 60_000)) {
+    if (!(await rateLimit(`otp-verify:${email}`, 10, 10 * 60_000))) {
         return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429 });
     }
 

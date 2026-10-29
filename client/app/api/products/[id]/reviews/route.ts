@@ -81,7 +81,7 @@ export async function POST(req: Request, { params }: Params) {
     const { id } = await params;
     const productId = Number(id);
     if (!productId) return fail("INVALID_PRODUCT_ID", 400);
-    if (!rateLimit(`product-review:${userId}`, 5, 10 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
+    if (!(await rateLimit(`product-review:${userId}`, 5, 10 * 60_000))) return fail("TOO_MANY_REQUESTS", 429);
 
     const form = await req.formData();
     const rating = Number(form.get("rating"));

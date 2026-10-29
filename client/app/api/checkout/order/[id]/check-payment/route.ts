@@ -32,7 +32,7 @@ export async function POST(_req: Request, { params }: Params) {
   // A tela de espera chama isso sozinha a cada 4s — limite generoso o
   // suficiente pra cobrir esse polling normal (até uns 20min de espera
   // contínua) sem travar o cliente legítimo, só contendo abuso de verdade.
-  if (!rateLimit(`check-payment:${userId}:${orderId}`, 100, 5 * 60_000)) {
+  if (!(await rateLimit(`check-payment:${userId}:${orderId}`, 100, 5 * 60_000))) {
     return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
   }
 

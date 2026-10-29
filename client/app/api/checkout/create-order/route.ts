@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     // impedia um script criar dezenas de pedidos pending_payment em
     // sequência (mitigado parcialmente pelo cron que expira pedidos
     // velhos, mas ainda gera ruído no banco e nos relatórios de staff).
-    if (!rateLimit(`create-order:${userId}`, 10, 60_000)) {
+    if (!(await rateLimit(`create-order:${userId}`, 10, 60_000))) {
       return fail("TOO_MANY_REQUESTS", 429, { "Retry-After": "60" });
     }
 

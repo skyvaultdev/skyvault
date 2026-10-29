@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: Params) {
     // limita tentativas de cobrança por cliente, não só por pedido, pra
     // cobrir tanto "duplo clique insistente no mesmo pedido" quanto "script
     // tentando cobrar vários pedidos em sequência".
-    if (!rateLimit(`checkout-pay:${userId}`, 10, 5 * 60_000)) {
+    if (!(await rateLimit(`checkout-pay:${userId}`, 10, 5 * 60_000))) {
       return fail("TOO_MANY_REQUESTS", 429);
     }
 

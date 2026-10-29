@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     // de um cliente só, então o alvo aqui é conter um flood, não um
     // usuário legítimo específico.
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-    if (!rateLimit(`webhook-mercadopago:${ip}`, 60, 60_000)) {
+    if (!(await rateLimit(`webhook-mercadopago:${ip}`, 60, 60_000))) {
       return fail("TOO_MANY_REQUESTS", 429);
     }
 

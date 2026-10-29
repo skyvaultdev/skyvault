@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   // do app — a sessão não carrega um id numérico de admin) — mesmo padrão
   // de otp-verify/otp-send pro login de cliente. Sem isso, um auth_token
   // roubado permitiria martelar o código de 6 dígitos sem limite.
-  if (!rateLimit(`2fa-verify:${session.email}`, 5, 5 * 60_000)) {
+  if (!(await rateLimit(`2fa-verify:${session.email}`, 5, 5 * 60_000))) {
     return NextResponse.json(
       { ok: false, error: "TOO_MANY_REQUESTS" },
       { status: 429, headers: { "Retry-After": "300" } }

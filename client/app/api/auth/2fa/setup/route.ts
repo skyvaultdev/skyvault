@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   const { session, denied } = await requirePermission("dashboard.access");
   if (denied) return denied;
 
-  if (!rateLimit(`2fa-setup:${session!.email}`, 5, 5 * 60_000)) {
+  if (!(await rateLimit(`2fa-setup:${session!.email}`, 5, 5 * 60_000))) {
     return fail("TOO_MANY_REQUESTS", 429, { "Retry-After": "300" });
   }
 

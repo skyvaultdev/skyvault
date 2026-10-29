@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   try {
     const { userId, denied } = await requireCustomer();
     if (denied) return denied;
-    if (!rateLimit(`checkout-quote:${userId}`, 30, 5 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
+    if (!(await rateLimit(`checkout-quote:${userId}`, 30, 5 * 60_000))) return fail("TOO_MANY_REQUESTS", 429);
 
     const { cep } = await req.json();
     const cepDigits = String(cep ?? "").replace(/\D/g, "");

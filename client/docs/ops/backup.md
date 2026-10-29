@@ -119,3 +119,22 @@ Testado de verdade, contra o Postgres de desenvolvimento deste projeto:
   em produção deve ser tratado como um treino/drill**, não só confiar
   cegamente nesta documentação.
 
+## Teste automatizado de restore (item C4)
+
+`scripts/ops/test_restore.sh` fecha o gap acima — cria um banco
+descartável (ou um container Postgres inteiro descartável, com
+`DOCKER=1`), restaura o backup mais recente nele, confirma (contagem de
+tabelas, linhas de tabelas críticas, RLS ativa, extensões instaladas) e
+destrói tudo no final. Roda automaticamente a cada push/PR em
+`.github/workflows/ci.yml` (contra o mesmo serviço Postgres descartável
+que já roda os testes — não precisa de Docker dentro do CI).
+
+Mesma limitação do item acima se aplica aqui: **não deu pra executar
+este script de ponta a ponta no ambiente usado para escrevê-lo** (mesma
+falta de `CREATEDB`/superuser/Docker). A sintaxe foi revisada com
+cuidado e o shell script passa em `bash -n` (checagem de sintaxe), e o
+YAML do workflow foi validado (parseado com `js-yaml`), mas a primeira
+execução real — seja via CI, seja rodando `DOCKER=1
+scripts/ops/test_restore.sh` numa máquina com Docker — deve ser tratada
+como a validação de verdade, não como algo já confirmado funcionando.
+

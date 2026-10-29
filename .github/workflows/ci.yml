@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: appdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: client
+
+    env:
+      # DB_* apontam pro serviço postgres acima (descartável, só desta
+      # execução) — depois do bootstrap abaixo, trocamos pro role app_user
+      # (sem BYPASSRLS, exigido pelas policies de RLS multi-loja).
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: appdb
+      DB_USER: app_user
+      DB_PASSWORD: app_user_ci_password
+      # O resto são valores fictícios — build e testes não dependem de
+      # credenciais reais de nenhum provedor externo (pagamento, email,
+      # OAuth continuam mockados/não exercitados nos testes).
+      WEBSITE_URL: http://localhost:3000
+      JWT_SECRET: ci-jwt-secret-not-a-real-secret
+      JWT_EXPIRES_IN: 8h
+      INTERNAL_API_SECRET: ci-internal-api-secret-not-a-real-secret
+      EMAIL_USER: ci@example.com
+      EMAIL_PASS: ci-fake-password
+      PAYMENT_PROVIDER: mock
+      ORDER_EXPIRATION_HOURS: "24"
+      CRON_SECRET: ci-cron-secret-not-a-real-secret
+      PLATFORM_LEGAL_NAME: CI Platform
+      PLATFORM_CONTACT_EMAIL: ci@example.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bootstrap database schema
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          PSQL="psql -h localhost -U postgres -d appdb -v ON_ERROR_STOP=1"
+
+          # db/schema_full.sql é um schema completo (banco novo e vazio) que
+          # já embute as migrations até 2026-09-25_multi_tenant_phase2b_app_role.sql
+          # inclusive (ver cabeçalho do arquivo) — exceto a criação do role
+          # app_user em si, que um dump de schema nunca captura.
+          $PSQL -f db/schema_full.sql
+          $PSQL -f db/migrations/2026-09-25_multi_tenant_phase2b_app_role.sql
+          $PSQL -c "ALTER ROLE app_user WITH PASSWORD '${DB_PASSWORD}'"
+
+          # Só as migrations MAIS NOVAS que o ponto onde schema_full.sql foi
+          # gerado (identificado pelo nome do último arquivo já coberto por
+          # ele). Arquivos PROPOSAL_* nunca são migrations reais — nunca
+          # aplicar.
+          squash_point="2026-09-25_multi_tenant_phase2b_app_role.sql"
+          apply=false
+          for f in $(ls db/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            if [ "$apply" = false ]; then
+              if [ "$base" = "$squash_point" ]; then apply=true; fi
+              continue
+            fi
+            case "$base" in
+              # PROPOSAL_* nunca é migration real. DB_atual.sql (item C3)
+              # é um snapshot consolidado pra bootstrap de banco NOVO, não
+              # uma migração sequencial — mesmo sendo idempotente, não é
+              # pra entrar nesse loop (senão reaplica tudo de novo, incluindo
+              # o bloco de criação do role app_user, de forma redundante).
+              PROPOSAL_*|DB_atual.sql) continue ;;
+            esac
+            echo "Aplicando migration: $base"
+            $PSQL -f "db/migrations/$base"
+          done
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npx next build
+
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Backup database (item C4 — pra testar o restore)
+        run: |
+          set -euo pipefail
+          DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres \
+            DB_NAME=appdb BACKUP_DIR=/tmp/backups \
+            bash scripts/backup/pg_backup.sh
+
+      - name: Test restore (item C4)
+        run: |
+          set -euo pipefail
+          DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres \
+            BACKUP_DIR=/tmp/backups TEST_DB_NAME=restore_test \
+            bash scripts/ops/test_restore.sh

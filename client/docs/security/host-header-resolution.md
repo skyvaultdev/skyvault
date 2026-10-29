@@ -1,9 +1,16 @@
-# Resolução de loja por Host header — risco conhecido, não endereçado
+# Resolução de loja por Host header — risco conhecido
 
 Item da Fase 4 do plano de segurança. `[DECISÃO]`: ao perguntar se existe
 um CDN/proxy obrigatório na frente da origem em produção, a resposta foi
-"não sei/não tenho certeza agora" — então isso fica documentado como um
+"não sei/não tenho certeza agora" — então isso ficou documentado como um
 risco conhecido, sem mudança de código, até essa resposta ficar clara.
+
+**Atualização (item C1)**: a mitigação descrita na seção "Como resolver"
+abaixo já está implementada em `lib/tenant/tenantContext.ts`, desligada
+por padrão (`HOST_VALIDATION=off`) — continua exigindo você confirmar a
+topologia real antes de ligar. Ver
+[`host-validation.md`](./host-validation.md) pro passo a passo de como
+decidir e ligar quando a resposta ficar clara.
 
 ## O que é
 

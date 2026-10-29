@@ -29,6 +29,35 @@ export const config = {
     tenant: {
         rootDomain: (process.env.ROOT_DOMAIN || "").trim().toLowerCase(),
         defaultStoreId: Number(process.env.DEFAULT_STORE_ID) || 1,
+
+        // Item C1 — validação de Host, desligada por padrão (sem mudar o
+        // comportamento atual até alguém ligar de propósito, depois de
+        // confirmar a topologia real de proxy/CDN em produção). Ver
+        // docs/security/host-validation.md pra como escolher o valor certo.
+        //   off     (padrão) — Host puro, sem checagem extra, como hoje.
+        //   report  — calcula o host "efetivo" (considerando
+        //             TRUSTED_PROXY) e loga se ele divergiria do Host
+        //             puro ou cairia fora da allowlist, mas resolve a
+        //             loja com o Host puro mesmo (nenhuma mudança real).
+        //   enforce — resolve a loja com o host efetivo de verdade.
+        hostValidationMode: (() => {
+            const raw = process.env.HOST_VALIDATION;
+            return raw === "report" || raw === "enforce" ? raw : "off";
+        })(),
+
+        // Só é considerado quando TRUSTED_PROXY=true — do contrário,
+        // X-Forwarded-Host é ignorado por completo (header que qualquer
+        // cliente pode mandar; só vale confiar nele quando HÁ de fato um
+        // proxy na frente que o sobrescreve com o valor real).
+        trustedProxy: process.env.TRUSTED_PROXY === "true",
+
+        // Hosts aceitos ALÉM dos domínios cadastrados na tabela `stores`
+        // (custom_domain/slug) — tratados como o domínio raiz: resolvem
+        // pra DEFAULT_STORE_ID em vez de precisar de uma linha em `stores`.
+        allowedHosts: (process.env.ALLOWED_HOSTS || "")
+            .split(",")
+            .map((h) => h.trim().toLowerCase())
+            .filter(Boolean),
     },
 
     jwt: {

@@ -144,3 +144,91 @@ describe("PATCH /api/admin/orders/[id] — marcar como pago manualmente", () => 
     }
   });
 });
+
+describe("PATCH /api/admin/orders/[id] — update_shipment: código de rastreio precisa ser real", () => {
+  let userId: number;
+  let productId: number;
+  let staffEmail: string;
+  let orderId: number;
+
+  beforeAll(async () => {
+    const db = getDB();
+    userId = await createTestUser("tracking-code");
+    staffEmail = `teste-staff-tracking-${Date.now()}@teste.com`;
+
+    const productRes = await db.query(
+      `INSERT INTO products (name, price, product_type, stock_count, is_unlimited, active) VALUES ($1, 50, 'physical', 5, false, true) RETURNING id`,
+      ["[TESTE] Produto Rastreio"]
+    );
+    productId = productRes.rows[0].id;
+
+    const orderRes = await db.query(`INSERT INTO orders (user_id, status, subtotal, total) VALUES ($1,'paid',50,50) RETURNING id`, [userId]);
+    orderId = Number(orderRes.rows[0].id);
+    await db.query(
+      `INSERT INTO order_items (order_id, product_id, quantity, unit_price, product_type, product_name) VALUES ($1,$2,1,50,'physical',$3)`,
+      [orderId, productId, "[TESTE] Produto Rastreio"]
+    );
+  });
+
+  afterAll(async () => {
+    const db = getDB();
+    await db.query(`DELETE FROM shipment_events WHERE shipment_id IN (SELECT id FROM shipments WHERE order_id = $1)`, [orderId]).catch(() => {});
+    await db.query(`DELETE FROM shipments WHERE order_id = $1`, [orderId]).catch(() => {});
+    await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId]);
+    await db.query(`DELETE FROM orders WHERE id = $1`, [orderId]);
+    await db.query(`DELETE FROM products WHERE id = $1`, [productId]);
+    await db.query(`DELETE FROM users WHERE id = $1`, [userId]);
+  });
+
+  it("recusa marcar como Postado sem nenhum código de rastreio informado (não inventa um)", async () => {
+    cookieValue = await signJWT({ email: staffEmail, sid: 1, permissions: ["orders.manage"] });
+    const res = await PATCH(
+      patchRequest({ action: "update_shipment", shipmentStatus: "posted", notifyEmail: false }),
+      paramsFor(String(orderId))
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("TRACKING_CODE_REQUIRED");
+
+    const shipment = await getDB().query(`SELECT tracking_code FROM shipments WHERE order_id = $1`, [orderId]);
+    expect(shipment.rows.length).toBe(0); // nada foi gravado
+  });
+
+  it("recusa código com formato inválido", async () => {
+    cookieValue = await signJWT({ email: staffEmail, sid: 1, permissions: ["orders.manage"] });
+    const res = await PATCH(
+      patchRequest({ action: "update_shipment", shipmentStatus: "posted", trackingCode: "código com espaço!", notifyEmail: false }),
+      paramsFor(String(orderId))
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("INVALID_TRACKING_CODE_FORMAT");
+  });
+
+  it("aceita um código real e grava tracking_generated=false", async () => {
+    cookieValue = await signJWT({ email: staffEmail, sid: 1, permissions: ["orders.manage"] });
+    const res = await PATCH(
+      patchRequest({ action: "update_shipment", shipmentStatus: "posted", trackingCode: "BR123456789TESTE", notifyEmail: false }),
+      paramsFor(String(orderId))
+    );
+    expect(res.status).toBe(200);
+
+    const shipment = await getDB().query(`SELECT status, tracking_code, tracking_generated FROM shipments WHERE order_id = $1`, [orderId]);
+    expect(shipment.rows[0].status).toBe("posted");
+    expect(shipment.rows[0].tracking_code).toBe("BR123456789TESTE");
+    expect(shipment.rows[0].tracking_generated).toBe(false);
+  });
+
+  it("uma vez com código salvo, mudar de etapa de novo não exige digitar o código outra vez", async () => {
+    cookieValue = await signJWT({ email: staffEmail, sid: 1, permissions: ["orders.manage"] });
+    const res = await PATCH(
+      patchRequest({ action: "update_shipment", shipmentStatus: "in_transit", notifyEmail: false }),
+      paramsFor(String(orderId))
+    );
+    expect(res.status).toBe(200);
+
+    const shipment = await getDB().query(`SELECT status, tracking_code FROM shipments WHERE order_id = $1`, [orderId]);
+    expect(shipment.rows[0].status).toBe("in_transit");
+    expect(shipment.rows[0].tracking_code).toBe("BR123456789TESTE"); // preservado
+  });
+});

@@ -263,14 +263,13 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
   async function saveShipment() {
     if (!selectedOrder) return;
 
-    // Postar sem código real gera um código INTERNO da loja (não rastreável
-    // na transportadora) — confirma antes, pra ninguém fazer isso sem querer.
+    // "Postado" exige o código de rastreio real (comprado por fora, direto
+    // na transportadora) — sem isso o pedido nunca fica rastreável de
+    // verdade. A API recusa (TRACKING_CODE_REQUIRED) se isto passar batido
+    // por algum outro caminho; checa aqui também pra dar feedback na hora.
     if (shipmentStatus === "posted" && !trackingCode.trim() && !selectedOrder.shipment?.tracking_code) {
-      const proceed = await modal.confirm(
-        "Você não informou o código de rastreio da transportadora. Posso gerar um código interno da loja, mas ele NÃO aparece no site da transportadora e o cliente será avisado disso. Gerar mesmo assim?",
-        { confirmLabel: "Gerar código interno" }
-      );
-      if (!proceed) return;
+      setFeedback({ type: "error", message: "Informe o código de rastreio real da transportadora antes de marcar como \"Postado\"." });
+      return;
     }
 
     setSavingShipment(true);
@@ -290,7 +289,7 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error("save_failed");
+      if (!res.ok) throw new Error(json?.error || "save_failed");
 
       await openOrder(selectedOrder.id);
       await loadOrders(ordersPage);
@@ -302,8 +301,15 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
             ? "Envio atualizado. Email enviado ao cliente."
             : "Envio atualizado.",
       });
-    } catch {
-      setFeedback({ type: "error", message: "Não foi possível salvar o envio. Tente novamente." });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      const message =
+        code === "TRACKING_CODE_REQUIRED"
+          ? "Informe o código de rastreio real da transportadora antes de marcar como \"Postado\"."
+          : code === "INVALID_TRACKING_CODE_FORMAT"
+            ? "Código de rastreio inválido — use só letras e números (6 a 30 caracteres)."
+            : "Não foi possível salvar o envio. Tente novamente.";
+      setFeedback({ type: "error", message });
     } finally {
       setSavingShipment(false);
     }
@@ -771,7 +777,7 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                             </optgroup>
                           </select>
                           <input
-                            placeholder={shipmentStatus === "posted" && !trackingCode ? "Gerado automaticamente ao salvar" : "Código de rastreio"}
+                            placeholder={shipmentStatus === "posted" ? "Código de rastreio real (obrigatório)" : "Código de rastreio"}
                             value={trackingCode}
                             onChange={(e) => setTrackingCode(e.target.value)}
                             className="settingsInput"
@@ -799,9 +805,9 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                           className="settingsInput"
                         />
                         <p className="helperText">
-                          Ao marcar &ldquo;Postado&rdquo; sem digitar um código, um código de rastreio é gerado automaticamente.
-                          Cada mudança de status vira uma etapa nova na timeline que o cliente vê — só grava se algo
-                          realmente mudou.
+                          Marcar como &ldquo;Postado&rdquo; exige o código de rastreio real da transportadora (comprado por
+                          fora, direto no site dela). Cada mudança de status vira uma etapa nova na timeline que o
+                          cliente vê — só grava se algo realmente mudou.
                         </p>
                         <button className="btn" onClick={saveShipment} disabled={savingShipment || !shipmentHasChanges}>
                           {savingShipment ? "Salvando..." : "Salvar envio"}

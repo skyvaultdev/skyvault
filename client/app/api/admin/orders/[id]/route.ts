@@ -1,6 +1,5 @@
 "use server";
 
-import crypto from "crypto";
 import type { PoolClient } from "pg";
 import { getDB, withTransaction } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
@@ -105,14 +104,12 @@ export async function GET(_req: Request, { params }: Params) {
 
 // Sem integração real de postagem (não compramos etiqueta pela API do
 // Melhor Envio, só cotamos) — não existe um código de rastreio de verdade
-// pra puxar automaticamente. Isso aqui gera um código no MESMO formato dos
-// Correios (2 letras + 9 dígitos + BR) só pra a experiência do
-// cliente/staff não ficar sem nada assim que o staff marca "Postado" — não
-// é rastreável numa transportadora de verdade.
-function generateTrackingCode(orderId: number): string {
-  const digits = String(orderId).padStart(6, "0").slice(-6) + crypto.randomInt(100, 999);
-  return `SV${digits}BR`;
-}
+// pra puxar automaticamente. Já existiu um gerador de código falso aqui
+// (mesmo formato dos Correios, mas inventado) — removido: mostrava uma
+// aparência de rastreável pro cliente sem ser. "Postado" agora exige o
+// código real que o staff comprou por fora, direto no site da
+// transportadora.
+const TRACKING_CODE_PATTERN = /^[A-Za-z0-9]{6,30}$/;
 
 async function restockPhysicalItems(db: PoolClient, orderId: number, staffEmail: string | null) {
   const items = await db.query(
@@ -380,7 +377,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
       // Cancelar um envio que já saiu restocaria item que não está na
       // prateleira — só "devolvido" (mercadoria voltou) restoca.
-      const curShip = await db.query(`SELECT status FROM shipments WHERE order_id = $1`, [orderId]);
+      const curShip = await db.query(`SELECT status, tracking_code FROM shipments WHERE order_id = $1`, [orderId]);
       if (newStatus === "cancelled" && ["posted", "in_transit", "delivered"].includes(curShip.rows[0]?.status)) {
         return fail("SHIPMENT_ALREADY_SENT", 409);
       }
@@ -388,7 +385,18 @@ export async function PATCH(req: Request, { params }: Params) {
       const eventCity = body.eventCity ? String(body.eventCity).trim() || null : null;
       const eventState = body.eventState ? String(body.eventState).trim().toUpperCase().slice(0, 2) || null : null;
       const eventDescription = body.eventDescription ? String(body.eventDescription).trim() || null : null;
-      let trackingCode = body.trackingCode ? String(body.trackingCode).trim() || null : null;
+      const trackingCode = body.trackingCode ? String(body.trackingCode).trim() || null : null;
+
+      if (trackingCode && !TRACKING_CODE_PATTERN.test(trackingCode)) {
+        return fail("INVALID_TRACKING_CODE_FORMAT", 400);
+      }
+
+      // "Postado" precisa de um código real — sem isso, o pedido não
+      // vira rastreável e o cliente não teria como acompanhar de verdade
+      // (ver comentário acima de TRACKING_CODE_PATTERN).
+      if (newStatus === "posted" && !trackingCode && !curShip.rows[0]?.tracking_code) {
+        return fail("TRACKING_CODE_REQUIRED", 400);
+      }
 
       await db.query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS tracking_generated BOOLEAN NOT NULL DEFAULT FALSE`);
       // true = código criado pela loja (não vem de transportadora) — o
@@ -405,12 +413,6 @@ export async function PATCH(req: Request, { params }: Params) {
             [orderId]
           );
           shipment = inserted.rows[0];
-        }
-
-        // Fornece o código de rastreio sozinho ao postar, se ninguém digitou um.
-        if (newStatus === "posted" && !trackingCode && !shipment.tracking_code) {
-          trackingCode = generateTrackingCode(orderId);
-          trackingGenerated = true;
         }
 
         const statusChanged = newStatus !== shipment.status;

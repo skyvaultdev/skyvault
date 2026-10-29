@@ -25,6 +25,19 @@ export async function register() {
         "credenciais de integração (ver lib/security/tokenCrypto.ts). Boot abortado."
       );
     }
+
+    // Item B4: REDIS_URL ausente em produção é DEGRADAÇÃO, não dado
+    // ilegível (diferente do bloco acima) — cada réplica volta a contar
+    // rate limit sozinha, sub-contando o limite real por N réplicas. Isso
+    // não trava o boot (derrubar o deploy inteiro por isso seria
+    // desproporcional ao risco), mas precisa ficar bem visível: log de
+    // erro + Sentry (se configurado), e GET /api/health reporta o estado.
+    if (process.env.NODE_ENV === "production" && !config.redis.url) {
+      const message = "REDIS_URL não configurada em produção — rate limit cai pro fallback em memória por instância (sub-conta o limite real com múltiplas réplicas).";
+      console.error(`[boot] ${message}`);
+      const { captureException } = await import("@/lib/observability/sentry");
+      captureException(new Error(message), { stage: "boot" });
+    }
   }
 }
 

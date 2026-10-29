@@ -64,6 +64,25 @@ async function rateLimitRedis(client: Redis, key: string, limit: number, windowM
   return count <= limit;
 }
 
+// Item B4 — usado por GET /api/health pra reportar o estado real do
+// Redis (não só "configurado ou não"): tenta um PING de verdade, com
+// timeout curto, pra não travar o health check esperando uma conexão
+// morta.
+export async function getRedisStatus(): Promise<"ok" | "not_configured" | "unreachable"> {
+  const client = lazyRedisClient();
+  if (!client) return "not_configured";
+
+  try {
+    await Promise.race([
+      client.ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2000)),
+    ]);
+    return "ok";
+  } catch {
+    return "unreachable";
+  }
+}
+
 export async function rateLimit(key: string, limit = 10, windowMs = 60_000): Promise<boolean> {
   const client = lazyRedisClient();
   if (!client) return rateLimitInMemory(key, limit, windowMs);

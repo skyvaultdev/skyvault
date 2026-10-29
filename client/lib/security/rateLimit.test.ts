@@ -100,3 +100,44 @@ describe("rateLimit — com Redis configurado (client mockado)", () => {
     vi.doUnmock("ioredis");
   });
 });
+
+describe("getRedisStatus — item B4 (usado por GET /api/health)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("not_configured sem REDIS_URL", async () => {
+    vi.doMock("@/config/configuration", () => ({ config: { redis: { url: undefined } } }));
+    const { getRedisStatus } = await import("./rateLimit");
+    expect(await getRedisStatus()).toBe("not_configured");
+    vi.doUnmock("@/config/configuration");
+  });
+
+  it("ok quando o PING responde", async () => {
+    vi.doMock("@/config/configuration", () => ({ config: { redis: { url: "redis://localhost:6379" } } }));
+    vi.doMock("ioredis", () => ({
+      default: class {
+        ping = vi.fn(async () => "PONG");
+        on = vi.fn();
+      },
+    }));
+    const { getRedisStatus } = await import("./rateLimit");
+    expect(await getRedisStatus()).toBe("ok");
+    vi.doUnmock("@/config/configuration");
+    vi.doUnmock("ioredis");
+  });
+
+  it("unreachable quando o PING falha", async () => {
+    vi.doMock("@/config/configuration", () => ({ config: { redis: { url: "redis://localhost:6379" } } }));
+    vi.doMock("ioredis", () => ({
+      default: class {
+        ping = vi.fn(async () => { throw new Error("ECONNREFUSED"); });
+        on = vi.fn();
+      },
+    }));
+    const { getRedisStatus } = await import("./rateLimit");
+    expect(await getRedisStatus()).toBe("unreachable");
+    vi.doUnmock("@/config/configuration");
+    vi.doUnmock("ioredis");
+  });
+});

@@ -91,6 +91,32 @@ describe("GET /api/auth/google/callback — webhook de login não manda email/IP
   });
 });
 
+describe("GET /api/auth/google/callback — não guarda tokens do Google (item B1a)", () => {
+  it("cria o usuário e completa o login (cookie + redirect) sem gravar access_token/refresh_token/expires_in", async () => {
+    const db = getDB();
+    const email = `teste-google-no-token-${Date.now()}-${Math.random().toString(36).slice(2)}@teste.com`;
+    vi.stubGlobal("fetch", mockFetch(email, "Fulano Sem Token"));
+
+    try {
+      const res = await GET(callbackRequest());
+      expect(res.status).toBe(307); // redirect
+      expect(res.headers.get("set-cookie")).toContain("auth_token=");
+
+      const row = await db.query(
+        `SELECT access_token, refresh_token, expires_in FROM googleuser WHERE email = $1`,
+        [email]
+      );
+      expect(row.rows).toHaveLength(1);
+      expect(row.rows[0].access_token).toBeNull();
+      expect(row.rows[0].refresh_token).toBeNull();
+      expect(row.rows[0].expires_in).toBeNull();
+    } finally {
+      await db.query(`DELETE FROM googleuser WHERE email = $1`, [email]);
+      await db.query(`DELETE FROM users WHERE email = $1`, [email]);
+    }
+  });
+});
+
 describe("GET /api/auth/google/callback — email de boas-vindas (Fase 5)", () => {
   it("manda o email de boas-vindas no PRIMEIRO login, mas não de novo num segundo login da mesma conta", async () => {
     const db = getDB();

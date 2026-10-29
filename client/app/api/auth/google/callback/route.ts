@@ -8,7 +8,6 @@ import { getDB } from "@/lib/database/db";
 import { signJWT } from "@/lib/jwt/init";
 import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
-import { encryptToken } from "@/lib/security/tokenCrypto";
 import { sendWelcomeEmail } from "@/lib/mail/sendWelcomeEmail";
 
 const google = config.google;
@@ -85,19 +84,20 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "EMAIL_NOT_VERIFIED" }, { status: 401 });
     }
 
+    // access_token/refresh_token/expires_in do Google NUNCA são lidos de
+    // volta do banco em lugar nenhum do código — só usados em memória, na
+    // linha acima, pra buscar o perfil. Guardar isso cifrado não tinha
+    // nenhum uso real, só mais segredo em repouso sem necessidade.
     const userFormatted = [
         String(user.name ?? user.email.split("@")[0]),
         String(user.email),
-        encryptToken(String(tokenData.access_token)),
-        tokenData.refresh_token ? encryptToken(String(tokenData.refresh_token)) : "",
-        Number(tokenData.expires_in),
     ];
     const db = getDB();
 
     await db.query(`
         INSERT INTO googleuser
-        (username, email, access_token, refresh_token, expires_in)
-        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (store_id, email) DO NOTHING`, userFormatted
+        (username, email)
+        VALUES ($1, $2) ON CONFLICT (store_id, email) DO NOTHING`, userFormatted
     );
 
     const insertedUser = await db.query(

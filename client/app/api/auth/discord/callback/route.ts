@@ -109,15 +109,22 @@ export async function GET(req: Request) {
     );
 
     var email = user?.email
+    // Sem email no payload — vai pra um canal do Discord (fora do nosso
+    // controle: pode vazar, mudar de membros, ficar com retenção
+    // indefinida). ID interno (não o id externo do Discord) + username
+    // bastam pra auditar "quem logou quando" sem mandar dado pessoal de
+    // verdade pra fora.
+    const internalUserIdRow = await db.query(`SELECT id FROM users WHERE email = $1`, [userFormatted[1]]);
+    const internalUserId = internalUserIdRow.rows[0]?.id ?? null;
     await sendWebhookLog({
         embeds: [
             {
                 title: "🔐 - OAUTH2 (Discord)",
                 color: 0x00ff99,
                 fields: [
-                    { name: "Email", value: user.email, inline: false },
+                    { name: "Provedor", value: "Discord", inline: true },
+                    { name: "ID interno", value: String(internalUserId ?? "desconhecido"), inline: true },
                     { name: "Usuário", value: user.username, inline: false },
-                    { name: "ID", value: user.id, inline: false },
                     { name: "Horário", value: new Date().toLocaleString(), inline: false }
                 ],
                 timestamp: new Date().toISOString()

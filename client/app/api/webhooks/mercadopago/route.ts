@@ -9,6 +9,7 @@ import { getMercadoPagoPaymentStatus } from "@/lib/payments/mercadoPagoProvider"
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
 import { sendOrderDeliveryEmail } from "@/lib/mail/sendOrderDeliveryEmail";
 import { logDeliveryFailure } from "@/lib/payments/deliveryFailures";
+import { captureException } from "@/lib/observability/sentry";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { ensureOrderAttentionColumn } from "@/lib/orders/deliverySnapshot";
 
@@ -209,6 +210,10 @@ export async function POST(req: Request) {
     return ok({ received: true });
   } catch (error) {
     console.error("[webhook mercadopago] erro inesperado:", error);
+    // orderId não está em escopo aqui (declarado dentro do try) — captura
+    // mesmo assim sem esse contexto; o caso com orderId disponível já é
+    // coberto por logDeliveryFailure() no catch interno, mais específico.
+    captureException(error, { stage: "webhook_mercadopago_unexpected" });
     return fail("WEBHOOK_INTERNAL_ERROR", 500);
   }
 }

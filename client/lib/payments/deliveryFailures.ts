@@ -1,4 +1,5 @@
 import { getDB } from "@/lib/database/db";
+import { captureException } from "@/lib/observability/sentry";
 
 export type DeliveryFailureStage = "checkout_pay" | "webhook" | "check_payment" | "mock_confirm_payment" | "admin_manual_confirm";
 
@@ -38,4 +39,8 @@ export async function logDeliveryFailure(orderId: number, stage: DeliveryFailure
     [orderId, stage, errorMessage]
   );
   console.error(`[delivery_failures] pedido #${orderId}: FALHA DE ENTREGA registrada (stage=${stage}) —`, error);
+  // Dinheiro já foi cobrado nesse ponto — isso não pode ficar só num log
+  // que ninguém olha. Contexto é só orderId/stage (nunca dado de
+  // pagamento); quem investigar busca o pedido pelo id.
+  captureException(error, { orderId, stage });
 }

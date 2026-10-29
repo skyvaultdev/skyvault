@@ -12,6 +12,7 @@ import { getShippingProvider, type PackageInfo } from "@/lib/shipping";
 import { ensureResellerTables } from "@/lib/resellers/ensureResellerTables";
 import { REFERRAL_COOKIE_NAME } from "@/lib/resellers/referralCookie";
 import { rateLimit } from "@/lib/security/rateLimit";
+import { captureException } from "@/lib/observability/sentry";
 
 type ShippingChoice = {
   recipientName: string;
@@ -346,6 +347,7 @@ export async function POST(req: Request) {
       return fail("COUPON_USER_LIMIT_REACHED", 400);
     }
     console.error("Erro ao criar pedido:", error);
+    captureException(error, { stage: "create_order" });
     return fail("CHECKOUT_INTERNAL_ERROR", 500);
   }
 }

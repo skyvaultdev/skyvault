@@ -13,6 +13,18 @@ export async function register() {
     // Sem SENTRY_DSN configurado, isso é um no-op (ver lib/observability/sentry.ts).
     const { initSentry } = await import("@/lib/observability/sentry");
     initSentry();
+
+    const { config } = await import("@/config/configuration");
+
+    // Chave de dados em repouso ausente = credencial de integração
+    // ilegível, não é degradação — diferente de REDIS_URL (ver abaixo),
+    // isso trava a subida em produção de propósito.
+    if (process.env.NODE_ENV === "production" && !config.integration.encryptionKey) {
+      throw new Error(
+        "INTEGRATION_ENCRYPTION_KEY não configurada em produção — obrigatória pra cifrar/decifrar " +
+        "credenciais de integração (ver lib/security/tokenCrypto.ts). Boot abortado."
+      );
+    }
   }
 }
 

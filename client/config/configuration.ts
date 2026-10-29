@@ -53,6 +53,18 @@ export const config = {
         orchestratorToken: process.env.INTERNAL_ORCHESTRATOR_TOKEN,
     },
 
+    // Chave de criptografia em repouso de credenciais de integração (hoje:
+    // melhor_envio_credentials.access_token_encrypted — ver
+    // lib/security/tokenCrypto.ts). Antes a chave vinha de sha256(JWT_SECRET)
+    // — reaproveitava o segredo de SESSÃO como chave de DADOS em repouso;
+    // rotacionar JWT_SECRET por um incidente quebraria silenciosamente a
+    // decifragem de toda credencial salva, sem aviso nenhum. Obrigatória em
+    // produção (checado no boot, ver instrumentation.ts) — em dev/teste,
+    // falta dela só derruba na hora de cifrar/decifrar de verdade.
+    integration: {
+        encryptionKey: process.env.INTEGRATION_ENCRYPTION_KEY,
+    },
+
     database: {
         host: process.env.DB_HOST!,
         user: process.env.DB_USER!,

@@ -6,16 +6,31 @@
 -- em catálogos grandes), então NÃO bloqueia a funcionalidade enquanto
 -- não for aplicado.
 --
--- NÃO testado contra o banco de dev desta tarefa: CREATE EXTENSION exige
--- um role com privilégio de superusuário (ou CREATE explícito na extensão),
--- que não estava disponível no ambiente usado pra implementar isso — só
--- app_user, sem esse privilégio (mesma limitação encontrada no item do
--- backup do Postgres). Aplique isso com um role privilegiado.
+-- Aplicado no banco de dev desta sessão (2026-10-29), como superuser.
+-- CREATE EXTENSION exige um role com privilégio de superusuário, OU
+-- `GRANT CREATE ON DATABASE <nome_do_banco> TO app_user;` rodado uma vez
+-- como superuser (pg_trgm é uma extensão "trusted" — depois desse GRANT,
+-- app_user consegue criar ela sozinho, sem precisar de superuser de novo).
+-- Rollback do GRANT: `REVOKE CREATE ON DATABASE <nome_do_banco> FROM app_user;`
+--
+-- Item C3 (revisão de segurança): bloco condicional — em ambientes onde
+-- quem roda isto NÃO tem privilégio (nem o GRANT acima foi feito), avisa
+-- em vez de abortar a migração inteira; os índices ficam pra quando
+-- alguém com privilégio rodar este arquivo de novo.
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE WARNING 'pg_trgm não pôde ser criada (privilégio insuficiente) — índices de busca NÃO foram criados agora. Rode como superuser (ou com o GRANT documentado acima) depois.';
+END $$;
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin (name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_products_description_trgm ON products USING gin (description gin_trgm_ops);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') THEN
+    CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin (name gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS idx_products_description_trgm ON products USING gin (description gin_trgm_ops);
+  END IF;
+END $$;
 
 -- Rollback:
 -- DROP INDEX IF EXISTS idx_products_name_trgm;

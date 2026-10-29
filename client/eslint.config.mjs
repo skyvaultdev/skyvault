@@ -10,6 +10,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Scripts de operação (migrações, backup) — Node puro, fora do bundle
+    // do app, CommonJS de propósito (sem "type": "module" no package.json
+    // e sem toolchain de execução de TS aqui, ao contrário do resto do
+    // projeto). Os testes desses scripts (*.test.ts) continuam lintados
+    // normalmente.
+    "scripts/**/*.js",
   ]),
 ]);
 

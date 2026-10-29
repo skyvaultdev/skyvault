@@ -6,8 +6,9 @@ import { cookies } from "next/headers";
 import { config } from "@/config/configuration";
 import { getDB } from "@/lib/database/db";
 import { signJWT } from "@/lib/jwt/init";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
-import { encryptToken } from "@/lib/security/tokenCrypto";
+import { sendWelcomeEmail } from "@/lib/mail/sendWelcomeEmail";
 const discord = config.discord;
 type Role = keyof typeof ROLES
 
@@ -78,25 +79,33 @@ export async function GET(req: Request) {
     var user = await userRes.json();
     if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 401 });
 
+    // access_token/refresh_token/expires_in do Discord NUNCA são lidos de
+    // volta do banco em lugar nenhum do código — só usados em memória, na
+    // linha acima, pra buscar o perfil. Guardar isso cifrado não tinha
+    // nenhum uso real, só mais segredo em repouso sem necessidade.
     const userFormatted = [
         String(user.username),
         String(user.email),
-        encryptToken(String(tokenData.access_token)),
-        encryptToken(String(tokenData.refresh_token)),
-        Number(tokenData.expires_in),
     ];
     const db = getDB();
 
     await db.query(`
         INSERT INTO discuser
-        (username, email, access_token, refresh_token, expires_in)
-        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (store_id, email) DO NOTHING`, userFormatted
+        (username, email)
+        VALUES ($1, $2) ON CONFLICT (store_id, email) DO NOTHING`, userFormatted
     );
 
-    await db.query(
-        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING`,
+    const insertedUser = await db.query(
+        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING RETURNING id`,
         [userFormatted[0], userFormatted[1]]
     );
+    // RETURNING só vem vazio quando ON CONFLICT DO NOTHING bateu (conta já
+    // existia) — rows.length > 0 prova que essa foi a PRIMEIRA vez.
+    if (insertedUser.rows.length > 0) {
+        sendWelcomeEmail({ to: userFormatted[1] as string, name: userFormatted[0] as string }).catch((err) =>
+            console.error(`Erro ao enviar email de boas-vindas (Discord) para ${userFormatted[1]}:`, err)
+        );
+    }
     await db.query(
         `UPDATE discuser SET user_id = (SELECT id FROM users WHERE email = $1) WHERE email = $1 AND user_id IS NULL`,
         [userFormatted[1]]
@@ -108,15 +117,22 @@ export async function GET(req: Request) {
     );
 
     var email = user?.email
+    // Sem email no payload — vai pra um canal do Discord (fora do nosso
+    // controle: pode vazar, mudar de membros, ficar com retenção
+    // indefinida). ID interno (não o id externo do Discord) + username
+    // bastam pra auditar "quem logou quando" sem mandar dado pessoal de
+    // verdade pra fora.
+    const internalUserIdRow = await db.query(`SELECT id FROM users WHERE email = $1`, [userFormatted[1]]);
+    const internalUserId = internalUserIdRow.rows[0]?.id ?? null;
     await sendWebhookLog({
         embeds: [
             {
                 title: "🔐 - OAUTH2 (Discord)",
                 color: 0x00ff99,
                 fields: [
-                    { name: "Email", value: user.email, inline: false },
+                    { name: "Provedor", value: "Discord", inline: true },
+                    { name: "ID interno", value: String(internalUserId ?? "desconhecido"), inline: true },
                     { name: "Usuário", value: user.username, inline: false },
-                    { name: "ID", value: user.id, inline: false },
                     { name: "Horário", value: new Date().toLocaleString(), inline: false }
                 ],
                 timestamp: new Date().toISOString()
@@ -144,13 +160,7 @@ export async function GET(req: Request) {
     });
 
     const res = NextResponse.redirect(config.WEBSITE_URL);
-    res.cookies.set("auth_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-    });
+    setAuthCookie(res, token);
     res.cookies.delete("oauth_state");
 
     return res;

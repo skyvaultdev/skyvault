@@ -16,10 +16,33 @@
   letter-spacing: 0.2px;
 }
 
-.infocontainer {
+.footerPlatformDisclosure {
+  margin-top: 4px !important;
+  opacity: 0.7;
+}
+
+.footerLegalInfo {
+  width: 100%;
+  max-width: 1000px;
+  margin: 18px auto 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: #71717a;
+  font-size: 11px;
+}
+
+.infocontainer {
+  /* Coluna, não linha: footerColumns e footerLegalInfo são dois blocos
+     que devem ficar um embaixo do outro. Com display:flex em row (o
+     original) os dois disputavam espaço na MESMA linha — foi assim que
+     o bloco de dados legais (adicionado depois) ficou espremido ao lado
+     das colunas em vez de aparecer como uma linha própria abaixo delas. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 14px;
 
   background-color: #1b1b1b;
@@ -31,10 +54,14 @@
 
 .footerColumns {
   display: flex;
-  grid-template-columns: repeat(4, minmax(140px, 200px));
-  gap: 20%;
+  flex-wrap: wrap;
+  gap: 20px 10%;
   width: 100%;
   max-width: 1000px;
+}
+
+.footerColumns .footerColumn {
+  flex: 1 1 140px;
 }
 
 .footerColumn {
@@ -74,8 +101,13 @@
 
 @media (max-width: 700px) {
   .footerColumns {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
     gap: 20px 16px;
+  }
+
+  .footerColumns .footerColumn {
+    /* ~2 colunas por linha (flex-basis > 50% força a quebra com o
+       flex-wrap do pai) em vez de 4 espremidas ou 1 por linha. */
+    flex-basis: calc(50% - 8px);
   }
 }
 

@@ -1,36 +1,165 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Loja — client/
 
-## Getting Started
+Loja virtual (Next.js App Router + Postgres). Este README cobre só o app
+dentro de `client/` — é daqui que todos os comandos abaixo devem ser
+rodados.
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- PostgreSQL 16 (ou qualquer versão recente compatível)
+- Uma conta Gmail com senha de app (para envio de e-mail) — opcional em dev
+- Credenciais de Google/Discord OAuth e Mercado Pago — opcionais em dev
+  (o login por e-mail e o provider de pagamento mock funcionam sem nada disso)
+
+## Instalação
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd client
+npm ci
+cp .env.example .env.local   # preencha com valores reais (ver abaixo)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variáveis de ambiente
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Todas as variáveis abaixo são lidas via `process.env` em algum lugar do
+código (`config/configuration.ts` centraliza a maioria). `.env.example`
+tem a lista completa, sem valores reais — copie para `.env.local` e
+preencha.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variável | Obrigatória | Para quê |
+|---|---|---|
+| `WEBSITE_URL` | sim | URL pública do site — usada em links de e-mail, OG/canonical, `notification_url` do Mercado Pago |
+| `ROOT_DOMAIN` | não | Liga o modo multi-loja (subdomínio/domínio próprio por loja). Vazio = loja única |
+| `DEFAULT_STORE_ID` | não | Loja usada quando não há `ROOT_DOMAIN` ou o host não bate com nenhuma loja cadastrada (padrão: `1`) |
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT` | sim | Conexão com o Postgres |
+| `JWT_SECRET`, `JWT_EXPIRES_IN` | sim | Assinatura do cookie de sessão (`auth_token`) de clientes/staff |
+| `DEV_JWT_SECRET`, `DEV_JWT_EXPIRES_IN` | não | Sessão do super-admin (`/dev`). Sem isso, um segredo aleatório é gerado a cada boot (sessões caem a cada restart) |
+| `INTERNAL_API_SECRET` | sim | Segredo das chamadas servidor-a-servidor internas (hoje: `proxy.ts` → `POST /api/internal/sync-user`). Nunca reuse `JWT_SECRET` aqui |
+| `EMAIL_USER`, `EMAIL_PASS` | não* | SMTP (Gmail) — login por código e e-mails de pedido. *Necessário em produção |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | não | Login social com Google |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_TOKEN`, `DISCORD_CLIENT_SECRET`, `DISCORD_SCOPES`, `WEBHOOK_URL` | não | Login social com Discord |
+| `PAYMENT_PROVIDER` | não | `mock` força o provider de teste mesmo com credenciais reais configuradas. Em produção, sem isso e sem credenciais, o checkout responde 503 (nunca cai no mock escondido) |
+| `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_PUBLIC_KEY`, `MERCADO_PAGO_WEBHOOK_SECRET`, `MERCADO_PAGO_SANDBOX` | não* | Credenciais da própria loja no Mercado Pago. *Necessário em produção pra cobrar de verdade |
+| `SHIPPING_PROVIDER` | não | `fixed_table` força a tabela de frete fixa local (credenciais do Melhor Envio continuam vindo do banco, não de env var) |
+| `ORDER_EXPIRATION_HOURS` | não | Horas até um pedido `pending_payment` expirar (padrão: `24`) — ver "Cron jobs" abaixo |
+| `ABANDONED_CART_HOURS` | não | Horas até um carrinho ser considerado abandonado pro e-mail de recuperação (padrão: `24`) — ver "Cron jobs" abaixo |
+| `CRON_SECRET` | sim, p/ os crons | Protege `POST /api/internal/cron/expire-orders` e `.../abandoned-cart-email` |
+| `DEV_ALLOWED_ORIGINS` | não | Origens externas liberadas no dev server (túnel ngrok/Cloudflare etc.), separadas por vírgula |
+| `PLATFORM_LEGAL_NAME`, `PLATFORM_CONTACT_EMAIL` | sim | Nome/contato de quem fornece a tecnologia (não a loja) — usado no contrato em `/termos-plataforma` e na linha de rodapé "Loja criada com ..." |
+| `GA4_MEASUREMENT_ID`, `META_PIXEL_ID` | não | Pixels de analytics/conversão (Google Analytics 4, Meta Pixel). Sem nenhum definido, nenhum script extra é carregado |
 
-## Learn More
+## Banco de dados e migrations
 
-To learn more about Next.js, take a look at the following resources:
+Não há ORM nem migration runner — schema em SQL puro:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `db/schema_full.sql` — dump completo do schema (referência; não é
+  aplicado automaticamente, é só pra entender o estado atual).
+- `db/migrations/*.sql` — arquivos datados (`AAAA-MM-DD_descricao.sql`),
+  aplicados **manualmente**, em ordem, contra o banco:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME" \
+  -f db/migrations/2026-10-06_coupon_per_user_limit.sql
+```
 
-## Deploy on Vercel
+(repita pra cada migration nova, na ordem da data no nome do arquivo).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Arquivos que começam com `PROPOSAL_` **não são migrations aplicadas** —
+são propostas em revisão, documentadas no próprio arquivo.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Várias rotas ainda criam/alteram tabelas em tempo de execução
+(`CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`)
+como rede de segurança contra migration não aplicada — isso é redundante
+com as migrations reais, mas intencionalmente não foi removido ainda (ver
+`db/migrations/PROPOSAL_consolidate_runtime_schema_changes.sql` para a
+lista completa e a proposta de consolidação).
+
+## Testes
+
+```bash
+npx vitest run       # roda uma vez
+npx vitest            # modo watch
+```
+
+A maioria dos testes faz integração real contra o banco configurado em
+`.env.local` (criam e limpam suas próprias linhas, prefixadas com
+`[TESTE]`/`teste-...@teste.com` — nunca tocam em dados existentes). Alguns
+testes de rota simulam `next/headers` (cookies/sessão) pra poder chamar o
+handler diretamente, fora do runtime de requisição do Next.
+
+## Build e produção
+
+```bash
+npx tsc --noEmit   # type-check
+npm run build      # next build
+npm run start      # next start — serve o build de produção
+```
+
+Para manter o processo vivo em um VPS, use um gerenciador de processos
+como o [PM2](https://pm2.keymetrics.io/):
+
+```bash
+npm install -g pm2
+npm run build
+pm2 start npm --name loja -- run start
+pm2 save
+pm2 startup   # configura o PM2 para subir com o sistema
+```
+
+`client/instrumentation.ts` inicializa o pool de conexões com o banco no
+boot do processo (`register()`), então a primeira requisição depois de um
+restart não paga o custo de abrir a conexão — e webhooks recebidos antes
+de qualquer página carregar (ex: Mercado Pago, logo após o deploy) também
+funcionam.
+
+## Cron jobs
+
+### Expirar pedidos pendentes
+
+Pedidos `pending_payment` com mais de `ORDER_EXPIRATION_HOURS` horas
+(padrão: 24) nunca são pagos e ficam presos nesse status pra sempre se
+nada os encerrar. `POST /api/internal/cron/expire-orders` marca esses
+pedidos como `expired` (e tenta cancelar qualquer Pix/boleto pendente no
+Mercado Pago).
+
+1. Defina `CRON_SECRET` e `INTERNAL_ORCHESTRATOR_TOKEN` no `.env` do servidor
+   (valores aleatórios, cada um o seu — nunca o mesmo valor nos dois).
+2. Agende uma chamada periódica (ex: a cada hora) a essa rota com os headers
+   `x-cron-secret` **e** `x-internal-orchestrator` — faltando qualquer um dos
+   dois, a chamada nem chega na rota (bloqueada antes, em `proxy.ts`, com
+   404):
+
+```bash
+# crontab -e
+0 * * * * curl -s -X POST https://sua-loja.com/api/internal/cron/expire-orders \
+  -H "x-cron-secret: SEU_CRON_SECRET_AQUI" \
+  -H "x-internal-orchestrator: SEU_INTERNAL_ORCHESTRATOR_TOKEN_AQUI" >> /var/log/expire-orders.log 2>&1
+```
+
+Sem `CRON_SECRET` configurado, a rota responde 500 e nunca expira nada —
+ela nunca roda "por acidente" sem o segredo definido. Sem
+`INTERNAL_ORCHESTRATOR_TOKEN` configurado, `/api/internal/**` inteiro fica
+inacessível (404) — nenhuma chamada passa, nem a do próprio app.
+
+### Recuperação de carrinho abandonado
+
+`POST /api/internal/cron/abandoned-cart-email` manda um e-mail pros
+clientes com itens no carrinho há mais de `ABANDONED_CART_HOURS` horas
+(padrão: 24) que ainda não foram avisados daquela versão do carrinho. Mesmo
+segredos (`CRON_SECRET` + `INTERNAL_ORCHESTRATOR_TOKEN`) e mesmo formato de
+chamada do expire-orders:
+
+```bash
+# crontab -e
+30 * * * * curl -s -X POST https://sua-loja.com/api/internal/cron/abandoned-cart-email \
+  -H "x-cron-secret: SEU_CRON_SECRET_AQUI" \
+  -H "x-internal-orchestrator: SEU_INTERNAL_ORCHESTRATOR_TOKEN_AQUI" >> /var/log/abandoned-cart-email.log 2>&1
+```
+
+## CI
+
+`.github/workflows/ci.yml` roda, em todo push/PR: `npm ci`,
+`npx tsc --noEmit`, `npx next build` e `npx vitest run`, contra um
+Postgres 16 descartável do próprio workflow (schema + migrations
+aplicados automaticamente antes dos testes).

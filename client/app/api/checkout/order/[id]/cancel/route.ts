@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/database/db";
 import { requireCustomer } from "@/lib/auth/customer";
+import { cancelMercadoPagoPayment } from "@/lib/payments/mercadoPagoProvider";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -28,6 +29,27 @@ export async function PATCH(_req: Request, { params }: Params) {
 
   if (result.rows.length === 0) {
     return NextResponse.json({ error: "ORDER_NOT_FOUND_OR_NOT_PENDING" }, { status: 404 });
+  }
+
+  // Cancela também o Pix pendente no Mercado Pago, se existir — senão o
+  // pagamento continua "em aberto" lá mesmo com o pedido já cancelado
+  // aqui. Falha nisso só loga, nunca desfaz o cancelamento (que já
+  // aconteceu, acima).
+  const pendingTxRes = await db.query(
+    `SELECT provider_txid FROM payment_transactions
+     WHERE order_id = $1 AND provider = 'mercadopago' AND status = 'pending' AND provider_txid IS NOT NULL`,
+    [orderId]
+  );
+  for (const tx of pendingTxRes.rows) {
+    try {
+      await cancelMercadoPagoPayment(tx.provider_txid);
+      await db.query(
+        `UPDATE payment_transactions SET status = 'expired', updated_at = NOW() WHERE order_id = $1 AND provider_txid = $2`,
+        [orderId, tx.provider_txid]
+      );
+    } catch (error) {
+      console.error(`[cancel] pedido #${orderId}: falha ao cancelar pagamento ${tx.provider_txid} no Mercado Pago —`, error);
+    }
   }
 
   return NextResponse.json({ data: { cancelled: true } });

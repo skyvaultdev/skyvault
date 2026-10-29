@@ -75,7 +75,7 @@ type Recommendation = {
 
 type PaymentMethod = "pix" | "credit_card" | "debit_card" | "boleto";
 
-type CheckoutStage = "loading" | "pending_resume" | "review" | "address" | "payment" | "awaiting_payment" | "delivered" | "empty" | "suspended";
+type CheckoutStage = "loading" | "pending_resume" | "review" | "address" | "payment" | "awaiting_payment" | "delivered" | "empty" | "suspended" | "legalInfoMissing";
 
 type PendingOrderItem = {
   product_name: string;
@@ -185,6 +185,7 @@ export default function CheckoutPage() {
   const deliveryFailCountRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [lookingUpCep, setLookingUpCep] = useState(false);
@@ -637,6 +638,14 @@ export default function CheckoutPage() {
   }
 
   async function handleCreateOrder() {
+    // Defesa em profundidade — os botões que chamam isso já ficam
+    // desabilitados sem o checkbox marcado, mas a função nunca pode
+    // depender só disso.
+    if (!termsAccepted) {
+      setErrorMessage("Marque que você leu e aceita os Termos de Uso e a Política de Privacidade pra continuar.");
+      return;
+    }
+
     setSubmitting(true);
     setErrorMessage("");
 
@@ -662,13 +671,21 @@ export default function CheckoutPage() {
       const res = await fetch("/api/checkout/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shipping: shippingPayload, couponCode: usingCoupon ? appliedCoupon?.code : undefined }),
+        body: JSON.stringify({
+          shipping: shippingPayload,
+          couponCode: usingCoupon ? appliedCoupon?.code : undefined,
+          termsAccepted,
+        }),
       });
       const json = await res.json();
 
       if (!res.ok) {
         if (json.error === "STORE_SUSPENDED") {
           setStage("suspended");
+        } else if (json.error === "STORE_LEGAL_INFO_MISSING") {
+          setStage("legalInfoMissing");
+        } else if (json.error === "TERMS_NOT_ACCEPTED") {
+          setErrorMessage("Marque que você leu e aceita os Termos de Uso e a Política de Privacidade pra continuar.");
         } else if (String(json.error).startsWith("OUT_OF_STOCK")) {
           setErrorMessage(`Item esgotado: ${String(json.error).split(":")[1] ?? ""}`);
         } else if (json.error === "MISSING_SHIPPING_ADDRESS" || json.error === "MISSING_SHIPPING_QUOTE") {
@@ -1087,6 +1104,18 @@ export default function CheckoutPage() {
     );
   }
 
+  if (stage === "legalInfoMissing") {
+    return (
+      <main className="checkoutPage">
+        <div className="checkoutCard">
+          <h1>Loja ainda não está pronta para vendas</h1>
+          <p className="checkoutHint">Esta loja ainda não está pronta para vendas. Tente novamente mais tarde.</p>
+          <Link href="/" className="checkoutBtnPrimary">Voltar à loja</Link>
+        </div>
+      </main>
+    );
+  }
+
   if (stage === "empty") {
     return (
       <main className="checkoutPage">
@@ -1302,7 +1331,7 @@ export default function CheckoutPage() {
           <button
             className="checkoutBtnPrimary"
             onClick={handleCreateOrder}
-            disabled={!selectedQuote || submitting}
+            disabled={!selectedQuote || submitting || !termsAccepted}
           >
             {submitting ? "Criando pedido..." : "Continuar para pagamento"}
           </button>
@@ -1558,12 +1587,18 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        <label className="checkoutTermsRow">
+          <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
+          Li e aceito os <a href="/termos" target="_blank" rel="noopener noreferrer">Termos de Uso</a> e a{" "}
+          <a href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</a> da loja.
+        </label>
+
         {errorMessage && <p className="checkoutError">{errorMessage}</p>}
 
         <button
           className="checkoutBtnPrimary"
           onClick={hasPhysical ? goToAddressStep : handleCreateOrder}
-          disabled={submitting}
+          disabled={submitting || !termsAccepted}
         >
           {hasPhysical ? "Continuar para entrega" : submitting ? "Criando pedido..." : "Continuar para pagamento"}
         </button>

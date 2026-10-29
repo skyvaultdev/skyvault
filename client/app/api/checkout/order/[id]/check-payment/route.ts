@@ -32,7 +32,7 @@ export async function POST(_req: Request, { params }: Params) {
   // A tela de espera chama isso sozinha a cada 4s — limite generoso o
   // suficiente pra cobrir esse polling normal (até uns 20min de espera
   // contínua) sem travar o cliente legítimo, só contendo abuso de verdade.
-  if (!rateLimit(`check-payment:${userId}:${orderId}`, 100, 5 * 60_000)) {
+  if (!(await rateLimit(`check-payment:${userId}:${orderId}`, 100, 5 * 60_000))) {
     return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
   }
 
@@ -92,11 +92,12 @@ export async function POST(_req: Request, { params }: Params) {
       console.error(`[check-payment] pedido #${orderId}: ATENÇÃO — pagamento confirmado com estoque insuficiente:`, result.stockShortages);
     }
     if (!result.alreadyProcessed && result.deliveredItems.length > 0 && result.customerEmail) {
-      try {
-        await sendOrderDeliveryEmail({ to: result.customerEmail, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems });
-      } catch (mailError) {
-        console.error("Falha ao enviar e-mail de entrega:", mailError);
-      }
+      // Disparado sem await — essa rota é chamada por polling a cada 4s;
+      // esperar o SMTP aqui travaria a resposta e, no limite, a própria
+      // tela de espera do cliente.
+      sendOrderDeliveryEmail({ to: result.customerEmail, orderId, orderNumber: result.order?.order_number, items: result.deliveredItems }).catch(
+        (mailError) => console.error("Falha ao enviar e-mail de entrega:", mailError)
+      );
     }
 
     return NextResponse.json({ data: { status: result.order.status } });

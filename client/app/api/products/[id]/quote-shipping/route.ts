@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: Params) {
     // Rota pública que dispara cotação real (Melhor Envio) — sem limite,
     // dava pra esgotar a cota da API da loja só chamando em loop.
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-    if (!rateLimit(`quote-shipping:${ip}`, 20, 5 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
+    if (!(await rateLimit(`quote-shipping:${ip}`, 20, 5 * 60_000))) return fail("TOO_MANY_REQUESTS", 429);
 
     const { id } = await params;
     const isNumeric = /^\d+$/.test(id);

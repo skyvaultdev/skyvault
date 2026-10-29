@@ -536,6 +536,16 @@
   width: fit-content;
 }
 
+.orderDetailDeliveredKeyRow {
+  display: grid;
+  gap: 2px;
+}
+
+.orderDetailDeliveredExpiry {
+  color: #a1a1aa;
+  font-size: 11px;
+}
+
 .orderDetailDeliveredFile {
   display: flex;
   align-items: center;

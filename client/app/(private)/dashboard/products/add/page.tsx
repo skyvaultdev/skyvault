@@ -82,6 +82,7 @@ export default function AddProductPage() {
   const [variations, setVariations] = useState<Variation[]>([]);
   const [newVariation, setNewVariation] = useState({ name: "", price: "", stockCount: "", isUnlimited: false });
   const [selectedVariationId, setSelectedVariationId] = useState<string>("");
+  const [editingVariationId, setEditingVariationId] = useState<string | null>(null);
 
   var slug = slugify(form.name);
 
@@ -124,20 +125,38 @@ export default function AddProductPage() {
 
   function addVariation() {
     if (!newVariation.name || !newVariation.price) return;
-    var variation: Variation = {
-      id: crypto.randomUUID(),
-      name: newVariation.name,
-      price: newVariation.price,
-      stockCount: newVariation.stockCount,
-      isUnlimited: newVariation.isUnlimited,
-    };
-    setVariations((prev) => [...prev, variation]);
+    if (editingVariationId) {
+      setVariations((prev) => prev.map((v) => v.id === editingVariationId
+        ? { ...v, name: newVariation.name, price: newVariation.price, stockCount: newVariation.stockCount, isUnlimited: newVariation.isUnlimited }
+        : v));
+      setEditingVariationId(null);
+    } else {
+      var variation: Variation = {
+        id: crypto.randomUUID(),
+        name: newVariation.name,
+        price: newVariation.price,
+        stockCount: newVariation.stockCount,
+        isUnlimited: newVariation.isUnlimited,
+      };
+      setVariations((prev) => [...prev, variation]);
+    }
+    setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
+  }
+
+  function startEditVariation(v: Variation) {
+    setEditingVariationId(v.id);
+    setNewVariation({ name: v.name, price: v.price, stockCount: v.stockCount, isUnlimited: v.isUnlimited });
+  }
+
+  function cancelEditVariation() {
+    setEditingVariationId(null);
     setNewVariation({ name: "", price: "", stockCount: "", isUnlimited: false });
   }
 
   function removeVariation(id: string) {
     setVariations((prev) => prev.filter((v) => v.id !== id));
     if (selectedVariationId === id) setSelectedVariationId("");
+    if (editingVariationId === id) cancelEditVariation();
   }
 
   var selectedVariation = variations.find((v) => v.id === selectedVariationId);
@@ -391,18 +410,22 @@ export default function AddProductPage() {
                   Ilimitado
                 </label>
               )}
-              <button type="button" onClick={addVariation} className="addbtn">Adicionar</button>
+              <button type="button" onClick={addVariation} className="addbtn">{editingVariationId ? "Salvar edição" : "Adicionar"}</button>
+              {editingVariationId && (
+                <button type="button" onClick={cancelEditVariation} className="btnSecondary">Cancelar</button>
+              )}
             </div>
             <div className="variationList">
               {variations.map((v) => (
-                <div key={v.id} className="variationItem">
+                <div key={v.id} className={`variationItem ${editingVariationId === v.id ? "editing" : ""}`}>
                   {v.name} - R$ {v.price}
                   {form.productType === "physical" && (
                     <span className="variationStockHint">
                       {" "}({v.isUnlimited ? "ilimitado" : `${v.stockCount || 0} em estoque`})
                     </span>
                   )}
-                  <button type="button" onClick={() => removeVariation(v.id)}><Icon name="x" /></button>
+                  <button type="button" title="Editar" className="variationEditBtn" onClick={() => startEditVariation(v)}><Icon name="edit" /></button>
+                  <button type="button" title="Remover" onClick={() => removeVariation(v.id)}><Icon name="x" /></button>
                 </div>
               ))}
             </div>

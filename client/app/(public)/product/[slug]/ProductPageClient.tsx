@@ -1,0 +1,708 @@
+"use client";
+
+import Link from "next/link";
+import Icon from "@/components/icons/Icon";
+import { useParams } from "next/navigation";
+import "./product.css";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FiLock, FiX, FiMaximize2, FiHeart } from "react-icons/fi";
+import ShippingQuoteList, { type ShippingQuote } from "@/app/(components)/shipping/ShippingQuoteList";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
+import { captureReferralFromUrl } from "@/lib/resellers/captureReferralClient";
+import ProductQuestions from "./ProductQuestions";
+import ProductReviews from "./ProductReviews";
+
+type ProductImage = { id: number; url: string; position: number };
+
+type Product = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  price: number;
+  category_id: number | null;
+  images: ProductImage[];
+  stock_count: number;
+  is_unlimited: boolean;
+  product_type?: "digital" | "physical";
+};
+
+type Variations = {
+  id: number;
+  // product_id/position nunca são selecionados pela API
+  // (lib/products/getPublicProduct.ts) — mantidos opcionais aqui só
+  // porque o sort abaixo já referencia `position` (vira no-op sem ele).
+  product_id?: number;
+  name: string;
+  price: number;
+  position?: number;
+  stock_count: number;
+  is_unlimited: boolean;
+};
+
+type Coupon = {
+  code: string;
+  percent_off: number;
+  min_order_value: number | null;
+};
+
+type Similar = {
+  id: number;
+  slug: string;
+  name: string;
+  price: number;
+  image_url: string | null;
+};
+
+function getSimilarity(a: string, b: string) {
+  const wordsA = a.toLowerCase().split(/\s+/);
+  const wordsB = b.toLowerCase().split(/\s+/);
+
+  const matches = wordsA.filter((w) => wordsB.includes(w));
+  return matches.length / Math.max(wordsA.length, 1);
+}
+
+type InitialProduct = Product & { variations: Variations[] };
+
+// Dados iniciais vêm do Server Component (page.tsx), que já fez a query
+// pra montar o <head> (title/OG/canonical/JSON-LD) — reaproveitar isso
+// aqui evita um fetch duplicado e o "Carregando..." no primeiro paint.
+export default function ProductPageClient({ initialProduct }: { initialProduct?: InitialProduct | null }) {
+  const params = useParams<{ slug: string }>();
+  const router = useRouter();
+  const modal = useModal();
+
+  const [product, setProduct] = useState<Product | null>(() => {
+    if (!initialProduct) return null;
+    const { variations: _variations, ...rest } = initialProduct;
+    return { ...rest, price: Number(rest.price), images: Array.isArray(rest.images) ? rest.images : [] };
+  });
+  const [variations, setVariations] = useState<Variations[]>(() => {
+    if (!initialProduct) return [];
+    return initialProduct.variations
+      .map((v) => ({ ...v, price: Number(v.price), stock_count: v.stock_count, is_unlimited: Boolean(v.is_unlimited) }))
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  });
+  const [selectedVariationPos, setSelectedVariationPos] = useState<number | null>(() => {
+    if (!initialProduct || initialProduct.variations.length === 0) return null;
+    const firstAvailable = initialProduct.variations.find((v) => v.is_unlimited || v.stock_count > 0);
+    return firstAvailable ? firstAvailable.id : initialProduct.variations[0].id;
+  });
+  const skippedInitialFetch = useRef(false);
+  const [similar, setSimilar] = useState<Similar[]>([]);
+
+  const [notFound, setNotFound] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  const [couponCode, setCouponCode] = useState("");
+  const [couponMessage, setCouponMessage] = useState("");
+  const [finalPrice, setFinalPrice] = useState<number | null>(null);
+
+  const [loadingAdd, setLoadingAdd] = useState(false);
+  const [paymentMethodLabels, setPaymentMethodLabels] = useState<string[]>(["Pix"]);
+  const [inWishlist, setInWishlist] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+
+  useEffect(() => {
+    // Lista real de métodos aceitos (aba Pagamentos da dashboard) em vez do
+    // "Pix" fixo que aparecia aqui independente da configuração.
+    fetch("/api/store-settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const d = json?.data;
+        if (!d) return;
+        const list: string[] = [];
+        if (d.accepts_pix !== false) list.push("Pix");
+        if (d.accepts_credit_card !== false) list.push("Cartão de crédito");
+        if (d.accepts_debit_card !== false) list.push("Cartão de débito");
+        if (d.accepts_boleto !== false) list.push("Boleto");
+        if (list.length > 0) setPaymentMethodLabels(list);
+      })
+      .catch(() => {});
+  }, []);
+
+  const [freightCep, setFreightCep] = useState("");
+  const [freightQuotes, setFreightQuotes] = useState<ShippingQuote[]>([]);
+  const [freightQuoting, setFreightQuoting] = useState(false);
+  const [freightError, setFreightError] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+  const totalPages = Math.ceil(similar.length / itemsPerPage);
+
+  var paginatedProducts = useMemo(() => {
+    var startIndex = (currentPage - 1) * itemsPerPage;
+    return similar.slice(startIndex, startIndex + itemsPerPage);
+  }, [similar, currentPage]);
+
+  var pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  useEffect(() => {
+    captureReferralFromUrl();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProduct() {
+      var slug = params.slug;
+      if (!slug) return;
+
+      // Já veio pronto do servidor (ver page.tsx) — evita um fetch
+      // duplicado e o flash de "Carregando..." no primeiro paint.
+      if (!skippedInitialFetch.current && initialProduct && initialProduct.slug === slug) {
+        skippedInitialFetch.current = true;
+        return;
+      }
+      skippedInitialFetch.current = true;
+
+      try {
+        var res = await fetch(`/api/products/${encodeURIComponent(slug)}`);
+        if (!res.ok) {
+          if (!cancelled && res.status === 404) setNotFound(true);
+          return;
+        }
+
+        const json = await res.json();
+        if (!json.ok || !json.data || cancelled) return;
+
+        var data = json.data as Product;
+        setProduct(null);
+        setVariations([]);
+        setSimilar([]);
+        setFinalPrice(null);
+        setCouponCode("");
+        setCouponMessage("");
+        setSelectedImage(0);
+        setSelectedVariationPos(null);
+
+        setProduct({
+          ...data,
+          price: Number(data.price),
+          images: Array.isArray(data.images) ? data.images : [],
+        });
+
+        var vData: Variations[] = Array.isArray(json.data.variations)
+          ? json.data.variations
+          : [];
+
+        var cleaned = vData
+          .map((v) => ({
+            ...v,
+            price: Number(v.price),
+            stock_count: v.stock_count,
+            is_unlimited: Boolean(v.is_unlimited)
+          }))
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+        setVariations(cleaned);
+        if (cleaned.length > 0) {
+          const firstAvailable = cleaned.find(v => v.is_unlimited || v.stock_count > 0);
+          setSelectedVariationPos(firstAvailable ? firstAvailable.id : cleaned[0].id);
+        }
+
+        setNotFound(false);
+      } catch {
+        setNotFound(true);
+      }
+    }
+
+    loadProduct();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.slug]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    let cancelled = false;
+
+    async function loadExtraData() {
+      if (!product) return;
+
+      try {
+        var allRes = await fetch(`/api/products`);
+        var allJson = await allRes.json();
+
+        const pool: any[] = allJson.data;
+
+        
+        var sameCategory: any[] = [];
+        var similarWords: { item: any; score: number }[] = [];
+        var noCategory: any[] = [];
+
+        pool.forEach((item) => {
+          if (item.id === product.id) return;
+
+          if (product.category_id && item.category_id === product.category_id) {
+            sameCategory.push(item);
+            return;
+          }
+
+          var score = getSimilarity(product.name, item.name);
+          if (score >= 0.4) {
+            similarWords.push({ item, score });
+            return;
+          }
+
+          if (!item.category_id) {
+            noCategory.push(item);
+          }
+        });
+
+        similarWords.sort((a, b) => b.score - a.score);
+        var finalResults = [
+          ...sameCategory,
+          ...similarWords.map((s) => s.item),
+          ...noCategory,
+        ]
+          .filter((v, i, arr) => arr.findIndex((t) => t.id === v.id) === i)
+          .slice(0, 4)
+          .map((item) => ({
+            id: Number(item.id),
+            slug: String(item.slug),
+            name: String(item.name),
+            price: Number(item.price),
+            image_url: item.image_url || null,
+          }));
+
+        setSimilar(finalResults);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    loadExtraData();
+  }, [product?.id, product?.category_id, product?.name]);
+
+  var selectedVariation = useMemo(() => {
+    return variations.find((v) => v.id === selectedVariationPos) || null;
+  }, [variations, selectedVariationPos]);
+
+  var basePrice = useMemo(() => {
+    if (!product) return 0;
+    return Number(selectedVariation?.price ?? product.price ?? 0);
+  }, [selectedVariation, product]);
+
+  var displayedPrice = useMemo(() => {
+    return finalPrice !== null ? Number(finalPrice) : basePrice;
+  }, [finalPrice, basePrice]);
+
+  var currentImage = useMemo(() => {
+    if (!product || !product.images.length) return "/placeholders/product.svg";
+    return product.images[selectedImage]?.url || "/placeholders/product.svg";
+  }, [product, selectedImage]);
+
+  var needsVariationChoice = variations.length > 0 && !selectedVariation;
+
+  var isAvailable = useMemo(() => {
+    if (!product) return false;
+    if (variations.length > 0 && !selectedVariation) return false;
+    var target = selectedVariation ?? product;
+    if (!target) return false;
+
+    return target.is_unlimited || target.stock_count > 0;
+  }, [product, selectedVariation, variations.length]);
+
+  useEffect(() => {
+    async function prefillCep() {
+      try {
+        const res = await fetch("/api/profile", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.data?.cep) setFreightCep(json.data.cep);
+      } catch {
+        // sem login ou sem CEP salvo — o campo fica em branco, usuário digita na hora
+      }
+    }
+    void prefillCep();
+  }, []);
+
+  useEffect(() => {
+    setFreightQuotes([]);
+    setFreightError("");
+  }, [selectedVariationPos]);
+
+  useEffect(() => {
+    const productId = product?.id;
+    if (!productId) return;
+    let cancelled = false;
+    async function checkWishlist() {
+      try {
+        const res = await fetch("/api/wishlist", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const list: Array<{ product_id: number }> = Array.isArray(json.data) ? json.data : [];
+        setInWishlist(list.some((item) => Number(item.product_id) === productId));
+      } catch {
+        // sem login — fica como "não favoritado"
+      }
+    }
+    void checkWishlist();
+    return () => { cancelled = true; };
+  }, [product?.id]);
+
+  async function toggleWishlist() {
+    if (!product) return;
+    setWishlistBusy(true);
+    try {
+      if (inWishlist) {
+        const res = await fetch(`/api/wishlist/${product.id}`, { method: "DELETE" });
+        if (res.ok) setInWishlist(false);
+      } else {
+        const res = await fetch("/api/wishlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: product.id }),
+        });
+        if (res.ok) setInWishlist(true);
+        else if (res.status === 401) router.push("/login");
+      }
+    } finally {
+      setWishlistBusy(false);
+    }
+  }
+
+  async function calculateFreight() {
+    if (!product) return;
+    const digits = freightCep.replace(/\D/g, "");
+    if (digits.length !== 8) {
+      setFreightError("CEP inválido.");
+      return;
+    }
+
+    setFreightQuoting(true);
+    setFreightError("");
+    setFreightQuotes([]);
+
+    try {
+      const res = await fetch(`/api/products/${product.id}/quote-shipping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cep: digits, variationId: selectedVariation?.id }),
+      });
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.data) && json.data.length > 0) {
+        setFreightQuotes(json.data);
+      } else {
+        setFreightError("Não foi possível calcular o frete pra esse CEP.");
+      }
+    } catch {
+      setFreightError("Erro ao calcular o frete.");
+    } finally {
+      setFreightQuoting(false);
+    }
+  }
+
+  async function applyCoupon() {
+    if (!product) return;
+
+    var code = couponCode.trim().toUpperCase();
+    if (!code) return;
+
+    try {
+      var res = await fetch(`/api/coupons?code=${encodeURIComponent(code)}`);
+      const json = await res.json();
+      const coupon = res.ok ? (json.data as Coupon) : null;
+
+      if (coupon) {
+        setFinalPrice(basePrice * (1 - Number(coupon.percent_off) / 100));
+        setCouponMessage(`-${coupon.percent_off}% aplicado!`);
+      } else {
+        setCouponMessage("Inválido");
+      }
+    } catch {
+      setCouponMessage("Erro");
+    }
+  }
+
+  async function addToCart() {
+    var variation_id = selectedVariation ? selectedVariation.id : null;
+    var response = await fetch("/api/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_id: product?.id,
+        variation_id,
+        quantity: 1,
+      }),
+    });
+
+    return { response, data: await response.json() };
+  }
+
+  async function handleAddToCart() {
+    setLoadingAdd(true);
+
+    try {
+      const { response, data } = await addToCart();
+      if (response.ok) {
+        router.refresh();
+        window.dispatchEvent(new Event("abrirCarrinho"));
+      } else {
+        if (data?.error === "UNAUTHORIZED_TOKEN") {
+          router.push("/login");
+        } else {
+          await modal.alert("Erro ao adicionar: " + (data?.message ?? "Erro desconhecido"));
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar ao carrinho:", error);
+      await modal.alert("Erro inesperado ao adicionar ao carrinho.");
+    } finally {
+      setLoadingAdd(false);
+    }
+  }
+
+  async function handleBuyNow() {
+    setLoadingAdd(true);
+
+    try {
+      const { response, data } = await addToCart();
+      if (response.ok) {
+        router.push("/checkout");
+      } else if (data?.error === "UNAUTHORIZED_TOKEN") {
+        router.push("/login");
+      } else {
+        await modal.alert("Erro ao comprar: " + (data?.message ?? "Erro desconhecido"));
+      }
+    } catch (error) {
+      console.error("Erro ao comprar agora:", error);
+      await modal.alert("Erro inesperado ao iniciar a compra.");
+    } finally {
+      setLoadingAdd(false);
+    }
+  }
+
+  if (notFound) return <main className="productPage">Produto não encontrado</main>;
+  if (!product) return <main className="productPage">Carregando...</main>;
+
+  return (
+    <main className="productPage">
+      {isZoomed && (
+        <div className="zoomOverlay" onClick={() => setIsZoomed(false)}>
+          <button className="closeZoom">
+            <FiX size={30} />
+          </button>
+          <img src={currentImage} alt="Zoom" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
+      <section className="productLayout">
+        <div className="card galleryCard">
+          <div className="mainImageContainer">
+            <img src={currentImage} alt={product.name} className="mainImage" />
+            <button className="zoomBtn" onClick={() => setIsZoomed(true)}>
+              <FiMaximize2 size={20} />
+            </button>
+          </div>
+
+          <div className="thumbRow">
+            {product.images.map((image, index) => (
+              <button
+                key={image.id}
+                onClick={() => setSelectedImage(index)}
+                className={`thumbBtn ${index === selectedImage ? "thumbActive" : ""}`}
+              >
+                <img src={image.url} alt="thumb" className="thumbImg" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="card infoCard">
+          <h1 className="productTitle">{product.name}</h1>
+
+          <p className="productPrice">
+            <strong>R$ {displayedPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+            {finalPrice !== null && <span className="oldPrice"> R$ {basePrice.toFixed(2).replace(".", ",")}</span>}
+          </p>
+
+          <div className={`productDesc ${!descExpanded && (product.description?.length ?? 0) > 380 ? "collapsed" : ""}`}>
+            {product.description?.split("\n").map((line, i) => (
+              <p key={i}>{line}</p>
+            ))}
+          </div>
+          {(product.description?.length ?? 0) > 380 && (
+            <button type="button" className="descToggle" onClick={() => setDescExpanded((v) => !v)}>
+              {descExpanded ? "Ler menos" : "Ler mais"}
+            </button>
+          )}
+
+          {variations.length > 0 && (
+            <div className="variationBlock">
+              <span className="variationLabel">Selecione uma opção:</span>
+
+              <div className="variationList">
+                {variations.map((v) => {
+                  var outOfStock = !v.is_unlimited && v.stock_count < 1;
+                  return (
+                    <button
+                      key={v.id}
+                      disabled={outOfStock}
+                      className={`variationItem ${selectedVariationPos === v.id ? "variationItemActive" : ""} ${outOfStock ? "outOfStock" : ""}`}
+                      onClick={() => setSelectedVariationPos(v.id)}
+                    >
+                      <div className="variationInfo">
+                        <p className="variationName">{v.name}</p>
+                        <p className="variationStock">
+                          {v.is_unlimited ? "Disponível" : outOfStock ? "Esgotado" : `${v.stock_count} em estoque`}
+                        </p>
+                      </div>
+                      <span className="variationPrice">R$ {v.price.toFixed(2).replace(".", ",")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {product.product_type === "physical" && (
+            <div className="freightCalc">
+              <p className="freightCalcLabel"><Icon name="box" /> Calcular frete e prazo de entrega</p>
+              <div className="freightCalcRow">
+                <input
+                  className="freightCalcInput"
+                  placeholder="Seu CEP"
+                  value={freightCep}
+                  onChange={(e) => setFreightCep(e.target.value.replace(/[^\d-]/g, ""))}
+                  maxLength={9}
+                />
+                <button className="freightCalcBtn" onClick={calculateFreight} disabled={freightQuoting}>
+                  {freightQuoting ? "Calculando..." : "Calcular"}
+                </button>
+              </div>
+              {freightError && <p className="freightCalcError">{freightError}</p>}
+              <ShippingQuoteList quotes={freightQuotes} />
+            </div>
+          )}
+
+          <div className="actions">
+            <button
+              className="btnPrimary"
+              onClick={handleBuyNow}
+              disabled={!isAvailable || loadingAdd}
+            >
+              {needsVariationChoice ? "Selecione uma opção" : isAvailable ? "Comprar agora" : "Produto Esgotado"}
+            </button>
+
+            <button
+              className="btncartadd"
+              onClick={handleAddToCart}
+              disabled={!isAvailable || loadingAdd}
+            >
+              {loadingAdd ? "Adicionando..." : needsVariationChoice ? "Selecione uma opção" : isAvailable ? "Adicionar ao carrinho" : "Esgotado"}
+            </button>
+
+            <button
+              type="button"
+              className="wishlistBtn"
+              onClick={() => void toggleWishlist()}
+              disabled={wishlistBusy}
+              aria-label={inWishlist ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              title={inWishlist ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            >
+              <FiHeart size={18} fill={inWishlist ? "currentColor" : "none"} />
+            </button>
+          </div>
+
+          {/*  <div className="couponBox">
+            <div className="couponRow">
+              <input
+                className="couponInput"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="CUPOM"
+              />
+              <button className="couponBtn" onClick={applyCoupon}>
+                Aplicar
+              </button> 
+            </div>
+            {couponMessage && <p className="couponMsg">{couponMessage}</p>}
+          </div>-*/}
+        </div>
+
+        <aside className="sideBar">
+          <article className="sideCard">
+            <h3 className="securebuy">
+              Compra segura <FiLock size={18} />
+            </h3>
+            <p>Seus dados estão protegidos.</p>
+          </article>
+
+          <aside className="sideBar">
+            <article className="sideCard">
+              <h3>Métodos de pagamento</h3>
+              <ul className="paymentMethodList">
+                {paymentMethodLabels.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+              <p className="paymentMethodHint">Os métodos disponíveis dependem do valor do pedido.</p>
+            </article>
+          </aside>
+        </aside>
+      </section>
+
+      {product && <ProductReviews productId={Number(product.id)} />}
+
+      {product && <ProductQuestions productId={Number(product.id)} />}
+
+      {similar.length > 0 && (
+        <section className="similarSection">
+          <h2 className="similarTitle">Recomendados para você</h2>
+
+          <div className="similarGrid">
+            {paginatedProducts.map((item) => (
+              <div key={item.id} className="similarCard" onClick={() => router.push(`/product/${item.slug}`)}>
+                <div className="similarImgWrapper">
+                  <img src={item.image_url || "/placeholders/product.svg"} alt={item.name} className="similarThumb" />
+                </div>
+
+                <div className="similarInfo">
+                  <h4 className="similarName">{item.name}</h4>
+                  <p className="similarPrice">
+                    R$ {Number(item.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                  <button className="buyButton2">Comprar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="btnPagination"
+          >
+            &larr;
+          </button>
+          {pageNumbers.map((num) => (
+            <button
+              key={num}
+              onClick={() => setCurrentPage(num)}
+              className={`pageNumber ${currentPage === num ? "active" : ""} btnPagination`}
+            > {num}
+            </button>
+          ))}
+          <button
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="btnPagination"
+          >
+            &rarr;
+          </button>
+
+        </div>
+      )}
+
+    </main>
+  );
+}

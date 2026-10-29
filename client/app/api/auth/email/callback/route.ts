@@ -7,8 +7,10 @@ import { createHash } from "crypto";
 import { getDB } from "@/lib/database/db";
 import { config } from "@/config/configuration"
 import { signJWT, verifyJWT } from "@/lib/jwt/init";
+import { setAuthCookie } from "@/lib/jwt/cookie";
 import { ROLES } from "@/lib/jwt/permissions"
 import { rateLimit } from "@/lib/security/rateLimit";
+import { sendWelcomeEmail } from "@/lib/mail/sendWelcomeEmail";
 type Role = keyof typeof ROLES
 
 function hashCode(code: string) {
@@ -16,13 +18,15 @@ function hashCode(code: string) {
 }
 
 export async function POST(req: Request) {
-    const { email, code } = await req.json();
+    const body = await req.json();
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const code = body?.code;
 
     if (!email || !code) {
         return NextResponse.json({ error: "INVALID_DATA" }, { status: 400 });
     }
 
-    if (!rateLimit(`otp-verify:${String(email).toLowerCase()}`, 10, 10 * 60_000)) {
+    if (!(await rateLimit(`otp-verify:${email}`, 10, 10 * 60_000))) {
         return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429 });
     }
 
@@ -45,9 +49,18 @@ export async function POST(req: Request) {
         [email]
     );
 
-    await db.query(`INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING`,
+    const insertedUser = await db.query(
+        `INSERT INTO users (username, email, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (store_id, email) DO NOTHING RETURNING id`,
         [username, email]
     );
+    // RETURNING só vem vazio quando ON CONFLICT DO NOTHING bateu (conta já
+    // existia) — rows.length > 0 prova que essa foi a PRIMEIRA vez, sem
+    // precisar de um SELECT separado (e sem a corrida que isso teria).
+    if (insertedUser.rows.length > 0) {
+        sendWelcomeEmail({ to: email, name: String(username) }).catch((err) =>
+            console.error(`Erro ao enviar email de boas-vindas (login por código) para ${email}:`, err)
+        );
+    }
 
     const adminRow = await db.query(`SELECT * FROM admin WHERE email = $1`, [email]);
     let role: Role | "regular_citizen" = "regular_citizen";
@@ -69,14 +82,6 @@ export async function POST(req: Request) {
     });
 
     const res = NextResponse.json({ ok: true });
-
-    res.cookies.set("auth_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-    });
-
+    setAuthCookie(res, token);
     return res;
 }

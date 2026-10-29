@@ -5,13 +5,13 @@ import { getDB } from "@/lib/database/db";
 import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/guard";
 import { ensureStockMovementsTable, logStockMovement } from "@/lib/stock/stockMovements";
+import { sniffDigitalProductFile } from "@/lib/files/sniffFile";
 
 type RouteParams = {
   params: Promise<{ id: string; target: string }>;
 };
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
-const BANNED_EXTENSIONS = [".exe", ".bat", ".cmd", ".sh", ".php", ".js", ".vbs"];
 
 export async function POST(req: Request, { params }: RouteParams) {
   const { session, denied } = await requirePermission("products.write");
@@ -28,22 +28,40 @@ export async function POST(req: Request, { params }: RouteParams) {
     const isUnlimited = rawUnlimited === "true" || rawUnlimited === "on" || rawUnlimited === "1";
     var file = formData.get("file") as File | null;
 
+    // Validade opcional das chaves vendidas (dias) — só faz sentido pra
+    // tipo "key"; qualquer outro tipo grava NULL (sem recorrência/cobrança
+    // automática, só a data informativa usada na entrega).
+    const rawValidityDays = formData.get("key_validity_days") as string | null;
+    const parsedValidityDays = rawValidityDays ? parseInt(rawValidityDays, 10) : NaN;
+    const keyValidityDays = type === "key" && Number.isFinite(parsedValidityDays) && parsedValidityDays > 0
+      ? parsedValidityDays
+      : null;
+
     if (type === "file" && file && file.size > 0) {
       if (file.size > MAX_FILE_SIZE) return fail("TOO_LARGE_FILE", 400);
 
-      var fileName = file.name.toLowerCase();
-      if (BANNED_EXTENSIONS.some(ext => fileName.endsWith(ext))) {
-        return fail("BANNED_FILE_EXTENSION", 400);
-      }
+      // Allowlist pelos bytes reais (sniffDigitalProductFile), não pela
+      // extensão do nome que quem faz upload controla — nome/Content-Type
+      // enviados pelo client não provam nada sobre o conteúdo real do
+      // arquivo. Cobre os formatos comuns de produto digital (arquivo,
+      // áudio, vídeo, imagem, pdf, texto); .exe/.msi continuam de fora de
+      // propósito, mesma intenção do blocklist que isso substitui.
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const sniffed = sniffDigitalProductFile(buffer);
+      if (!sniffed) return fail("UNSUPPORTED_FILE_TYPE", 400);
 
       var uploadDir = join(process.cwd(), "stock", "products", "uploads");
       if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true });
 
-      var uniqueName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+      // Mantém o nome "amigável" original (pro cliente que comprar ver um
+      // nome de arquivo decente ao baixar, não um UUID) mas troca a
+      // extensão pela REAL (sniffed), não pela que o client alegou.
+      const baseName = file.name.replace(/\.[^./\\]*$/, "").replace(/[^a-zA-Z0-9._-]/g, "_") || "arquivo";
+      var uniqueName = `${Date.now()}-${baseName}${sniffed.ext}`;
       var filePath = join(uploadDir, uniqueName);
 
-      var bytes = await file.arrayBuffer();
-      await writeFile(filePath, Buffer.from(bytes));
+      await writeFile(filePath, buffer);
 
       content = uniqueName;
     }
@@ -112,9 +130,10 @@ export async function POST(req: Request, { params }: RouteParams) {
        SET stock_type = $1,
            stock_content = $2,
            stock_count = $3,
-           is_unlimited = $5
+           is_unlimited = $5,
+           key_validity_days = $6
        WHERE id = $4`,
-      [type, savedContent, count, id, isUnlimited]
+      [type, savedContent, count, id, isUnlimited, keyValidityDays]
     );
 
     if (before) {

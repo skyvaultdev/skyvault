@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: Params) {
     const questionId = Number(qid);
     if (!productId || !questionId) return fail("INVALID_ID", 400);
 
-    if (!rateLimit(`question-reply:${userId}`, 10, 10 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
+    if (!(await rateLimit(`question-reply:${userId}`, 10, 10 * 60_000))) return fail("TOO_MANY_REQUESTS", 429);
 
     const body = await req.json();
     const text = String(body.body ?? "").trim();

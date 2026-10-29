@@ -1,32 +1,14 @@
 "use server";
 
-import { Pool } from "pg";
 import { log } from "../logger";
-import { config } from "@/config/configuration";
-
-declare global {
-  var pgPool: Pool | undefined;
-  
-}
-const database = config.database;
+import { getOrCreatePool } from "./pool";
 
 export async function initApp() {
-  
-
   try {
-    if (!global.pgPool) {
-      global.pgPool = new Pool({
-        host: database.host,
-        user: database.user,
-        password: database.password,
-        database: database.database,
-        port: database.port,
-      });
+    const pool = getOrCreatePool();
+    log.info("PostgreSQL pool criado");
 
-      log.info("PostgreSQL pool criado");
-    }
-
-    await global.pgPool.query("SELECT 1");
+    await pool.query("SELECT 1");
 
     log.info("PostgreSQL conectado com sucesso");
   } catch (err) {

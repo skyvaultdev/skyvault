@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: Params) {
     const productId = Number(id);
     if (!productId) return fail("INVALID_PRODUCT_ID", 400);
 
-    if (!rateLimit(`product-question:${userId}`, 5, 10 * 60_000)) return fail("TOO_MANY_REQUESTS", 429);
+    if (!(await rateLimit(`product-question:${userId}`, 5, 10 * 60_000))) return fail("TOO_MANY_REQUESTS", 429);
 
     const body = await req.json();
     const question = String(body.question ?? "").trim();

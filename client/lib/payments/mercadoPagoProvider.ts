@@ -1,4 +1,4 @@
-import { MercadoPagoConfig, Payment } from "mercadopago";
+import { MercadoPagoConfig, Payment, PaymentRefund } from "mercadopago";
 import { config } from "@/config/configuration";
 import { loadMercadoPagoCredentials } from "./mercadoPagoCredentials";
 import type { PaymentProvider, ChargeRequest, ChargeResult } from "./PaymentProvider";
@@ -84,6 +84,45 @@ export async function getMercadoPagoPaymentStatus(paymentId: string): Promise<{ 
   const result = await payment.get({ id: paymentId });
 
   return { paid: result.status === "approved", raw: result };
+}
+
+// Cancela um pagamento ainda pendente/em processo (Pix não pago, por
+// exemplo) — chamado quando um pedido pending_payment expira
+// (lib/orders/expirePendingOrders.ts) ou quando o próprio cliente cancela
+// o pedido (app/api/checkout/order/[id]/cancel/route.ts). O Mercado Pago só
+// aceita cancelar pagamento que ainda não foi aprovado; falha aqui é só
+// logada pelo chamador, nunca trava o fluxo (o Pix expira por conta
+// própria do lado do Mercado Pago de qualquer forma).
+export async function cancelMercadoPagoPayment(paymentId: string): Promise<void> {
+  const creds = await loadMercadoPagoCredentials();
+  if (!creds) throw new Error("Mercado Pago não configurado.");
+
+  const client = new MercadoPagoConfig({ accessToken: creds.accessToken });
+  const payment = new Payment(client);
+  await payment.cancel({ id: paymentId });
+}
+
+// Estorno real de um pagamento já aprovado — chamado pelo staff ao marcar
+// um pedido como "reembolsado" (app/api/admin/orders/[id]/route.ts), nunca
+// automaticamente. Diferente de cancelMercadoPagoPayment: aqui o dinheiro
+// JÁ foi capturado, então é um estorno (refund), não um cancelamento.
+export async function refundMercadoPagoPayment(
+  paymentId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const creds = await loadMercadoPagoCredentials();
+  if (!creds) return { ok: false, message: "Mercado Pago não configurado." };
+
+  try {
+    const client = new MercadoPagoConfig({ accessToken: creds.accessToken });
+    const refund = new PaymentRefund(client);
+    await refund.total({ payment_id: paymentId });
+    return { ok: true };
+  } catch (error) {
+    const message =
+      (error as { cause?: { message?: string } })?.cause?.message ??
+      (error instanceof Error ? error.message : "Erro desconhecido ao reembolsar no Mercado Pago.");
+    return { ok: false, message };
+  }
 }
 
 // Chamado só pela dashboard /dev, em modo leitura — confirma que a

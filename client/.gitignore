@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Arquivos privados do cliente (anexos de chat) e conteúdo digital vendido
+# (chaves/arquivos de produtos) — nunca podem ir pro histórico do git, são
+# dados de cliente/propriedade vendida, não código. Uploads públicos
+# (imagens de produto, loja, avatares) também ficam fora: crescem sem
+# limite e não servem pra nada versionados. O .gitkeep garante que a
+# pasta continua existindo num checkout novo.
+!/private/chat/
+/private/chat/*
+!/private/chat/.gitkeep
+
+/stock/products/uploads/*
+!/stock/products/uploads/.gitkeep
+
+/public/uploads/*
+!/public/uploads/.gitkeep

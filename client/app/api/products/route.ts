@@ -53,9 +53,25 @@ export async function GET(req: Request) {
     var params: Array<string | number> = [];
     var where: string[] = [];
 
+    // Busca (por nome OU descrição) é paginada — é o caso de uso real de
+    // /api/search no site público, onde um termo comum podia facilmente
+    // passar de 100 resultados e o resto ficava invisível pra sempre (sem
+    // "carregar mais", sem página 2). Os outros usos deste endpoint (sem
+    // "name" — dropdowns/listas administrativas que esperam TODOS os
+    // produtos de uma vez) continuam exatamente como antes, devolvendo um
+    // array puro, pra não quebrar quem já chama isso hoje.
+    const isSearch = !!name;
+    let page = 1;
+    let pageSize = 24;
+
     if (name) {
+      page = Math.max(1, Number(searchParams.get("page")) || 1);
+      pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize")) || 24));
       params.push(`%${name}%`);
-      where.push(`p.name ILIKE $${params.length}`);
+      const nameIdx = params.length;
+      params.push(`%${name}%`);
+      const descIdx = params.length;
+      where.push(`(p.name ILIKE $${nameIdx} OR p.description ILIKE $${descIdx})`);
     }
     if (category) {
       if (/^\d+$/.test(category)) {
@@ -68,6 +84,16 @@ export async function GET(req: Request) {
     }
 
     var whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+
+    let total = 0;
+    if (isSearch) {
+      const countRes = await db.query(`SELECT COUNT(*) AS n FROM products p LEFT JOIN categories c ON c.id = p.category_id ${whereClause}`, params);
+      total = Number(countRes.rows[0]?.n ?? 0);
+    }
+
+    const limitClause = isSearch ? `LIMIT $${params.length + 1} OFFSET $${params.length + 2}` : "LIMIT 100";
+    const queryParams = isSearch ? [...params, pageSize, (page - 1) * pageSize] : params;
+
     const result = await db.query(
       `
       SELECT p.id, p.name, p.slug, p.description, p.price, p.active, p.position,
@@ -90,11 +116,14 @@ export async function GET(req: Request) {
       LEFT JOIN categories c ON c.id = p.category_id
       ${whereClause}
       ORDER BY COALESCE(p.position, 2147483647), p.created_at DESC
-      LIMIT 100
+      ${limitClause}
       `,
-      params
+      queryParams
     );
 
+    if (isSearch) {
+      return ok({ items: result.rows, total, page, pageSize });
+    }
     return ok(result.rows);
   } catch (error) {
     console.error(error);

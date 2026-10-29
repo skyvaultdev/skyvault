@@ -62,6 +62,7 @@ type OrderItemDetail = {
   height_cm: number | null;
   deliveredContent: string[] | null;
   deliveredFileSize: number | null;
+  deliveredExpiresAt?: (string | null)[] | null;
 };
 
 const FILE_DOWNLOAD_PREFIX = "/api/files/products/uploads/";
@@ -85,7 +86,7 @@ type ShipmentEvent = {
 type OrderDetail = OrderRow & {
   items: OrderItemDetail[];
   shippingAddress: any | null;
-  paymentTransactions: Array<{ id: number; method: string; status: string; provider_txid: string | null; created_at: string }>;
+  paymentTransactions: Array<{ id: number; provider: string; method: string; status: string; provider_txid: string | null; created_at: string }>;
   shipment: { id: number; status: string; tracking_code: string | null; carrier_name: string | null } | null;
   shipmentEvents: ShipmentEvent[];
 };
@@ -308,7 +309,7 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
     }
   }
 
-  async function setOrderStatus(status: "paid" | "delivered" | "refunded") {
+  async function setOrderStatus(status: "paid" | "delivered") {
     if (!selectedOrder) return;
     setSavingStatus(true);
     setFeedback(null);
@@ -329,6 +330,66 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
       });
     } catch {
       setFeedback({ type: "error", message: "Não foi possível atualizar o status." });
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
+  // Reembolso de verdade (via Mercado Pago) só é possível se existe um
+  // pagamento aprovado daquele provider pra esse pedido — senão é só uma
+  // marcação manual (pedido pago fora do Mercado Pago, ou em modo mock),
+  // que a API exige confirmar explicitamente (manualRefund).
+  const hasMercadoPagoPayment = !!selectedOrder?.paymentTransactions.some(
+    (tx) => tx.provider === "mercadopago" && tx.status === "paid"
+  );
+
+  async function refundOrder() {
+    if (!selectedOrder) return;
+    if (!hasMercadoPagoPayment) {
+      const confirmed = await modal.confirm(
+        "Esse pedido não tem um pagamento aprovado pelo Mercado Pago — o reembolso será só manual (marca o pedido como reembolsado, mas não devolve dinheiro de verdade). Confirma?",
+        { danger: true }
+      );
+      if (!confirmed) return;
+    }
+    setSavingStatus(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_order_status",
+          status: "refunded",
+          notifyEmail,
+          reason: cancelReason.trim() || undefined,
+          manualRefund: !hasMercadoPagoPayment,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setFeedback({
+          type: "error",
+          message:
+            typeof json?.error === "string" && json.error.startsWith("REFUND_FAILED:")
+              ? `O Mercado Pago recusou o reembolso: ${json.error.slice("REFUND_FAILED:".length)}`
+              : "Não foi possível reembolsar o pedido.",
+        });
+        return;
+      }
+
+      await openOrder(selectedOrder.id);
+      await loadOrders(ordersPage);
+      setFeedback({
+        type: "success",
+        message: json?.data?.refundedViaMercadoPago
+          ? "Reembolso confirmado no Mercado Pago."
+          : json?.data?.emailSent
+            ? "Pedido marcado como reembolsado. Email enviado ao cliente."
+            : "Pedido marcado como reembolsado.",
+      });
+    } catch {
+      setFeedback({ type: "error", message: "Não foi possível reembolsar o pedido." });
     } finally {
       setSavingStatus(false);
     }
@@ -397,6 +458,9 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
               onChange={(e) => setSearch(e.target.value)}
               className="searchInput"
             />
+            <a href="/api/admin/orders/export" className="btnSecondary" download>
+              Exportar CSV
+            </a>
           </div>
 
           <div className="quickFilterChips">
@@ -615,7 +679,14 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                               );
                             }
                             return (
-                              <code key={idx} className="orderDetailDeliveredCode">{content}</code>
+                              <div key={idx} className="orderDetailDeliveredKeyRow">
+                                <code className="orderDetailDeliveredCode">{content}</code>
+                                {item.deliveredExpiresAt?.[idx] && (
+                                  <small className="orderDetailDeliveredExpiry">
+                                    Válida até {new Date(item.deliveredExpiresAt[idx]!).toLocaleDateString("pt-BR")}
+                                  </small>
+                                )}
+                              </div>
                             );
                           })}
                         </div>
@@ -762,8 +833,8 @@ export default function OrdersPanel({ canManage }: { canManage: boolean }) {
                         </button>
                       )}
                       {(selectedOrder.status === "paid" || selectedOrder.status === "delivered") && (
-                        <button className="btnSecondary" onClick={() => setOrderStatus("refunded")} disabled={savingStatus}>
-                          Marcar como reembolsado
+                        <button className="btnSecondary" onClick={refundOrder} disabled={savingStatus}>
+                          {hasMercadoPagoPayment ? "Reembolsar via Mercado Pago" : "Marcar como reembolsado (manual)"}
                         </button>
                       )}
                     </div>

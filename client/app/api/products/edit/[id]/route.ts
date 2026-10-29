@@ -103,31 +103,70 @@ export async function PUT(req: Request, { params }: Params) {
         var variationsRaw = formData.get("variations");
         if (variationsRaw) {
             var variations = JSON.parse(String(variationsRaw));
-            await db.query("DELETE FROM product_variations WHERE product_id = $1", [productId]);
+
+            // Atualiza por id em vez de apagar tudo e recriar: variações
+            // editadas mantêm o mesmo id, então suas keys digitais
+            // (stock_keys, ON DELETE CASCADE) e o histórico em pedidos
+            // continuam válidos. Só é apagada a variação que o staff
+            // removeu de verdade.
+            var existingVariations = await db.query("SELECT id, stock_count FROM product_variations WHERE product_id = $1", [productId]);
+            var existingIds = new Set(existingVariations.rows.map((r) => Number(r.id)));
+            var stockBeforeById = new Map(existingVariations.rows.map((r) => [Number(r.id), Number(r.stock_count ?? 0)]));
+
+            var keptIds = new Set<number>();
 
             for (var v of variations) {
-                if (v.name && !isNaN(Number(v.price))) {
-                    if (isPhysical) {
-                        var vIsUnlimited = Boolean(v.isUnlimited);
-                        var vStockCount = vIsUnlimited ? 0 : Number(v.stockCount ?? 0) || 0;
+                if (!(v.name && !isNaN(Number(v.price)))) continue;
+                var vId = v.id != null && Number.isInteger(Number(v.id)) ? Number(v.id) : null;
+                var isExisting = vId !== null && existingIds.has(vId);
+
+                if (isPhysical) {
+                    var vIsUnlimited = Boolean(v.isUnlimited);
+                    var vStockCount = vIsUnlimited ? 0 : Number(v.stockCount ?? 0) || 0;
+
+                    if (isExisting) {
+                        keptIds.add(vId as number);
+                        await db.query(
+                            "UPDATE product_variations SET name = $1, price = $2, stock_count = $3, is_unlimited = $4 WHERE id = $5 AND product_id = $6",
+                            [v.name, Number(v.price), vStockCount, vIsUnlimited, vId, productId]
+                        );
+                        var before = stockBeforeById.get(vId as number) ?? 0;
+                        if (!vIsUnlimited && vStockCount !== before) {
+                            await logStockMovement(db, {
+                                productId, variationId: vId, productName: name, variationName: v.name,
+                                change: vStockCount - before, reason: "manual_adjustment", staffEmail,
+                                note: "Editado no cadastro do produto",
+                            });
+                        }
+                    } else {
                         var variationInsert = await db.query(
                             "INSERT INTO product_variations (product_id, name, price, stock_count, is_unlimited) VALUES ($1, $2, $3, $4, $5) RETURNING id",
                             [productId, v.name, Number(v.price), vStockCount, vIsUnlimited]
                         );
+                        keptIds.add(Number(variationInsert.rows[0].id));
                         if (!vIsUnlimited && vStockCount > 0) {
                             await logStockMovement(db, {
                                 productId, variationId: variationInsert.rows[0].id, productName: name, variationName: v.name,
                                 change: vStockCount, reason: "manual_adjustment", staffEmail,
-                                note: "Variação recriada na edição do produto — valor não reflete um delta real",
+                                note: "Variação criada na edição do produto",
                             });
                         }
-                    } else {
-                        await db.query(
-                            "INSERT INTO product_variations (product_id, name, price) VALUES ($1, $2, $3)",
-                            [productId, v.name, Number(v.price)]
-                        );
                     }
+                } else if (isExisting) {
+                    keptIds.add(vId as number);
+                    await db.query("UPDATE product_variations SET name = $1, price = $2 WHERE id = $3 AND product_id = $4", [v.name, Number(v.price), vId, productId]);
+                } else {
+                    var digitalInsert = await db.query(
+                        "INSERT INTO product_variations (product_id, name, price) VALUES ($1, $2, $3) RETURNING id",
+                        [productId, v.name, Number(v.price)]
+                    );
+                    keptIds.add(Number(digitalInsert.rows[0].id));
                 }
+            }
+
+            var removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+            if (removedIds.length > 0) {
+                await db.query("DELETE FROM product_variations WHERE product_id = $1 AND id = ANY($2)", [productId, removedIds]);
             }
         }
 

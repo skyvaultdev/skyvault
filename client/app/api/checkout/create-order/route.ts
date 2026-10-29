@@ -11,6 +11,8 @@ import { ensureOrderNumberColumn, generateUniqueOrderNumber } from "@/lib/orders
 import { getShippingProvider, type PackageInfo } from "@/lib/shipping";
 import { ensureResellerTables } from "@/lib/resellers/ensureResellerTables";
 import { REFERRAL_COOKIE_NAME } from "@/lib/resellers/referralCookie";
+import { rateLimit } from "@/lib/security/rateLimit";
+import { captureException } from "@/lib/observability/sentry";
 
 type ShippingChoice = {
   recipientName: string;
@@ -28,6 +30,12 @@ type ShippingChoice = {
   etaDays: number;
 };
 
+// Lançado dentro da transação quando a re-checagem do limite "por cliente"
+// do cupom (com advisory lock) falha — precisa de um tipo próprio pra o
+// catch de fora distinguir isso de um erro genérico e devolver 400 em vez
+// de 500 (ver confirmOrderPayment.ts e create-order mais abaixo).
+class CouponUserLimitError extends Error {}
+
 // Só monta o pedido — NÃO cobra ainda. A cobrança de verdade acontece em
 // /api/checkout/pay/[orderId], depois que o cliente escolhe o método no
 // Payment Brick (Pix/cartão/boleto). Separar os dois passos evita ter que
@@ -39,17 +47,37 @@ export async function POST(req: Request) {
     const { userId, denied } = await requireCustomer();
     if (denied) return denied;
 
+    // requireCustomer() já barra request anônima, então userId é sempre um
+    // número real aqui (sem precisar de fallback por IP) — mesmo padrão já
+    // usado em checkout/pay e checkout/quote-shipping. Sem isso, nada
+    // impedia um script criar dezenas de pedidos pending_payment em
+    // sequência (mitigado parcialmente pelo cron que expira pedidos
+    // velhos, mas ainda gera ruído no banco e nos relatórios de staff).
+    if (!(await rateLimit(`create-order:${userId}`, 10, 60_000))) {
+      return fail("TOO_MANY_REQUESTS", 429, { "Retry-After": "60" });
+    }
+
     const db = getDB();
 
-    const storeStatusRes = await db.query(`SELECT suspended FROM store_settings ORDER BY id DESC LIMIT 1`);
+    const storeStatusRes = await db.query(
+      `SELECT suspended, legal_name, document, contact_email FROM store_settings ORDER BY id DESC LIMIT 1`
+    );
     if (storeStatusRes.rows[0]?.suspended) {
       return fail("STORE_SUSPENDED", 503);
+    }
+
+    // A loja só pode vender com os dados legais mínimos preenchidos (item
+    // 8) — sem isso, não tem como identificar o responsável pela venda
+    // nem o contato de atendimento publicado no rodapé/políticas.
+    const legalInfo = storeStatusRes.rows[0];
+    if (!legalInfo?.legal_name || !legalInfo?.document || !legalInfo?.contact_email) {
+      return fail("STORE_LEGAL_INFO_MISSING", 409);
     }
 
     const cartRes = await db.query(
       `SELECT
          c.id AS cart_item_id, c.quantity,
-         p.id AS product_id, p.name AS product_name, p.product_type,
+         p.id AS product_id, p.name AS product_name, p.product_type, p.active,
          v.id AS variation_id, v.name AS variation_name,
          COALESCE(v.price, p.price) AS unit_price,
          COALESCE(v.stock_count, p.stock_count) AS stock_count,
@@ -68,6 +96,9 @@ export async function POST(req: Request) {
     if (cartRes.rows.length === 0) return fail("EMPTY_CART", 400);
 
     for (const row of cartRes.rows) {
+      if (!row.active) {
+        return fail(`PRODUCT_UNAVAILABLE:${row.product_name}`, 409);
+      }
       if (!row.is_unlimited && Number(row.stock_count) < row.quantity) {
         return fail(`OUT_OF_STOCK:${row.product_name}`, 409);
       }
@@ -77,6 +108,15 @@ export async function POST(req: Request) {
     // (só cupom) — antes só era lido dentro do bloco de físico, então
     // cupom nunca chegava a ser considerado num carrinho 100% digital.
     const body = await req.json().catch(() => ({}));
+
+    // Checkbox obrigatório no checkout ("Li e aceito os Termos de Uso e a
+    // Política de Privacidade da loja") — sem isso marcado, a API nem
+    // tenta criar o pedido. O timestamp vira prova de consentimento por
+    // pedido (orders.terms_accepted_at), mesmo princípio do aceite do
+    // owner pro contrato da plataforma (store_settings.platform_terms_accepted_at).
+    if (body?.termsAccepted !== true) {
+      return fail("TERMS_NOT_ACCEPTED", 400);
+    }
 
     const hasPhysical = cartRes.rows.some((row) => row.product_type === "physical");
     let shipping: ShippingChoice | null = null;
@@ -154,10 +194,11 @@ export async function POST(req: Request) {
     // automático não se empilham: usa o que for melhor pro cliente, pra
     // não ter desconto somado sem limite nenhum.
     let coupon: { id: number; code: string; percentOff: number } | null = null;
+    let couponPerUserLimit = 0;
     const couponCode = String(body?.couponCode ?? "").trim().toUpperCase();
     if (couponCode) {
       const couponRes = await db.query(
-        `SELECT id, code, percent_off, min_order_value FROM coupons
+        `SELECT id, code, percent_off, min_order_value, per_user_limit FROM coupons
          WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW())
            AND (usage_limit = 0 OR used_count < usage_limit)`,
         [couponCode]
@@ -167,6 +208,26 @@ export async function POST(req: Request) {
       if (row.min_order_value && subtotal < Number(row.min_order_value)) {
         return fail(`COUPON_MIN_ORDER_VALUE:${row.min_order_value}`, 400);
       }
+
+      // Limite por cliente, além do limite global (já filtrado acima) —
+      // conta só pedidos que chegaram a pagar de verdade (used_count
+      // também só incrementa na confirmação de pagamento, nunca aqui).
+      // Esse check aqui é só uma saída rápida (fora de transação, pode
+      // sofrer corrida entre duas requisições simultâneas) — a checagem
+      // que realmente fecha a corrida acontece de novo dentro da
+      // transação, com advisory lock, logo abaixo.
+      couponPerUserLimit = Number(row.per_user_limit ?? 0);
+      if (couponPerUserLimit > 0) {
+        const usedByUserRes = await db.query(
+          `SELECT COUNT(*) AS n FROM orders
+           WHERE coupon_id = $1 AND user_id = $2 AND status NOT IN ('pending_payment', 'cancelled', 'expired')`,
+          [row.id, userId]
+        );
+        if (Number(usedByUserRes.rows[0]?.n ?? 0) >= couponPerUserLimit) {
+          return fail("COUPON_USER_LIMIT_REACHED", 400);
+        }
+      }
+
       coupon = { id: row.id, code: row.code, percentOff: Number(row.percent_off) };
     }
 
@@ -200,6 +261,26 @@ export async function POST(req: Request) {
 
     const { orderId, orderNumber: newOrderNumber } = await withTransaction(async (client) => {
       const orderNumber = await generateUniqueOrderNumber(client);
+
+      // Fecha a corrida do limite "por cliente": pg_advisory_xact_lock
+      // serializa duas criações concorrentes do MESMO usuário+cupom (a
+      // segunda espera a primeira COMMITAR antes de contar) — sem isso,
+      // duas requisições simultâneas contam 0 pedidos qualificados cada
+      // uma (nenhum dos dois pedidos existe ainda nesse instante) e as
+      // duas passam, driblando um cupom "1 por cliente". O lock é
+      // liberado sozinho no fim da transação (xact = scoped à transação).
+      if (appliedCouponId && couponPerUserLimit > 0) {
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`coupon-user:${userId}:${appliedCouponId}`]);
+        const recheck = await client.query(
+          `SELECT COUNT(*) AS n FROM orders
+           WHERE coupon_id = $1 AND user_id = $2 AND status NOT IN ('pending_payment', 'cancelled', 'expired')`,
+          [appliedCouponId, userId]
+        );
+        if (Number(recheck.rows[0]?.n ?? 0) >= couponPerUserLimit) {
+          throw new CouponUserLimitError();
+        }
+      }
+
       let shippingAddressId: number | null = null;
 
       if (shipping) {
@@ -217,8 +298,8 @@ export async function POST(req: Request) {
       }
 
       const orderRes = await client.query(
-        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number, reseller_id)
-         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO orders (user_id, status, total, subtotal, discount, shipping_fee, shipping_address_id, coupon_id, order_number, reseller_id, terms_accepted_at)
+         VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9, NOW())
          RETURNING id`,
         [userId, total, subtotal, discount, shippingFee, shippingAddressId, appliedCouponId, orderNumber, resellerId]
       );
@@ -244,9 +325,9 @@ export async function POST(req: Request) {
         );
       }
 
-      if (appliedCouponId) {
-        await client.query(`UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`, [appliedCouponId]);
-      }
+      // used_count NÃO incrementa aqui — só em confirmOrderPayment, quando
+      // o pedido realmente é pago (ver lib/payments/confirmOrderPayment.ts).
+      // Um pedido criado e nunca pago não pode consumir vaga de cupom.
 
       await client.query(`DELETE FROM cart_items WHERE user_id = $1`, [userId]);
 
@@ -262,7 +343,11 @@ export async function POST(req: Request) {
       201
     );
   } catch (error) {
+    if (error instanceof CouponUserLimitError) {
+      return fail("COUPON_USER_LIMIT_REACHED", 400);
+    }
     console.error("Erro ao criar pedido:", error);
+    captureException(error, { stage: "create_order" });
     return fail("CHECKOUT_INTERNAL_ERROR", 500);
   }
 }

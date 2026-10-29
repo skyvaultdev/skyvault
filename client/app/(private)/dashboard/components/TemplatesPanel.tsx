@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./TemplatesPanel.css";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
 import Icon, { type IconName } from "@/components/icons/Icon";
@@ -16,9 +16,9 @@ export default function TemplatesPanel() {
   const [addType, setAddType] = useState(SECTION_DEFS[0].type);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [armedId, setArmedId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [uploading, setUploading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,15 +54,44 @@ export default function TemplatesPanel() {
     update({ ...config, sections: list });
   }
 
-  function dropOn(targetId: string) {
-    if (!config || !dragId || dragId === targetId) return;
+  function dropOn(sourceId: string, targetId: string) {
+    if (!config || sourceId === targetId) return;
     const list = [...config.sections];
-    const from = list.findIndex((x) => x.id === dragId);
+    const from = list.findIndex((x) => x.id === sourceId);
     const to = list.findIndex((x) => x.id === targetId);
     if (from < 0 || to < 0) return;
     const [item] = list.splice(from, 1);
     list.splice(to, 0, item);
     update({ ...config, sections: list });
+  }
+
+  // Arrasto por mouse/toque de verdade (pointer events + captura), em vez do
+  // HTML5 drag-and-drop nativo — mais confiável entre navegadores/SOs e não
+  // depende de um re-render terminar antes do gesto começar.
+  function onGripPointerDown(e: React.PointerEvent, id: string) {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDraggingId(id);
+    setOverId(id);
+  }
+
+  function onGripPointerMove(e: React.PointerEvent) {
+    if (!draggingId) return;
+    let closestId: string | null = null;
+    let closestDist = Infinity;
+    for (const [id, el] of itemRefs.current) {
+      const rect = el.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      const dist = Math.abs(e.clientY - mid);
+      if (dist < closestDist) { closestDist = dist; closestId = id; }
+    }
+    if (closestId && closestId !== overId) setOverId(closestId);
+  }
+
+  function onGripPointerUp() {
+    if (draggingId && overId && draggingId !== overId) dropOn(draggingId, overId);
+    setDraggingId(null);
+    setOverId(null);
   }
 
   async function uploadMedia(section: HomeSection, listKey: string, items: Record<string, string>[], idx: number) {
@@ -83,6 +112,34 @@ export default function TemplatesPanel() {
           return;
         }
         setField(section, listKey, items.map((x, k) => (k === idx ? { ...x, mediaUrl: json.data.url, kind: json.data.kind } : x)));
+      } finally {
+        setUploading(null);
+      }
+    };
+    input.click();
+  }
+
+  async function uploadSingleMedia(section: HomeSection, f: FieldDef) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setUploading(`${section.id}-${f.key}`);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/admin/home-media", { method: "POST", body: fd });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          await modal.alert(json.error === "FILE_TOO_LARGE" ? "Arquivo grande demais (imagem até 5 MB, vídeo até 30 MB)." : "Não foi possível enviar o arquivo. Use JPG, PNG, WEBP, GIF, MP4 ou WEBM.");
+          return;
+        }
+        patchSection(section.id, (s) => ({
+          ...s,
+          data: { ...s.data, [f.key]: json.data.url, ...(f.kindKey ? { [f.kindKey]: json.data.kind } : {}) },
+        }));
       } finally {
         setUploading(null);
       }
@@ -148,6 +205,27 @@ export default function TemplatesPanel() {
 
   function renderField(section: HomeSection, f: FieldDef) {
     const value = section.data[f.key];
+    if (f.type === "media") {
+      const kind = f.kindKey ? String(section.data[f.kindKey] ?? "image") : "image";
+      const busy = uploading === `${section.id}-${f.key}`;
+      return (
+        <div className="tpMedia">
+          {value ? (
+            kind === "video"
+              ? <video src={String(value)} muted className="tpMediaThumb" />
+              : <img src={String(value)} alt="" className="tpMediaThumb" />
+          ) : null}
+          <button type="button" className="btnSecondary" disabled={busy} onClick={() => void uploadSingleMedia(section, f)}>
+            <Icon name="upload" /> {busy ? "Enviando..." : value ? "Trocar arquivo" : "Enviar imagem/vídeo"}
+          </button>
+          {!!value && (
+            <button type="button" className="btnSecondary" onClick={() => setField(section, f.key, "")}>
+              <Icon name="x" /> Remover
+            </button>
+          )}
+        </div>
+      );
+    }
     if (f.type === "textarea") {
       return <textarea className="tpInput" rows={3} maxLength={1000} value={String(value ?? "")} onChange={(e) => setField(section, f.key, e.target.value)} />;
     }
@@ -215,20 +293,18 @@ export default function TemplatesPanel() {
           return (
             <div
               key={s.id}
-              className={`tpItem ${s.enabled ? "" : "off"} ${dragId === s.id ? "dragging" : ""} ${overId === s.id && dragId !== s.id ? "over" : ""}`}
-              draggable={armedId === s.id}
-              onDragStart={(e) => { setDragId(s.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", s.id); }}
-              onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverId(s.id); } }}
-              onDrop={(e) => { e.preventDefault(); dropOn(s.id); setDragId(null); setOverId(null); setArmedId(null); }}
-              onDragEnd={() => { setDragId(null); setOverId(null); setArmedId(null); }}
+              ref={(el) => { if (el) itemRefs.current.set(s.id, el); else itemRefs.current.delete(s.id); }}
+              className={`tpItem ${s.enabled ? "" : "off"} ${draggingId === s.id ? "dragging" : ""} ${overId === s.id && draggingId !== s.id ? "over" : ""}`}
             >
               <div className="tpItemHead">
                 <span
                   className="tpGrip"
                   title="Segure e arraste para reordenar"
-                  onPointerDown={() => setArmedId(s.id)}
-                  onPointerUp={() => setArmedId(null)}
-                  onPointerCancel={() => setArmedId(null)}
+                  onPointerDown={(e) => onGripPointerDown(e, s.id)}
+                  onPointerMove={onGripPointerMove}
+                  onPointerUp={onGripPointerUp}
+                  onPointerCancel={onGripPointerUp}
+                  style={{ touchAction: "none" }}
                 >
                   <Icon name="grip" />
                 </span>

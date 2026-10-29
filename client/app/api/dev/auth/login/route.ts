@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const { email, password } = await req.json();
     if (!email || !password) return fail("MISSING_CREDENTIALS", 400);
 
-    if (!rateLimit(`dev-login:${String(email).toLowerCase()}`, 8, 10 * 60_000)) {
+    if (!(await rateLimit(`dev-login:${String(email).toLowerCase()}`, 8, 10 * 60_000))) {
       return fail("TOO_MANY_REQUESTS", 429);
     }
 

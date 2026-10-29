@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # 17, não 16: é a versão gerenciada pela Square Cloud em produção —
+      # o CI precisa testar contra a mesma versão major que vai rodar de
+      # verdade (ver docs/deploy/squarecloud.md).
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: appdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: client
+
+    env:
+      # DB_* apontam pro serviço postgres acima (descartável, só desta
+      # execução) — depois do bootstrap abaixo, trocamos pro role app_user
+      # (sem BYPASSRLS, exigido pelas policies de RLS multi-loja).
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: appdb
+      DB_USER: app_user
+      DB_PASSWORD: app_user_ci_password
+      # O resto são valores fictícios — build e testes não dependem de
+      # credenciais reais de nenhum provedor externo (pagamento, email,
+      # OAuth continuam mockados/não exercitados nos testes).
+      WEBSITE_URL: http://localhost:3000
+      JWT_SECRET: ci-jwt-secret-not-a-real-secret
+      JWT_EXPIRES_IN: 8h
+      INTERNAL_API_SECRET: ci-internal-api-secret-not-a-real-secret
+      # Segunda camada de TODAS as rotas /api/internal/** (ver
+      # config/configuration.ts) — sem isso, sync-user e os crons internos
+      # recusam qualquer chamada, mesmo com o segredo específico certo.
+      INTERNAL_ORCHESTRATOR_TOKEN: ci-internal-orchestrator-token-not-a-real-secret
+      EMAIL_USER: ci@example.com
+      EMAIL_PASS: ci-fake-password
+      PAYMENT_PROVIDER: mock
+      ORDER_EXPIRATION_HOURS: "24"
+      CRON_SECRET: ci-cron-secret-not-a-real-secret
+      PLATFORM_LEGAL_NAME: CI Platform
+      PLATFORM_CONTACT_EMAIL: ci@example.com
+      # Login social — valores fictícios: os testes mockam as respostas das
+      # APIs do Google/Discord por URL, nunca usam essas credenciais de
+      # verdade (não existe chamada real a provedor externo nos testes).
+      GOOGLE_CLIENT_ID: ci-google-client-id-not-real
+      GOOGLE_CLIENT_SECRET: ci-google-client-secret-not-real
+      DISCORD_CLIENT_ID: ci-discord-client-id-not-real
+      DISCORD_CLIENT_TOKEN: ci-discord-client-token-not-real
+      DISCORD_CLIENT_SECRET: ci-discord-client-secret-not-real
+      DISCORD_SCOPES: identify,email,guilds,guilds.join
+      # Qualquer URL fictícia serve — os testes de callback do Google/Discord
+      # capturam a chamada ao webhook (mock de fetch) em vez de bater na rede.
+      WEBHOOK_URL: https://discord.com/api/webhooks/000000000000000000/ci-fake-not-real
+      # Chaves de cifragem em repouso (32 bytes base64) — geradas só pra esta
+      # suíte, sem relação com nenhum ambiente real. Sem elas, os scripts de
+      # recifragem (scripts/migrations/reencrypt*.js) abortam com erro.
+      CHAT_ENCRYPTION_KEY: 3GieBuMgvLoyIYBa7ABL5aD5FI5/1ge0tk/iR11h9zc=
+      INTEGRATION_ENCRYPTION_KEY: Dd7ywyRxNyMxGWYPcpipWR1dVcchbYe+eNjwFEJAAt4=
+      # Resto do bloco multi-loja/segurança — valores explícitos iguais ao
+      # default de produção (ver .env.example), só pra não depender de
+      # nenhum default implícito mudar silenciosamente sem o CI notar.
+      CSRF_MODE: report
+      HOST_VALIDATION: off
+      ALLOWED_HOSTS: ""
+      TRUSTED_PROXY: "false"
+      DEFAULT_STORE_ID: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install postgresql-client-17
+        # O runner ubuntu-latest já vem com postgresql-client (16) pré-instalado.
+        # pg_dump/pg_restore/psql de uma versão MAIS VELHA que o servidor falham
+        # com "server version mismatch" — precisamos do cliente 17 (repositório
+        # oficial PGDG) pra bater com o serviço postgres:17 acima, e ele tem que
+        # vir na frente do PATH pra ser o binário realmente usado.
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap database schema
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          PSQL="psql -h localhost -U postgres -d appdb -v ON_ERROR_STOP=1"
+
+          # db/migrations/DB_atual.sql é o MESMO arquivo que vai bootstrapar
+          # o banco de produção (ver docs/deploy/squarecloud.md) — já inclui
+          # TODAS as tabelas e a criação do role app_user (dono de tudo, só
+          # no FINAL, depois de toda tabela existir — ver o arquivo). Rodar
+          # qualquer outra coisa aqui (ex: schema_full.sql, que é só
+          # referência — ver README.md — seguido de replay de migrations
+          # avulsas) testaria um caminho de bootstrap DIFERENTE do real e
+          # pode deixar tabela nova sem o app_user como dono (foi exatamente
+          # o bug encontrado: wishlist_items/data_subject_requests criadas
+          # DEPOIS da transferência de ownership ficavam com "permissão
+          # negada" pro app_user).
+          $PSQL -f db/migrations/DB_atual.sql
+          $PSQL -c "ALTER ROLE app_user WITH PASSWORD '${DB_PASSWORD}'"
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npx next build
+
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Backup database (item C4 — pra testar o restore)
+        run: |
+          set -euo pipefail
+          DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres \
+            DB_NAME=appdb BACKUP_DIR=/tmp/backups \
+            bash scripts/backup/pg_backup.sh
+
+      - name: Test restore (item C4)
+        run: |
+          set -euo pipefail
+          DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres \
+            BACKUP_DIR=/tmp/backups TEST_DB_NAME=restore_test \
+            bash scripts/ops/test_restore.sh

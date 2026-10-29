@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import "./header.css";
 import { FaUserCircle, FaPlus, FaMinus, FaTrash } from "react-icons/fa";
-import { FiShoppingCart, FiX, FiLogOut, FiPackage, FiUser } from "react-icons/fi";
+import { FiShoppingCart, FiX, FiLogOut, FiPackage, FiUser, FiHeart } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/app/(components)/modal/ModalProvider";
 import NotificationsBell from "./NotificationsBell";
@@ -222,7 +222,6 @@ export default function Header() {
           <Link href="/" className="logollink"> <img 
           src={logoUrl || "/logo.png"} alt="" className="logo"/> </Link>
           <li><Link href="/">Home</Link></li>
-          <li><Link href="/terms">Termos da loja</Link></li>
         </ul>
       </nav>
 
@@ -320,7 +319,19 @@ export default function Header() {
                         onClick={() => setDropAberto(false)}
                       >
                         <FiPackage />
-                        Orders
+                        Meus pedidos
+                      </Link>
+
+                      <hr className="dropdownDivider" />
+
+                      { }
+                      <Link
+                        href="/favoritos"
+                        className="userDropdownItem"
+                        onClick={() => setDropAberto(false)}
+                      >
+                        <FiHeart />
+                        Favoritos
                       </Link>
 
                       <hr className="dropdownDivider" />

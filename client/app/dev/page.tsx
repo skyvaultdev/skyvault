@@ -38,6 +38,7 @@ export default function DevDashboardPage() {
     <main className="devPage">
       <header className="devHeader">
         <h1>Dashboard de devs</h1>
+        <a href="/termos-plataforma" target="_blank" rel="noopener noreferrer">Termos da plataforma</a>
         <button
           onClick={async () => {
             await fetch("/api/dev/auth/logout", { method: "POST" });

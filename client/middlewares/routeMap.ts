@@ -1,10 +1,10 @@
-"use server";
-
 const PRIVATE_ROUTES = [
   "/dashboard",
   "/profile",
   "/checkout",
   "/reseller",
+  "/orders",
+  "/favoritos",
 ];
 
 // Subconjunto de PRIVATE_ROUTES que além de exigir login exige a

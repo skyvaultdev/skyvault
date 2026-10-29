@@ -18,7 +18,6 @@ type StoreSettings = {
   logo_url: string;
   background_style: string;
   background_img_url: string;
-  background_css: string;
   updated_at: Date;
 };
 
@@ -69,11 +68,18 @@ export async function GET() {
 
     // Rota PÚBLICA (tema, logo, checkout, página de produto): lista só as
     // colunas que o site precisa. `SELECT *` vazaria também colunas
-    // internas (ex: chat_encryption_key, suspended, origin_cep).
+    // internas (ex: chat_encryption_key, suspended, origin_cep). Os 5
+    // campos legais aqui são pequenos e PRECISAM ser públicos (aparecem no
+    // rodapé da loja) — os 3 textos grandes de política (privacy_policy,
+    // returns_policy, store_terms) ficam de fora: as páginas que os
+    // exibem leem o banco direto (app/(public)/_legal/loadStoreLegalInfo.ts),
+    // sem passar por aqui, pra essa rota (chamada em toda página) não
+    // carregar um texto grande sem precisar dele.
     const result = await db.query(`
       SELECT id, primary_color, secondary_color, store_name, logo_url,
-             background_style, background_img_url, background_css, background_solid_color,
+             background_style, background_img_url, background_solid_color,
              accepts_pix, accepts_credit_card, accepts_debit_card, accepts_boleto,
+             legal_name, document, address, contact_email, contact_phone,
              updated_at
       FROM store_settings
       ORDER BY id DESC
@@ -100,7 +106,6 @@ export async function POST(req: Request) {
     var storeName: string | undefined;
     var logoUrl: string | undefined;
     var backgroundStyle: string | undefined;
-    var backgroundCss: string | undefined;
     var backgroundImgUrl: string | undefined;
     var backgroundSolidColor: string | undefined;
     var removeBackgroundImage = false;
@@ -111,7 +116,6 @@ export async function POST(req: Request) {
       primaryColor = form.get("primaryColor")?.toString().trim() || undefined;
       secondaryColor = form.get("secondaryColor")?.toString().trim() || undefined;
       backgroundStyle = form.get("backgroundStyle")?.toString().trim() || undefined;
-      backgroundCss = form.get("backgroundCss")?.toString() || undefined;
       storeName = form.get("storeName")?.toString().trim() || undefined;
       backgroundSolidColor = form.get("backgroundSolidColor")?.toString().trim() || undefined;
 
@@ -163,7 +167,6 @@ export async function POST(req: Request) {
       storeName = body.storeName?.trim();
       logoUrl = body.logoUrl?.trim();
       backgroundStyle = body.backgroundStyle?.trim();
-      backgroundCss = body.backgroundCss;
       backgroundImgUrl = body.backgroundImgUrl?.trim();
       backgroundSolidColor = body.backgroundSolidColor?.trim();
     }
@@ -184,11 +187,10 @@ export async function POST(req: Request) {
         store_name = COALESCE($3, store_name),
         logo_url = COALESCE($4, logo_url),
         background_style = COALESCE($5, background_style),
-        background_css = COALESCE($6, background_css),
-        background_img_url = CASE WHEN $10::boolean THEN NULL ELSE COALESCE($7, background_img_url) END,
-        background_solid_color = COALESCE($8, background_solid_color),
+        background_img_url = CASE WHEN $9::boolean THEN NULL ELSE COALESCE($6, background_img_url) END,
+        background_solid_color = COALESCE($7, background_solid_color),
         updated_at = NOW()
-      WHERE id = $9
+      WHERE id = $8
       RETURNING *
       `,
       [
@@ -197,7 +199,6 @@ export async function POST(req: Request) {
         storeName ?? null,
         logoUrl ?? null,
         backgroundStyle ?? null,
-        backgroundCss ?? null,
         backgroundImgUrl ?? null,
         backgroundSolidColor && /^#[0-9a-fA-F]{6}$/.test(backgroundSolidColor) ? backgroundSolidColor : null,
         row.id,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import "./profile.css";
+import { useModal } from "@/app/(components)/modal/ModalProvider";
 
 const PIX_KEY_TYPE_LABELS: Record<string, string> = {
   cpf: "CPF", cnpj: "CNPJ", email: "Email", phone: "Telefone", random: "Chave aleatória",
@@ -29,6 +30,10 @@ function isProfileComplete(form: ProfileForm): boolean {
 }
 
 export default function ProfilePage() {
+  const modal = useModal();
+  const [deletionPending, setDeletionPending] = useState(false);
+  const [requestingDeletion, setRequestingDeletion] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +54,59 @@ export default function ProfilePage() {
   useEffect(() => {
     void loadProfile();
     void loadResellerStatus();
+    void loadDeletionStatus();
   }, []);
+
+  async function loadDeletionStatus() {
+    try {
+      const res = await fetch("/api/profile/request-deletion", { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      setDeletionPending(json.data?.status === "pending");
+    } catch {
+      // sem solicitação ainda — fica false
+    }
+  }
+
+  async function exportData() {
+    setExportingData(true);
+    try {
+      const res = await fetch("/api/profile/data-export");
+      if (!res.ok) {
+        await modal.alert("Não foi possível gerar seus dados agora. Tente novamente.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "meus-dados.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingData(false);
+    }
+  }
+
+  async function requestDeletion() {
+    const confirmed = await modal.confirm(
+      "Pedir a exclusão dos seus dados? Nossa equipe vai revisar e processar o pedido — pedidos já feitos continuam no histórico, só sem seus dados pessoais (nome, e-mail, endereço).",
+      { danger: true }
+    );
+    if (!confirmed) return;
+
+    setRequestingDeletion(true);
+    try {
+      const res = await fetch("/api/profile/request-deletion", { method: "POST" });
+      if (res.ok) {
+        setDeletionPending(true);
+      } else {
+        await modal.alert("Não foi possível registrar o pedido. Tente novamente.");
+      }
+    } finally {
+      setRequestingDeletion(false);
+    }
+  }
 
   async function loadProfile() {
     try {
@@ -297,6 +354,26 @@ export default function ProfilePage() {
           </form>
         </div>
       )}
+
+      <div className="profileCard">
+        <h2>Privacidade e dados pessoais</h2>
+        <p className="profileHint">
+          Baixe uma cópia de tudo que temos sobre você, ou peça a exclusão dos seus dados pessoais (LGPD).
+        </p>
+        <div className="profileActionsRow">
+          <button type="button" className="profileSaveBtn" onClick={() => void exportData()} disabled={exportingData}>
+            {exportingData ? "Gerando..." : "Baixar meus dados"}
+          </button>
+          <button
+            type="button"
+            className="profileDangerBtn"
+            onClick={() => void requestDeletion()}
+            disabled={requestingDeletion || deletionPending}
+          >
+            {deletionPending ? "Exclusão solicitada — em análise" : requestingDeletion ? "Enviando..." : "Solicitar exclusão dos meus dados"}
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

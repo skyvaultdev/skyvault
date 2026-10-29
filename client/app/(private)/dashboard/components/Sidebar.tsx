@@ -20,7 +20,10 @@ export type DashboardTab = "inicio"
   | "pagamentos"
   | "revendedores"
   | "templates"
-  | "geral";
+  | "geral"
+  | "legal"
+  | "dataRequests"
+  | "seguranca";
 
 
 export type Permission =
@@ -34,7 +37,8 @@ export type Permission =
   | "shipping.manage"
   | "shipping.credentials"
   | "payments.manage"
-  | "resellers.manage";
+  | "resellers.manage"
+  | "users.manage";
 
 type SidebarProps = {
   selectedTab: DashboardTab;
@@ -60,6 +64,7 @@ const MENU_GROUPS: MenuGroup[] = [
     items: [
       { key: "inicio", label: "Início", permission: "dashboard.access", icon: "home" },
       { key: "infos", label: "Informações", permission: "dashboard.access", icon: "info" },
+      { key: "seguranca", label: "Segurança da conta", permission: "dashboard.access", icon: "shield" },
     ],
   },
   {
@@ -99,6 +104,13 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     title: "Administração",
     items: [{ key: "equipe", label: "Equipe", permission: "team.manage", icon: "shield" }],
+  },
+  {
+    title: "Jurídico",
+    items: [
+      { key: "legal", label: "Informações legais", permission: "store.customize", icon: "file" },
+      { key: "dataRequests", label: "Solicitações LGPD", permission: "users.manage", icon: "shield" },
+    ],
   },
 ];
 

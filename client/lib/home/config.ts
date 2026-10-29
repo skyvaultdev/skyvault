@@ -12,6 +12,8 @@ export type FieldDef = {
   options?: { value: string; label: string }[];
   min?: number;
   max?: number;
+  // Campo companheiro (select image/video) que guarda o tipo de mídia deste campo "media".
+  kindKey?: string;
 };
 
 export type ListDef = { key: string; label: string; max: number; fields: FieldDef[] };
@@ -39,17 +41,18 @@ export const SECTION_DEFS: SectionDef[] = [
   },
   {
     type: "hero", label: "Banner principal", icon: "image",
-    description: "Bloco grande de abertura com título, texto e botão.",
+    description: "Bloco grande de abertura com título, texto e botão — imagem ou vídeo de fundo.",
     fields: [
       { key: "badge", label: "Selo (opcional)", type: "text", placeholder: "NOVIDADE" },
       { key: "title", label: "Título", type: "text", placeholder: "Título de impacto" },
       { key: "subtitle", label: "Subtítulo", type: "textarea" },
       { key: "buttonText", label: "Texto do botão", type: "text", placeholder: "Ver produtos" },
       { key: "buttonLink", label: "Link do botão", type: "url", placeholder: "/catalog" },
-      { key: "imageUrl", label: "Imagem de fundo (URL, opcional)", type: "url" },
+      { key: "mediaKind", label: "Tipo de fundo", type: "select", options: [{ value: "image", label: "Imagem" }, { value: "video", label: "Vídeo (mudo, em loop)" }] },
+      { key: "imageUrl", label: "Imagem/vídeo de fundo", type: "media", kindKey: "mediaKind" },
       { key: "align", label: "Alinhamento", type: "select", options: [{ value: "center", label: "Centro" }, { value: "left", label: "Esquerda" }] },
     ],
-    defaults: { badge: "", title: "Bem-vindo à nossa loja", subtitle: "Entrega automática e suporte rápido.", buttonText: "Ver produtos", buttonLink: "/catalog", imageUrl: "", align: "center" },
+    defaults: { badge: "", title: "Bem-vindo à nossa loja", subtitle: "Entrega automática e suporte rápido.", buttonText: "Ver produtos", buttonLink: "/catalog", mediaKind: "image", imageUrl: "", align: "center" },
   },
   {
     type: "banners", label: "Banners da loja", icon: "film",
@@ -109,6 +112,28 @@ export const SECTION_DEFS: SectionDef[] = [
     defaults: { perCategory: 6 },
   },
   {
+    type: "testimonials", label: "Depoimentos", icon: "sparkle",
+    description: "Citações de clientes satisfeitos, em carrossel.",
+    fields: [{ key: "title", label: "Título", type: "text", placeholder: "O que dizem sobre a gente" }],
+    lists: [{ key: "items", label: "Depoimentos", max: 8, fields: [
+      { key: "quote", label: "Depoimento", type: "textarea" },
+      { key: "author", label: "Nome", type: "text", placeholder: "Ana C." },
+      { key: "role", label: "Detalhe (opcional)", type: "text", placeholder: "Cliente desde 2024" },
+    ] }],
+    defaults: { title: "O que dizem sobre a gente", items: [] },
+  },
+  {
+    type: "cta", label: "Chamada de ação", icon: "megaphone",
+    description: "Faixa de destaque com título, texto e botão — bom pra promoções ou anúncios.",
+    fields: [
+      { key: "title", label: "Título", type: "text", placeholder: "Aproveite a promoção" },
+      { key: "subtitle", label: "Texto", type: "textarea" },
+      { key: "buttonText", label: "Texto do botão", type: "text", placeholder: "Ver oferta" },
+      { key: "buttonLink", label: "Link do botão", type: "url", placeholder: "/catalog" },
+    ],
+    defaults: { title: "Aproveite enquanto dura", subtitle: "Condições especiais por tempo limitado.", buttonText: "Ver oferta", buttonLink: "/catalog" },
+  },
+  {
     type: "faq", label: "Perguntas frequentes", icon: "help",
     description: "Lista de perguntas e respostas (abre e fecha).",
     fields: [{ key: "title", label: "Título", type: "text", placeholder: "Perguntas frequentes" }],
@@ -154,15 +179,30 @@ export const TEMPLATES: { id: string; name: string; description: string; build: 
     build: () => ({ template: "classic", sections: [mk("banners"), mk("categories", { title: "", style: "select" }), mk("highlights"), mk("catalog")] }),
   },
   {
-    id: "showcase", name: "Vitrine", description: "Aviso, banner grande, números de confiança, produto em destaque, categorias, FAQ e comunidade.",
+    id: "showcase", name: "Vitrine", description: "Aviso, banner grande, números de confiança, produto em destaque, categorias, chamada de ação, FAQ e comunidade.",
     build: () => ({
       template: "showcase",
-      sections: [mk("announcement"), mk("hero", { badge: "DESTAQUE DA SEMANA", align: "left" }), mk("stats"), mk("spotlight"), mk("categories"), mk("highlights"), mk("catalog"), mk("faq"), mk("social")],
+      sections: [mk("announcement"), mk("hero", { badge: "DESTAQUE DA SEMANA", align: "left" }), mk("stats"), mk("spotlight"), mk("categories"), mk("highlights"), mk("catalog"), mk("cta"), mk("faq"), mk("social")],
     }),
   },
   {
     id: "minimal", name: "Minimalista", description: "Banner simples, produtos por categoria e links de contato.",
     build: () => ({ template: "minimal", sections: [mk("hero", { title: "Nossa loja", subtitle: "", buttonText: "Ver produtos" }), mk("catalog"), mk("social")] }),
+  },
+  {
+    id: "social-proof", name: "Prova social", description: "Banner com vídeo, depoimentos de clientes, números, destaques e chamada de ação — foca em passar confiança antes da compra.",
+    build: () => ({
+      template: "social-proof",
+      sections: [
+        mk("hero", { badge: "", title: "Feito pra quem confia no que compra", buttonText: "Ver produtos" }),
+        mk("stats"),
+        mk("highlights"),
+        mk("testimonials"),
+        mk("catalog"),
+        mk("cta", { title: "Ainda com dúvida?", subtitle: "Fale com a gente antes de comprar.", buttonText: "Ver produtos", buttonLink: "/catalog" }),
+        mk("faq"),
+      ],
+    }),
   },
 ];
 

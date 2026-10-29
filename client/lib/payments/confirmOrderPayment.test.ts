@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { initApp } from "@/lib/database/init";
 import { getDB } from "@/lib/database/db";
 import { confirmOrderPayment } from "@/lib/payments/confirmOrderPayment";
@@ -196,6 +196,72 @@ describe("confirmOrderPayment — tipos de entrega digital: arquivo e chave", ()
       expect(second.alreadyProcessed).toBe(true);
       const stockRowAfter = await db.query(`SELECT stock_count FROM products WHERE id = $1`, [productId]);
       expect(stockRowAfter.rows[0].stock_count).toBe(1);
+    } finally {
+      await db.query(`DELETE FROM stock_keys WHERE product_id = $1`, [productId]);
+      if (orderId) await cleanupOrder(db, orderId);
+      await db.query(`DELETE FROM stock_movements WHERE product_id = $1`, [productId]).catch(() => {});
+      await db.query(`DELETE FROM products WHERE id = $1`, [productId]);
+    }
+  });
+
+  it("grava stock_keys.expires_at quando o produto tem key_validity_days configurado", async () => {
+    const db = getDB();
+    const productRes = await db.query(
+      `INSERT INTO products (name, price, product_type, stock_type, stock_count, is_unlimited, active, key_validity_days)
+       VALUES ($1, $2, 'digital', 'key', $3, false, true, $4) RETURNING id`,
+      ["[TESTE] Produto Chave Com Validade", 59.9, 1, 30]
+    );
+    const productId = productRes.rows[0].id;
+    let orderId: number | undefined;
+    try {
+      const keyRes = await db.query(
+        `INSERT INTO stock_keys (product_id, key_content, is_sold) VALUES ($1, $2, false) RETURNING id`,
+        [productId, "VALID-1234-5678"]
+      );
+      const keyId = keyRes.rows[0].id;
+
+      orderId = await createOrderWithItem(db, userId, productId, 1, "digital", "[TESTE] Produto Chave Com Validade");
+
+      const result = await confirmOrderPayment(orderId);
+
+      expect(result.deliveredItems[0]).toMatchObject({ type: "key", content: "VALID-1234-5678" });
+      expect(result.deliveredItems[0].expiresAt).not.toBeNull();
+
+      const keyRow = await db.query(`SELECT expires_at FROM stock_keys WHERE id = $1`, [keyId]);
+      const expiresAt = new Date(keyRow.rows[0].expires_at);
+      const expectedMinimum = new Date(Date.now() + 29 * 24 * 60 * 60 * 1000);
+      expect(expiresAt.getTime()).toBeGreaterThan(expectedMinimum.getTime());
+    } finally {
+      await db.query(`DELETE FROM stock_keys WHERE product_id = $1`, [productId]);
+      if (orderId) await cleanupOrder(db, orderId);
+      await db.query(`DELETE FROM stock_movements WHERE product_id = $1`, [productId]).catch(() => {});
+      await db.query(`DELETE FROM products WHERE id = $1`, [productId]);
+    }
+  });
+
+  it("deixa stock_keys.expires_at em NULL quando o produto não tem validade configurada", async () => {
+    const db = getDB();
+    const productRes = await db.query(
+      `INSERT INTO products (name, price, product_type, stock_type, stock_count, is_unlimited, active)
+       VALUES ($1, $2, 'digital', 'key', $3, false, true) RETURNING id`,
+      ["[TESTE] Produto Chave Sem Validade", 59.9, 1]
+    );
+    const productId = productRes.rows[0].id;
+    let orderId: number | undefined;
+    try {
+      const keyRes = await db.query(
+        `INSERT INTO stock_keys (product_id, key_content, is_sold) VALUES ($1, $2, false) RETURNING id`,
+        [productId, "NOEXPIRY-0001"]
+      );
+      const keyId = keyRes.rows[0].id;
+
+      orderId = await createOrderWithItem(db, userId, productId, 1, "digital", "[TESTE] Produto Chave Sem Validade");
+
+      const result = await confirmOrderPayment(orderId);
+      expect(result.deliveredItems[0].expiresAt).toBeNull();
+
+      const keyRow = await db.query(`SELECT expires_at FROM stock_keys WHERE id = $1`, [keyId]);
+      expect(keyRow.rows[0].expires_at).toBeNull();
     } finally {
       await db.query(`DELETE FROM stock_keys WHERE product_id = $1`, [productId]);
       if (orderId) await cleanupOrder(db, orderId);
@@ -437,5 +503,121 @@ describe("confirmOrderPayment — regressão: migração não aplicada", () => {
     expect(orderRow.rows[0].status).toBe("delivered");
 
     await cleanupOrder(db, orderId);
+  });
+});
+
+describe("confirmOrderPayment — cupom: used_count só incrementa na confirmação de pagamento", () => {
+  let userId: number;
+  let productId: number;
+  let couponId: number;
+
+  beforeAll(async () => {
+    const db = getDB();
+    userId = await createTestUser(db, "coupon-confirm");
+
+    const productRes = await db.query(
+      `INSERT INTO products (name, price, product_type, stock_type, stock_content, stock_count, is_unlimited, active)
+       VALUES ($1, $2, 'digital', 'infinite', $3, $4, false, true)
+       RETURNING id`,
+      ["[TESTE] Produto Cupom Confirm", 100, "Entrega automática ativada", 10]
+    );
+    productId = productRes.rows[0].id;
+
+    const couponRes = await db.query(
+      `INSERT INTO coupons (code, percent_off, usage_limit, used_count, per_user_limit, active)
+       VALUES ($1, 10, 2, 0, 0, true) RETURNING id`,
+      [`TESTE-CONFIRM-${Date.now()}`]
+    );
+    couponId = couponRes.rows[0].id;
+  });
+
+  afterAll(async () => {
+    const db = getDB();
+    await db.query(`DELETE FROM stock_movements WHERE product_id = $1`, [productId]).catch(() => {});
+    await db.query(`DELETE FROM products WHERE id = $1`, [productId]);
+    await db.query(`DELETE FROM coupons WHERE id = $1`, [couponId]);
+    await db.query(`DELETE FROM users WHERE id = $1`, [userId]);
+  });
+
+  async function createOrderWithCoupon(db: ReturnType<typeof getDB>, quantity: number) {
+    const orderRes = await db.query(
+      `INSERT INTO orders (user_id, status, subtotal, total, coupon_id) VALUES ($1, 'pending_payment', $2, $2, $3) RETURNING id`,
+      [userId, 100 * quantity, couponId]
+    );
+    const orderId = Number(orderRes.rows[0].id);
+    await db.query(
+      `INSERT INTO order_items (order_id, product_id, quantity, unit_price, product_type, product_name)
+       VALUES ($1, $2, $3, $4, 'digital', $5)`,
+      [orderId, productId, quantity, 100, "[TESTE] Produto Cupom Confirm"]
+    );
+    return orderId;
+  }
+
+  it("não incrementa used_count ao criar o pedido — só confirmOrderPayment incrementa", async () => {
+    const db = getDB();
+    const orderId = await createOrderWithCoupon(db, 1);
+    try {
+      // Simula o que create-order/route.ts faz: valida e grava o pedido
+      // com coupon_id, SEM tocar em used_count (ver item 1 do fix).
+      const before = await db.query(`SELECT used_count FROM coupons WHERE id = $1`, [couponId]);
+      expect(before.rows[0].used_count).toBe(0);
+
+      const result = await confirmOrderPayment(orderId);
+      expect(result.order.status).toBe("delivered");
+
+      const after = await db.query(`SELECT used_count FROM coupons WHERE id = $1`, [couponId]);
+      expect(after.rows[0].used_count).toBe(1);
+
+      // Idempotente: confirmar de novo o mesmo pedido não incrementa outra vez.
+      await confirmOrderPayment(orderId);
+      const afterSecond = await db.query(`SELECT used_count FROM coupons WHERE id = $1`, [couponId]);
+      expect(afterSecond.rows[0].used_count).toBe(1);
+    } finally {
+      await cleanupOrder(db, orderId);
+    }
+  });
+
+  it("incrementa used_count mesmo se o limite já tinha sido atingido quando o pagamento confirma (não bloqueia entrega)", async () => {
+    const db = getDB();
+    await db.query(`UPDATE coupons SET used_count = usage_limit WHERE id = $1`, [couponId]);
+
+    const orderId = await createOrderWithCoupon(db, 1);
+    try {
+      const result = await confirmOrderPayment(orderId);
+      // O cliente já pagou com o desconto aplicado — a entrega não pode
+      // ser bloqueada só porque o cupom esgotou nesse meio-tempo.
+      expect(result.order.status).toBe("delivered");
+
+      const after = await db.query(`SELECT used_count, usage_limit FROM coupons WHERE id = $1`, [couponId]);
+      expect(Number(after.rows[0].used_count)).toBe(Number(after.rows[0].usage_limit) + 1);
+    } finally {
+      await cleanupOrder(db, orderId);
+      await db.query(`UPDATE coupons SET used_count = 0 WHERE id = $1`, [couponId]);
+    }
+  });
+
+  it("avisa (console.warn) mas NÃO bloqueia a entrega quando o pagamento confirma excedendo o limite por cliente", async () => {
+    const db = getDB();
+    await db.query(`UPDATE coupons SET per_user_limit = 1 WHERE id = $1`, [couponId]);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const firstOrderId = await createOrderWithCoupon(db, 1);
+    const secondOrderId = await createOrderWithCoupon(db, 1);
+    try {
+      const firstResult = await confirmOrderPayment(firstOrderId);
+      expect(firstResult.order.status).toBe("delivered");
+
+      warnSpy.mockClear();
+      const secondResult = await confirmOrderPayment(secondOrderId);
+      // Cliente já pagou o segundo pedido com desconto — não pode ficar
+      // sem receber só porque excedeu o limite por cliente nesse meio-tempo.
+      expect(secondResult.order.status).toBe("delivered");
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("limite por cliente"));
+    } finally {
+      warnSpy.mockRestore();
+      await cleanupOrder(db, firstOrderId);
+      await cleanupOrder(db, secondOrderId);
+      await db.query(`UPDATE coupons SET per_user_limit = 0, used_count = 0 WHERE id = $1`, [couponId]);
+    }
   });
 });

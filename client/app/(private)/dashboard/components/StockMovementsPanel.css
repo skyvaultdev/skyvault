@@ -1,3 +1,44 @@
+.stockExpiringBox {
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.stockExpiringBox h4 {
+  margin: 0 0 10px 0;
+  font-size: 13.5px;
+  color: #fbbf24;
+}
+
+.stockExpiringList {
+  display: grid;
+  gap: 8px;
+}
+
+.stockExpiringRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+.stockExpiringProduct {
+  color: #fff;
+  font-weight: 600;
+}
+
+.stockExpiringMeta {
+  color: #a1a1aa;
+}
+
+.stockExpiringDate {
+  color: #fbbf24;
+  margin-left: auto;
+}
+
 .stockMovFilterRow {
   display: flex;
   gap: 10px;

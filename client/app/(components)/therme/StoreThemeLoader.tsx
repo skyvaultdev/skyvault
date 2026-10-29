@@ -31,9 +31,6 @@ export default function StoreThemeLoader() {
         var backgroundImageUrl =
           data.backgroundImageUrl ?? data.background_img_url ?? null;
 
-        var backgroundCss =
-          data.backgroundCss ?? data.background_css ?? null;
-
         // 4) aplica global
         var root = document.documentElement;
         var body = document.body;
@@ -51,18 +48,6 @@ export default function StoreThemeLoader() {
           body.style.backgroundImage = "";
           body.style.backgroundSize = "";
           body.style.backgroundPosition = "";
-        }
-
-        // 5) injeta css custom
-        const tagId = "store-custom-background";
-        var previousTag = document.getElementById(tagId);
-        if (previousTag) previousTag.remove();
-
-        if (backgroundCss) {
-          const styleTag = document.createElement("style");
-          styleTag.id = tagId;
-          styleTag.innerHTML = `body { ${backgroundCss} }`;
-          document.head.appendChild(styleTag);
         }
       } catch {}
     }

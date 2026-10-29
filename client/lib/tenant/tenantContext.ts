@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { headers } from "next/headers";
 import { config } from "@/config/configuration";
+import { getOrCreatePool } from "@/lib/database/pool";
 
 // Qual loja (tenant) está atendendo a requisição atual.
 //
@@ -38,9 +39,27 @@ function isLocalOrIp(host: string): boolean {
   return host === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.endsWith(".localhost");
 }
 
+// Item C1 — host considerado "raiz" (resolve pra DEFAULT_STORE_ID sem
+// precisar de linha em `stores`): domínio raiz, localhost/IP (como já era)
+// OU explicitamente liberado via ALLOWED_HOSTS.
+function isAllowedRootHost(host: string): boolean {
+  return host === config.tenant.rootDomain || isLocalOrIp(host) || config.tenant.allowedHosts.includes(host);
+}
+
+// X-Forwarded-Host só é considerado com TRUSTED_PROXY=true — do contrário
+// é ignorado por completo (header que qualquer cliente pode mandar sem
+// proxy nenhum reescrevendo). Com múltiplos proxies empilhados, o padrão
+// é o mais PRÓXIMO do cliente original vir primeiro na lista.
+function getEffectiveHost(headersList: Headers): string | null {
+  if (config.tenant.trustedProxy) {
+    const forwarded = headersList.get("x-forwarded-host");
+    if (forwarded) return normalizeHost(forwarded.split(",")[0]);
+  }
+  return normalizeHost(headersList.get("host"));
+}
+
 async function queryStoreId(host: string): Promise<number | null> {
-  const pool = global.pgPool;
-  if (!pool) throw new Error("Database not initialized");
+  const pool = getOrCreatePool();
   const root = config.tenant.rootDomain;
   const sub = root && host.endsWith(`.${root}`) ? host.slice(0, -(root.length + 1)) : null;
   try {
@@ -75,7 +94,7 @@ export async function resolveStoreForHost(rawHost: string | null): Promise<numbe
   }
 
   // Host não corresponde a nenhuma loja.
-  const isRoot = !!host && (host === config.tenant.rootDomain || isLocalOrIp(host));
+  const isRoot = !!host && isAllowedRootHost(host);
   if (!multi || isRoot) return config.tenant.defaultStoreId;
   throw new StoreNotFoundError(host);
 }
@@ -84,15 +103,37 @@ export async function getCurrentStoreId(): Promise<number> {
   const explicit = storage.getStore();
   if (explicit !== undefined) return explicit;
 
+  let headersList: Headers;
   let host: string | null = null;
   try {
-    host = (await headers()).get("host");
+    headersList = await headers();
+    host = headersList.get("host");
   } catch (err) {
     // Erros de controle do Next (ex: bail de renderização estática) precisam subir.
     if (err && typeof err === "object" && "digest" in err) throw err;
     if (config.tenant.rootDomain) throw new Error("NO_TENANT_CONTEXT");
     return config.tenant.defaultStoreId;
   }
+
+  // Item C1 — "off" (padrão): nenhuma mudança de comportamento. "report":
+  // calcula o host efetivo e só LOGA se ele divergir do Host puro ou cair
+  // fora da allowlist — resolve com o Host puro mesmo, igual sempre foi.
+  // "enforce": resolve de verdade com o host efetivo.
+  const mode = config.tenant.hostValidationMode;
+  if (mode !== "off") {
+    const effectiveHost = getEffectiveHost(headersList);
+    if (mode === "report") {
+      const plainHost = normalizeHost(host);
+      if (effectiveHost !== plainHost) {
+        console.warn(
+          `[HOST_VALIDATION report] host efetivo "${effectiveHost}" (via X-Forwarded-Host) difere do Host puro "${plainHost}" — em enforce, isso mudaria qual loja atende essa requisição.`
+        );
+      }
+    } else {
+      host = effectiveHost;
+    }
+  }
+
   return resolveStoreForHost(host);
 }
 

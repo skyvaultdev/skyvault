@@ -49,7 +49,6 @@ type StoreSettings = {
   primaryColor: string;
   secondaryColor: string;
   backgroundType: BackgroundType;
-  backgroundCss: string;
   backgroundImageUrl: string;
   backgroundSolidColor?: string;
 };
@@ -66,7 +65,6 @@ type DashboardTabsProps = {
   // Widened to match the full set of background options the store actually
   // supports (previously only allowed "lines" | "dots").
   onBackgroundTypeChange: (type: BackgroundType) => void;
-  onBackgroundCssChange: (css: string) => void;
   onBackgroundImageChange: (file: File | null) => void;
   onSaveBackground: () => Promise<void>;
   orderedProducts: ProductItem[];
@@ -100,7 +98,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
     onSaveColors,
     storeSettings,
     onBackgroundTypeChange,
-    onBackgroundCssChange,
     onBackgroundImageChange,
     onSaveBackground,
     orderedProducts,
@@ -333,14 +330,6 @@ export default function DashboardTabs(props: DashboardTabsProps) {
           accept="image/*"
           onChange={(event) => onBackgroundImageChange(event.target.files?.[0] ?? null)}
           className="settingsInput"
-        />
-        <label className="fieldLabel" htmlFor="background-css">CSS customizado</label>
-        <textarea
-          id="background-css"
-          value={storeSettings.backgroundCss ?? ""}
-          onChange={(event) => onBackgroundCssChange(event.target.value)}
-          className="settingsTextarea"
-          rows={4}
         />
         <button className="btn" type="button" onClick={() => void onSaveBackground()}>
           Salvar background

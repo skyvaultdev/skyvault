@@ -88,3 +88,20 @@ export function captureException(error: unknown, context?: ErrorContext) {
   if (!DSN) return;
   Sentry.captureException(error, { extra: context });
 }
+
+// Item C2 — agrega violações de CSP no Sentry. fingerprint por
+// (directive + blockedUri) agrupa violações IDÊNTICAS num único Issue —
+// sem isso, uma extensão de navegador ruidosa ou um recurso quebrado
+// manda uma violação idêntica por visitante/carregamento, inflando tanto
+// a cota de eventos quanto a lista de issues com ruído repetido. O rate
+// limit por fingerprint (ver app/api/csp-report/route.ts) já evita mandar
+// de novo a mesma violação com frequência — isto aqui só define COMO ela
+// é enviada quando passa por esse limite.
+export function captureCspViolation(violation: { directive: string; blockedUri: string; documentUri?: string; sourceFile?: string; lineNumber?: number }) {
+  if (!DSN) return;
+  Sentry.captureMessage(`CSP violation: ${violation.directive} blocked ${violation.blockedUri}`, {
+    level: "warning",
+    fingerprint: ["csp-violation", violation.directive, violation.blockedUri],
+    extra: violation,
+  });
+}

@@ -68,9 +68,14 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
           },
-          // Report-Only: nunca bloqueia nada, só reporta. Ver
-          // docs/security/csp.md pro passo de promoção pra enforced.
-          { key: "Content-Security-Policy-Report-Only", value: CSP_DIRECTIVES },
+          // CSP_MODE=report (padrão): nunca bloqueia nada, só reporta.
+          // CSP_MODE=enforce: passa a bloquear de verdade (mesma lista de
+          // diretivas). Ver docs/security/csp.md pro critério de quando
+          // promover.
+          {
+            key: process.env.CSP_MODE === "enforce" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only",
+            value: CSP_DIRECTIVES,
+          },
           ...(process.env.NODE_ENV === "production"
             ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]
             : []),

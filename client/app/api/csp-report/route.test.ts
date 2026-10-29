@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
+const captureCspViolationMock = vi.fn();
+vi.mock("@/lib/observability/sentry", () => ({
+  captureCspViolation: captureCspViolationMock,
+}));
+
 const { POST } = await import("./route");
 
 function reportRequest(body: unknown) {
@@ -13,11 +18,17 @@ function reportRequest(body: unknown) {
 describe("POST /api/csp-report", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    captureCspViolationMock.mockClear();
   });
 
   it("devolve 204 sem corpo e loga o relatório recebido (formato report-uri clássico)", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const violated = { "csp-report": { "violated-directive": "script-src", "blocked-uri": "https://evil.example" } };
+    const violated = {
+      "csp-report": {
+        "violated-directive": "script-src",
+        "blocked-uri": `https://evil-${Date.now()}.example`,
+      },
+    };
 
     const res = await POST(reportRequest(violated));
 
@@ -37,5 +48,28 @@ describe("POST /api/csp-report", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(204);
+  });
+
+  it("item C2: manda a violação pro Sentry (via captureCspViolation)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const uniqueUri = `https://evil-c2-${Date.now()}-${Math.random()}.example`;
+    const violated = { "csp-report": { "violated-directive": "script-src", "blocked-uri": uniqueUri } };
+
+    await POST(reportRequest(violated));
+
+    expect(captureCspViolationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ directive: "script-src", blockedUri: uniqueUri })
+    );
+  });
+
+  it("item C2: a MESMA violação (directive+blocked-uri) duas vezes seguidas só manda pro Sentry uma vez (rate limit por fingerprint)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const uniqueUri = `https://evil-repetido-${Date.now()}-${Math.random()}.example`;
+    const violated = { "csp-report": { "violated-directive": "style-src", "blocked-uri": uniqueUri } };
+
+    await POST(reportRequest(violated));
+    await POST(reportRequest(violated));
+
+    expect(captureCspViolationMock).toHaveBeenCalledTimes(1);
   });
 });

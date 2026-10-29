@@ -43,6 +43,48 @@ describe("lib/observability/sentry — desabilitado sem SENTRY_DSN", () => {
   });
 });
 
+describe("lib/observability/sentry — captureCspViolation (item C2)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("não chama o SDK sem SENTRY_DSN configurado", async () => {
+    vi.stubEnv("SENTRY_DSN", "");
+    const sentryCaptureMessage = vi.fn();
+    vi.doMock("@sentry/nextjs", () => ({ init: vi.fn(), captureMessage: sentryCaptureMessage }));
+
+    const { captureCspViolation } = await import("./sentry");
+    captureCspViolation({ directive: "script-src", blockedUri: "https://evil.example" });
+
+    expect(sentryCaptureMessage).not.toHaveBeenCalled();
+    vi.doUnmock("@sentry/nextjs");
+  });
+
+  it("com SENTRY_DSN: manda fingerprint por (directive, blockedUri), nível warning", async () => {
+    vi.stubEnv("SENTRY_DSN", "https://teste@sentry.example/1");
+    const sentryCaptureMessage = vi.fn();
+    vi.doMock("@sentry/nextjs", () => ({ init: vi.fn(), captureMessage: sentryCaptureMessage }));
+
+    const { captureCspViolation } = await import("./sentry");
+    captureCspViolation({
+      directive: "script-src",
+      blockedUri: "https://evil.example",
+      documentUri: "https://loja.example.com/checkout",
+    });
+
+    expect(sentryCaptureMessage).toHaveBeenCalledWith(
+      "CSP violation: script-src blocked https://evil.example",
+      {
+        level: "warning",
+        fingerprint: ["csp-violation", "script-src", "https://evil.example"],
+        extra: { directive: "script-src", blockedUri: "https://evil.example", documentUri: "https://loja.example.com/checkout" },
+      }
+    );
+    vi.doUnmock("@sentry/nextjs");
+  });
+});
+
 describe("lib/observability/sentry — beforeSend (scrubEvent) passado pro Sentry.init", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

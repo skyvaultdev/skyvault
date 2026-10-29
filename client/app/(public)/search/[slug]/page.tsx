@@ -13,19 +13,31 @@ type Product = {
     category_name?: string | null;
 };
 
+const PAGE_SIZE = 24;
+
 export default function SearchPage() {
     const params = useParams<{ slug?: string | string[] }>();
 
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
 
     const raw = params?.slug;
     const term = Array.isArray(raw) ? raw.join(" ") : raw ?? "";
+
+    // Novo termo de busca sempre volta pra página 1 — sem isso, trocar de
+    // busca enquanto numa página 3 de um termo anterior mostrava "página
+    // 3" de um resultado totalmente diferente, ou simplesmente vazio.
+    useEffect(() => {
+        setPage(1);
+    }, [term]);
 
     useEffect(() => {
         const q = term.trim();
         if (!q) {
             setProducts([]);
+            setTotal(0);
             return;
         }
 
@@ -34,12 +46,16 @@ export default function SearchPage() {
                 setLoading(true);
 
                 try {
-                    const res = await fetch(`/api/products?name=${q}`, { method: "GET" });
+                    const url = `/api/products?name=${encodeURIComponent(q)}&page=${page}&pageSize=${PAGE_SIZE}`;
+                    const res = await fetch(url, { method: "GET" });
                     const json = await res.json();
-                    const data = (json?.data ?? json?.product ?? []) as Product[];
-                    setProducts(Array.isArray(data) ? data : []);
+                    const data = json?.data;
+                    const items = (data?.items ?? []) as Product[];
+                    setProducts(Array.isArray(items) ? items : []);
+                    setTotal(Number(data?.total ?? 0));
                 } catch {
                     setProducts([]);
+                    setTotal(0);
                 } finally {
                     setLoading(false);
                 }
@@ -49,7 +65,9 @@ export default function SearchPage() {
         }, 300);
 
         return () => clearTimeout(timeout);
-    }, [term]);
+    }, [term, page]);
+
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
     return (
         <main className="searchPage">
@@ -76,6 +94,30 @@ export default function SearchPage() {
                         </div>
                     ))}
                 </div>
+
+                {!loading && total > PAGE_SIZE && (
+                    <div className="searchPagination">
+                        <button
+                            type="button"
+                            className="searchPageBtn"
+                            disabled={page <= 1}
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        >
+                            ← Anterior
+                        </button>
+                        <span className="searchPaginationInfo">
+                            Página {page} de {totalPages} · {total} produto(s)
+                        </span>
+                        <button
+                            type="button"
+                            className="searchPageBtn"
+                            disabled={page >= totalPages}
+                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        >
+                            Próxima →
+                        </button>
+                    </div>
+                )}
             </div>
         </main>
     );

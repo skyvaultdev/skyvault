@@ -29,7 +29,11 @@ describe("getPaymentProvider — nunca cai no mock escondido em produção", () 
 
     const { getPaymentProvider, PaymentNotConfiguredError } = await import("./index");
     await expect(getPaymentProvider()).rejects.toThrow(PaymentNotConfiguredError);
-  });
+    // Timeout maior que o default (5000ms) — esse teste não faz I/O
+    // nenhum, mas sob a suíte inteira rodando em paralelo (CI com menos
+    // núcleos que uma máquina de dev) já flakou por lentidão pura de CPU,
+    // não por travar de verdade. Ver investigação na mensagem do commit.
+  }, 15000);
 
   it("fora de produção, sem credenciais, cai no mock normalmente (conveniência de dev)", async () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = "test";

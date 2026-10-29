@@ -13,12 +13,35 @@ vi.mock("next/headers", () => ({
 
 const { POST } = await import("./route");
 
+// A rota recusa com STORE_LEGAL_INFO_MISSING sem esses 3 campos (ver
+// route.ts) — num banco novo (CI) eles nascem NULL, só são preenchidos
+// quando alguém configura pela dashboard. Guarda/restaura o valor
+// original em vez de depender do que já estiver no banco de quem roda
+// isto localmente.
+let originalLegalInfo: { legal_name: string | null; document: string | null; contact_email: string | null } | null = null;
+
 beforeAll(async () => {
   await initApp();
+  const db = getDB();
+  const row = await db.query(`SELECT legal_name, document, contact_email FROM store_settings ORDER BY id DESC LIMIT 1`);
+  originalLegalInfo = row.rows[0] ?? null;
+  await db.query(
+    `UPDATE store_settings SET legal_name = $1, document = $2, contact_email = $3
+     WHERE id = (SELECT id FROM store_settings ORDER BY id DESC LIMIT 1)`,
+    ["[TESTE] Loja CI", "00.000.000/0001-00", "ci-teste@example.com"]
+  );
 });
 
 afterAll(async () => {
-  await (getDB() as unknown as { end: () => Promise<void> }).end();
+  const db = getDB();
+  if (originalLegalInfo) {
+    await db.query(
+      `UPDATE store_settings SET legal_name = $1, document = $2, contact_email = $3
+       WHERE id = (SELECT id FROM store_settings ORDER BY id DESC LIMIT 1)`,
+      [originalLegalInfo.legal_name, originalLegalInfo.document, originalLegalInfo.contact_email]
+    );
+  }
+  await (db as unknown as { end: () => Promise<void> }).end();
 });
 
 afterEach(() => {

@@ -9,8 +9,11 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
+      # 17, não 16: é a versão gerenciada pela Square Cloud em produção —
+      # o CI precisa testar contra a mesma versão major que vai rodar de
+      # verdade (ver docs/deploy/squarecloud.md).
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -56,12 +59,28 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install postgresql-client-17
+        # O runner ubuntu-latest já vem com postgresql-client (16) pré-instalado.
+        # pg_dump/pg_restore/psql de uma versão MAIS VELHA que o servidor falham
+        # com "server version mismatch" — precisamos do cliente 17 (repositório
+        # oficial PGDG) pra bater com o serviço postgres:17 acima, e ele tem que
+        # vir na frente do PATH pra ser o binário realmente usado.
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
       - name: Bootstrap database schema
         run: |

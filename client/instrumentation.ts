@@ -38,6 +38,11 @@ export async function register() {
       const { captureException } = await import("@/lib/observability/sentry");
       captureException(new Error(message), { stage: "boot" });
     }
+
+    // Item e do deploy — desligado por padrão (INTERNAL_CRON_ENABLED=true
+    // pra ligar). Ver lib/cron/internalScheduler.ts.
+    const { startInternalCronScheduler } = await import("@/lib/cron/internalScheduler");
+    startInternalCronScheduler();
   }
 }
 

@@ -105,6 +105,18 @@ export const config = {
         secret: process.env.CRON_SECRET,
     },
 
+    // Chave de criptografia em repouso de chat_messages.body (ver
+    // lib/chat/messageCrypto.ts). Antes vivia em store_settings, no MESMO
+    // banco que guarda o conteúdo cifrado — um dump do banco trazia os
+    // dois juntos, anulando a proteção pretendida (ver achado da revisão
+    // de segurança). Agora é obrigatória, lida só daqui, nunca gerada/
+    // persistida pelo app — perder/trocar esse valor torna toda mensagem
+    // já gravada permanentemente ilegível, por isso NÃO tem fallback
+    // gerado por boot (ao contrário de devAuth.secret).
+    chat: {
+        encryptionKey: process.env.CHAT_ENCRYPTION_KEY,
+    },
+
     redis: {
         // Opcional — lib/security/rateLimit.ts usa isso pra compartilhar o
         // contador de rate limit entre múltiplas instâncias/réplicas do
